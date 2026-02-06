@@ -288,13 +288,13 @@ func mapDatasetResponseToState(data *DatasetResourceModel, result *datasetAPIRes
 
 	data.DataType = types.StringValue(result.DataType)
 
-	if result.InputsSchemaDefinition != nil && len(result.InputsSchemaDefinition) > 0 && string(result.InputsSchemaDefinition) != "null" {
+	if len(result.InputsSchemaDefinition) > 0 && string(result.InputsSchemaDefinition) != "null" {
 		data.InputsSchemaDefinition = types.StringValue(string(result.InputsSchemaDefinition))
 	} else {
 		data.InputsSchemaDefinition = types.StringNull()
 	}
 
-	if result.OutputsSchemaDefinition != nil && len(result.OutputsSchemaDefinition) > 0 && string(result.OutputsSchemaDefinition) != "null" {
+	if len(result.OutputsSchemaDefinition) > 0 && string(result.OutputsSchemaDefinition) != "null" {
 		data.OutputsSchemaDefinition = types.StringValue(string(result.OutputsSchemaDefinition))
 	} else {
 		data.OutputsSchemaDefinition = types.StringNull()

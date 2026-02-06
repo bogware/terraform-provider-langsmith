@@ -285,17 +285,17 @@ func mapExampleResponseToState(data *ExampleResourceModel, result *exampleAPIRes
 	data.ID = types.StringValue(result.ID)
 	data.DatasetID = types.StringValue(result.DatasetID)
 
-	if result.Inputs != nil && len(result.Inputs) > 0 && string(result.Inputs) != "null" {
+	if len(result.Inputs) > 0 && string(result.Inputs) != "null" {
 		data.Inputs = types.StringValue(string(result.Inputs))
 	}
 
-	if result.Outputs != nil && len(result.Outputs) > 0 && string(result.Outputs) != "null" {
+	if len(result.Outputs) > 0 && string(result.Outputs) != "null" {
 		data.Outputs = types.StringValue(string(result.Outputs))
 	} else {
 		data.Outputs = types.StringNull()
 	}
 
-	if result.Metadata != nil && len(result.Metadata) > 0 && string(result.Metadata) != "null" {
+	if len(result.Metadata) > 0 && string(result.Metadata) != "null" {
 		data.Metadata = types.StringValue(string(result.Metadata))
 	} else {
 		data.Metadata = types.StringNull()

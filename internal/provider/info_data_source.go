@@ -111,7 +111,7 @@ func (d *InfoDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		data.LicenseExpirationTime = types.StringNull()
 	}
 
-	if result.BatchIngestConfig != nil && len(result.BatchIngestConfig) > 0 && string(result.BatchIngestConfig) != "null" {
+	if len(result.BatchIngestConfig) > 0 && string(result.BatchIngestConfig) != "null" {
 		data.BatchIngestConfig = types.StringValue(string(result.BatchIngestConfig))
 	} else {
 		data.BatchIngestConfig = types.StringNull()

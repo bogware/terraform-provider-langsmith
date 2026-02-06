@@ -277,7 +277,7 @@ func mapProjectResponseToState(data *ProjectResourceModel, result *projectAPIRes
 		data.ReferenceDatasetID = types.StringNull()
 	}
 
-	if result.Extra != nil && len(result.Extra) > 0 && string(result.Extra) != "null" {
+	if len(result.Extra) > 0 && string(result.Extra) != "null" {
 		data.Extra = types.StringValue(string(result.Extra))
 	} else {
 		data.Extra = types.StringNull()
