@@ -299,12 +299,18 @@ func mapBulkExportDestinationResponseToState(data *BulkExportDestinationResource
 
 	if result.Config.Prefix != "" {
 		data.Prefix = types.StringValue(result.Config.Prefix)
+	} else {
+		data.Prefix = types.StringNull()
 	}
 	if result.Config.Region != "" {
 		data.Region = types.StringValue(result.Config.Region)
+	} else {
+		data.Region = types.StringNull()
 	}
 	if result.Config.EndpointURL != "" {
 		data.EndpointURL = types.StringValue(result.Config.EndpointURL)
+	} else {
+		data.EndpointURL = types.StringNull()
 	}
 
 	data.TenantID = types.StringValue(result.TenantID)

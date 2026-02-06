@@ -124,6 +124,7 @@ func (p *LangSmithProvider) DataSources(ctx context.Context) []func() datasource
 		NewDatasetDataSource,
 		NewWorkspaceDataSource,
 		NewInfoDataSource,
+		NewOrganizationDataSource,
 	}
 }
 

@@ -252,7 +252,7 @@ func mapTagValueResponseToState(data *TagValueResourceModel, result *tagValueAPI
 
 	if result.Description != "" {
 		data.Description = types.StringValue(result.Description)
-	} else if data.Description.IsNull() {
+	} else {
 		data.Description = types.StringNull()
 	}
 

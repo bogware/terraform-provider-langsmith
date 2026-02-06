@@ -68,6 +68,7 @@ internal/
     dataset_data_source.go               # langsmith_dataset (lookup by name or id)
     workspace_data_source.go             # langsmith_workspace (lookup by name or id)
     info_data_source.go                  # langsmith_info (server info, no inputs)
+    organization_data_source.go          # langsmith_organization (current org info)
 
 tools/tools.go                           # Code generation: copywrite headers, terraform fmt, tfplugindocs
 examples/                                # Example .tf configs (used by doc generator)
