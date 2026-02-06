@@ -91,6 +91,9 @@ func (r *PromptResource) Schema(ctx context.Context, req resource.SchemaRequest,
 			"repo_handle": schema.StringAttribute{
 				MarkdownDescription: "The name/handle of the prompt repo.",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"is_public": schema.BoolAttribute{
 				MarkdownDescription: "Whether the prompt is publicly accessible.",

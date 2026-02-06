@@ -255,8 +255,10 @@ func mapPlaygroundSettingsResponseToState(data *PlaygroundSettingsResourceModel,
 		data.Description = types.StringNull()
 	}
 
-	if result.Settings != nil && len(result.Settings) > 0 && string(result.Settings) != "null" {
+	if len(result.Settings) > 0 && string(result.Settings) != "null" {
 		data.Settings = types.StringValue(string(result.Settings))
+	} else {
+		data.Settings = types.StringNull()
 	}
 
 	data.CreatedAt = types.StringValue(result.CreatedAt)

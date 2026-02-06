@@ -104,28 +104,46 @@ func (r *BulkExportDestinationResource) Schema(ctx context.Context, req resource
 			"display_name": schema.StringAttribute{
 				MarkdownDescription: "The display name of the bulk export destination.",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"destination_type": schema.StringAttribute{
 				MarkdownDescription: "The type of the destination. Defaults to `s3`.",
 				Optional:            true,
 				Computed:            true,
 				Default:             stringdefault.StaticString("s3"),
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"bucket_name": schema.StringAttribute{
 				MarkdownDescription: "The S3 bucket name.",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"prefix": schema.StringAttribute{
 				MarkdownDescription: "The S3 key prefix.",
 				Optional:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"region": schema.StringAttribute{
 				MarkdownDescription: "The AWS region of the S3 bucket.",
 				Optional:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"endpoint_url": schema.StringAttribute{
 				MarkdownDescription: "The S3-compatible endpoint URL.",
 				Optional:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"access_key_id": schema.StringAttribute{
 				MarkdownDescription: "The AWS access key ID for the destination.",

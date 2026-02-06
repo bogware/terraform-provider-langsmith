@@ -302,6 +302,8 @@ func mapDatasetResponseToState(data *DatasetResourceModel, result *datasetAPIRes
 
 	if result.ExternallyManaged != nil {
 		data.ExternallyManaged = types.BoolValue(*result.ExternallyManaged)
+	} else {
+		data.ExternallyManaged = types.BoolNull()
 	}
 
 	data.TenantID = types.StringValue(result.TenantID)

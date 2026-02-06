@@ -117,13 +117,16 @@ func (d *WorkspaceDataSource) Read(ctx context.Context, req datasource.ReadReque
 
 	var found *workspaceDataSourceAPIResponse
 	for i := range results {
-		if idSet && results[i].ID == data.ID.ValueString() {
-			found = &results[i]
-			break
-		}
-		if nameSet && results[i].DisplayName == data.DisplayName.ValueString() {
-			found = &results[i]
-			break
+		if idSet {
+			if results[i].ID == data.ID.ValueString() {
+				found = &results[i]
+				break
+			}
+		} else if nameSet {
+			if results[i].DisplayName == data.DisplayName.ValueString() {
+				found = &results[i]
+				break
+			}
 		}
 	}
 

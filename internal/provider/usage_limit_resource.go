@@ -77,6 +77,9 @@ func (r *UsageLimitResource) Schema(ctx context.Context, req resource.SchemaRequ
 			"limit_type": schema.StringAttribute{
 				MarkdownDescription: "The type of usage limit.",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"limit_value": schema.Int64Attribute{
 				MarkdownDescription: "The limit value.",

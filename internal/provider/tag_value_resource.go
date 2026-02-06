@@ -83,6 +83,9 @@ func (r *TagValueResource) Schema(ctx context.Context, req resource.SchemaReques
 			"tag_key_id": schema.StringAttribute{
 				MarkdownDescription: "The UUID of the parent tag key.",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"value": schema.StringAttribute{
 				MarkdownDescription: "The tag value.",

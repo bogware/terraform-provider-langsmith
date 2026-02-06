@@ -85,6 +85,7 @@ func (r *WorkspaceResource) Schema(ctx context.Context, req resource.SchemaReque
 				Computed:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"created_at": schema.StringAttribute{

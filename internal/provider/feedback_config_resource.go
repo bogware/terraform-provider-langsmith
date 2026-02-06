@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -96,6 +97,8 @@ func (r *FeedbackConfigResource) Schema(ctx context.Context, req resource.Schema
 			"is_lower_score_better": schema.BoolAttribute{
 				MarkdownDescription: "Whether a lower score is better.",
 				Optional:            true,
+				Computed:            true,
+				Default:             booldefault.StaticBool(false),
 			},
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "The tenant ID.",
@@ -166,7 +169,15 @@ func (r *FeedbackConfigResource) Create(ctx context.Context, req resource.Create
 	data.ID = types.StringValue(data.FeedbackKey.ValueString())
 
 	// Read back to get computed fields
-	r.readFeedbackConfig(ctx, &data, &resp.Diagnostics)
+	found := r.readFeedbackConfig(ctx, &data, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if !found {
+		resp.Diagnostics.AddError("Feedback config not found after creation",
+			fmt.Sprintf("Created feedback config with key %q but could not read it back.", data.FeedbackKey.ValueString()))
+		return
+	}
 
 	tflog.Trace(ctx, "created feedback config resource", map[string]interface{}{"key": data.FeedbackKey.ValueString()})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -179,20 +190,24 @@ func (r *FeedbackConfigResource) Read(ctx context.Context, req resource.ReadRequ
 		return
 	}
 
-	r.readFeedbackConfig(ctx, &data, &resp.Diagnostics)
+	found := r.readFeedbackConfig(ctx, &data, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+	if !found {
+		resp.State.RemoveResource(ctx)
 		return
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *FeedbackConfigResource) readFeedbackConfig(ctx context.Context, data *FeedbackConfigResourceModel, diags *diag.Diagnostics) {
+func (r *FeedbackConfigResource) readFeedbackConfig(ctx context.Context, data *FeedbackConfigResourceModel, diags *diag.Diagnostics) bool {
 	var configs []feedbackConfigAPIResponse
 	err := r.client.Get(ctx, "/api/v1/feedback-configs", nil, &configs)
 	if err != nil {
 		diags.AddError("Error reading feedback configs", err.Error())
-		return
+		return false
 	}
 
 	feedbackKey := data.FeedbackKey.ValueString()
@@ -208,9 +223,7 @@ func (r *FeedbackConfigResource) readFeedbackConfig(ctx context.Context, data *F
 		}
 	}
 	if found == nil {
-		diags.AddError("Feedback config not found",
-			fmt.Sprintf("No feedback config found with key: %s", feedbackKey))
-		return
+		return false
 	}
 
 	data.ID = types.StringValue(found.FeedbackKey)
@@ -234,12 +247,15 @@ func (r *FeedbackConfigResource) readFeedbackConfig(ctx context.Context, data *F
 	}
 	if cats, ok := found.FeedbackConfig["categories"]; ok {
 		catsJSON, err := json.Marshal(cats)
-		if err == nil {
-			data.Categories = types.StringValue(string(catsJSON))
+		if err != nil {
+			diags.AddError("Error serializing categories", err.Error())
+			return false
 		}
+		data.Categories = types.StringValue(string(catsJSON))
 	} else {
 		data.Categories = types.StringNull()
 	}
+	return true
 }
 
 func (r *FeedbackConfigResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -264,7 +280,15 @@ func (r *FeedbackConfigResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	r.readFeedbackConfig(ctx, &data, &resp.Diagnostics)
+	found := r.readFeedbackConfig(ctx, &data, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if !found {
+		resp.Diagnostics.AddError("Feedback config not found after update",
+			fmt.Sprintf("Updated feedback config with key %q but could not read it back.", data.FeedbackKey.ValueString()))
+		return
+	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

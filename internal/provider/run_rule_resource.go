@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -136,10 +137,14 @@ func (r *RunRuleResource) Schema(ctx context.Context, req resource.SchemaRequest
 			"add_to_dataset_prefer_correction": schema.BoolAttribute{
 				MarkdownDescription: "Whether to prefer correction when adding to dataset.",
 				Optional:            true,
+				Computed:            true,
+				Default:             booldefault.StaticBool(false),
 			},
 			"num_few_shot_examples": schema.Int64Attribute{
 				MarkdownDescription: "Number of few-shot examples.",
 				Optional:            true,
+				Computed:            true,
+				Default:             int64default.StaticInt64(0),
 			},
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "The tenant ID.",

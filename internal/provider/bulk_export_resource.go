@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -149,6 +150,9 @@ func (r *BulkExportResource) Schema(ctx context.Context, req resource.SchemaRequ
 			"interval_hours": schema.Int64Attribute{
 				MarkdownDescription: "The interval in hours for recurring exports.",
 				Optional:            true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.RequiresReplace(),
+				},
 			},
 			"filter": schema.StringAttribute{
 				MarkdownDescription: "A filter expression for the export.",

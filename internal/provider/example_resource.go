@@ -303,6 +303,8 @@ func mapExampleResponseToState(data *ExampleResourceModel, result *exampleAPIRes
 
 	if result.Split != nil {
 		data.Split = types.StringValue(*result.Split)
+	} else {
+		data.Split = types.StringNull()
 	}
 
 	if result.SourceRunID != nil {
