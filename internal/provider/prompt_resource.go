@@ -225,14 +225,20 @@ func (r *PromptResource) Read(ctx context.Context, req resource.ReadRequest, res
 
 	if result.Repo.Description != "" {
 		data.Description = types.StringValue(result.Repo.Description)
+	} else {
+		data.Description = types.StringNull()
 	}
 	if result.Repo.Readme != "" {
 		data.Readme = types.StringValue(result.Repo.Readme)
+	} else {
+		data.Readme = types.StringNull()
 	}
 	if len(result.Repo.Tags) > 0 {
 		tags, diags := types.ListValueFrom(ctx, types.StringType, result.Repo.Tags)
 		resp.Diagnostics.Append(diags...)
 		data.Tags = tags
+	} else {
+		data.Tags = types.ListNull(types.StringType)
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

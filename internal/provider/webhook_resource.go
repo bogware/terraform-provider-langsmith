@@ -33,15 +33,15 @@ type WebhookResource struct {
 }
 
 type WebhookResourceModel struct {
-	ID              types.String `tfsdk:"id"`
-	URL             types.String `tfsdk:"url"`
-	Headers         types.Map    `tfsdk:"headers"`
-	Triggers        types.List   `tfsdk:"triggers"`
-	IncludePrompts  types.List   `tfsdk:"include_prompts"`
-	ExcludePrompts  types.List   `tfsdk:"exclude_prompts"`
-	TenantID        types.String `tfsdk:"tenant_id"`
-	CreatedAt       types.String `tfsdk:"created_at"`
-	UpdatedAt       types.String `tfsdk:"updated_at"`
+	ID             types.String `tfsdk:"id"`
+	URL            types.String `tfsdk:"url"`
+	Headers        types.Map    `tfsdk:"headers"`
+	Triggers       types.List   `tfsdk:"triggers"`
+	IncludePrompts types.List   `tfsdk:"include_prompts"`
+	ExcludePrompts types.List   `tfsdk:"exclude_prompts"`
+	TenantID       types.String `tfsdk:"tenant_id"`
+	CreatedAt      types.String `tfsdk:"created_at"`
+	UpdatedAt      types.String `tfsdk:"updated_at"`
 }
 
 type webhookCreateRequest struct {
@@ -290,20 +290,28 @@ func (r *WebhookResource) mapResponseToModel(ctx context.Context, result *webhoo
 		headers, diags := types.MapValueFrom(ctx, types.StringType, result.Headers)
 		diagnostics.Append(diags...)
 		data.Headers = headers
+	} else {
+		data.Headers = types.MapNull(types.StringType)
 	}
 	if len(result.Triggers) > 0 {
 		triggers, diags := types.ListValueFrom(ctx, types.StringType, result.Triggers)
 		diagnostics.Append(diags...)
 		data.Triggers = triggers
+	} else {
+		data.Triggers = types.ListNull(types.StringType)
 	}
 	if len(result.IncludePrompts) > 0 {
 		prompts, diags := types.ListValueFrom(ctx, types.StringType, result.IncludePrompts)
 		diagnostics.Append(diags...)
 		data.IncludePrompts = prompts
+	} else {
+		data.IncludePrompts = types.ListNull(types.StringType)
 	}
 	if len(result.ExcludePrompts) > 0 {
 		prompts, diags := types.ListValueFrom(ctx, types.StringType, result.ExcludePrompts)
 		diagnostics.Append(diags...)
 		data.ExcludePrompts = prompts
+	} else {
+		data.ExcludePrompts = types.ListNull(types.StringType)
 	}
 }

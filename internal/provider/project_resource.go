@@ -48,11 +48,11 @@ type ProjectResourceModel struct {
 
 // projectAPIRequest is the request body for creating/updating a project.
 type projectAPIRequest struct {
-	Name               string           `json:"name"`
-	Description        *string          `json:"description,omitempty"`
-	DefaultDatasetID   *string          `json:"default_dataset_id,omitempty"`
-	ReferenceDatasetID *string          `json:"reference_dataset_id,omitempty"`
-	Extra              json.RawMessage  `json:"extra,omitempty"`
+	Name               string          `json:"name"`
+	Description        *string         `json:"description,omitempty"`
+	DefaultDatasetID   *string         `json:"default_dataset_id,omitempty"`
+	ReferenceDatasetID *string         `json:"reference_dataset_id,omitempty"`
+	Extra              json.RawMessage `json:"extra,omitempty"`
 }
 
 // projectAPIResponse is the API response for a project.

@@ -36,19 +36,19 @@ type BulkExportResource struct {
 
 // BulkExportResourceModel describes the resource data model.
 type BulkExportResourceModel struct {
-	ID                       types.String `tfsdk:"id"`
-	BulkExportDestinationID  types.String `tfsdk:"bulk_export_destination_id"`
-	SessionID                types.String `tfsdk:"session_id"`
-	StartTime                types.String `tfsdk:"start_time"`
-	EndTime                  types.String `tfsdk:"end_time"`
-	Format                   types.String `tfsdk:"format"`
-	Compression              types.String `tfsdk:"compression"`
-	IntervalHours            types.Int64  `tfsdk:"interval_hours"`
-	Filter                   types.String `tfsdk:"filter"`
-	Status                   types.String `tfsdk:"status"`
-	TenantID                 types.String `tfsdk:"tenant_id"`
-	CreatedAt                types.String `tfsdk:"created_at"`
-	UpdatedAt                types.String `tfsdk:"updated_at"`
+	ID                      types.String `tfsdk:"id"`
+	BulkExportDestinationID types.String `tfsdk:"bulk_export_destination_id"`
+	SessionID               types.String `tfsdk:"session_id"`
+	StartTime               types.String `tfsdk:"start_time"`
+	EndTime                 types.String `tfsdk:"end_time"`
+	Format                  types.String `tfsdk:"format"`
+	Compression             types.String `tfsdk:"compression"`
+	IntervalHours           types.Int64  `tfsdk:"interval_hours"`
+	Filter                  types.String `tfsdk:"filter"`
+	Status                  types.String `tfsdk:"status"`
+	TenantID                types.String `tfsdk:"tenant_id"`
+	CreatedAt               types.String `tfsdk:"created_at"`
+	UpdatedAt               types.String `tfsdk:"updated_at"`
 }
 
 // bulkExportAPICreateRequest is the request body for creating a bulk export.
@@ -70,19 +70,19 @@ type bulkExportAPIUpdateRequest struct {
 
 // bulkExportAPIResponse is the API response for a bulk export.
 type bulkExportAPIResponse struct {
-	ID                       string  `json:"id"`
-	BulkExportDestinationID  string  `json:"bulk_export_destination_id"`
-	SessionID                string  `json:"session_id"`
-	StartTime                string  `json:"start_time"`
-	EndTime                  *string `json:"end_time"`
-	Format                   string  `json:"format"`
-	Compression              string  `json:"compression"`
-	IntervalHours            *int64  `json:"interval_hours"`
-	Filter                   *string `json:"filter"`
-	Status                   string  `json:"status"`
-	TenantID                 string  `json:"tenant_id"`
-	CreatedAt                string  `json:"created_at"`
-	UpdatedAt                string  `json:"updated_at"`
+	ID                      string  `json:"id"`
+	BulkExportDestinationID string  `json:"bulk_export_destination_id"`
+	SessionID               string  `json:"session_id"`
+	StartTime               string  `json:"start_time"`
+	EndTime                 *string `json:"end_time"`
+	Format                  string  `json:"format"`
+	Compression             string  `json:"compression"`
+	IntervalHours           *int64  `json:"interval_hours"`
+	Filter                  *string `json:"filter"`
+	Status                  string  `json:"status"`
+	TenantID                string  `json:"tenant_id"`
+	CreatedAt               string  `json:"created_at"`
+	UpdatedAt               string  `json:"updated_at"`
 }
 
 func (r *BulkExportResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -103,30 +103,48 @@ func (r *BulkExportResource) Schema(ctx context.Context, req resource.SchemaRequ
 			"bulk_export_destination_id": schema.StringAttribute{
 				MarkdownDescription: "The UUID of the bulk export destination.",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"session_id": schema.StringAttribute{
 				MarkdownDescription: "The UUID of the project/session to export.",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"start_time": schema.StringAttribute{
 				MarkdownDescription: "The start time for the export in RFC3339 format.",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"end_time": schema.StringAttribute{
 				MarkdownDescription: "The end time for the export in RFC3339 format.",
 				Optional:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"format": schema.StringAttribute{
 				MarkdownDescription: "The export format. Defaults to `Parquet`.",
 				Optional:            true,
 				Computed:            true,
 				Default:             stringdefault.StaticString("Parquet"),
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"compression": schema.StringAttribute{
 				MarkdownDescription: "The compression type. Defaults to `gzip`.",
 				Optional:            true,
 				Computed:            true,
 				Default:             stringdefault.StaticString("gzip"),
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"interval_hours": schema.Int64Attribute{
 				MarkdownDescription: "The interval in hours for recurring exports.",
@@ -135,6 +153,9 @@ func (r *BulkExportResource) Schema(ctx context.Context, req resource.SchemaRequ
 			"filter": schema.StringAttribute{
 				MarkdownDescription: "A filter expression for the export.",
 				Optional:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"status": schema.StringAttribute{
 				MarkdownDescription: "The status of the bulk export.",

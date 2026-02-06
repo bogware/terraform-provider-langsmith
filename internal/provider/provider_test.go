@@ -4,6 +4,7 @@
 package provider
 
 import (
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
@@ -15,5 +16,7 @@ var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServe
 }
 
 func testAccPreCheck(t *testing.T) {
-	// Verify LANGSMITH_API_KEY is set for acceptance tests
+	if v := os.Getenv("LANGSMITH_API_KEY"); v == "" {
+		t.Fatal("LANGSMITH_API_KEY must be set for acceptance tests")
+	}
 }

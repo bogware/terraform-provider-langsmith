@@ -25,8 +25,9 @@ type LangSmithProvider struct {
 
 // LangSmithProviderModel describes the provider data model.
 type LangSmithProviderModel struct {
-	APIKey types.String `tfsdk:"api_key"`
-	APIURL types.String `tfsdk:"api_url"`
+	APIKey   types.String `tfsdk:"api_key"`
+	APIURL   types.String `tfsdk:"api_url"`
+	TenantID types.String `tfsdk:"tenant_id"`
 }
 
 func (p *LangSmithProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -45,6 +46,10 @@ func (p *LangSmithProvider) Schema(ctx context.Context, req provider.SchemaReque
 			},
 			"api_url": schema.StringAttribute{
 				MarkdownDescription: "The LangSmith API base URL. Defaults to `https://api.smith.langchain.com`. Can also be set with the `LANGSMITH_API_URL` environment variable.",
+				Optional:            true,
+			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "The LangSmith workspace/tenant ID. Required for org-scoped API keys. Can also be set with the `LANGSMITH_TENANT_ID` environment variable.",
 				Optional:            true,
 			},
 		},
@@ -80,7 +85,12 @@ func (p *LangSmithProvider) Configure(ctx context.Context, req provider.Configur
 		apiURL = data.APIURL.ValueString()
 	}
 
-	c := client.NewClient(apiURL, apiKey)
+	tenantID := os.Getenv("LANGSMITH_TENANT_ID")
+	if !data.TenantID.IsNull() {
+		tenantID = data.TenantID.ValueString()
+	}
+
+	c := client.NewClient(apiURL, apiKey, tenantID)
 	resp.DataSourceData = c
 	resp.ResourceData = c
 }

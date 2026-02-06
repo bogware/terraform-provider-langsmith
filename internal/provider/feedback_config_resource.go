@@ -224,15 +224,21 @@ func (r *FeedbackConfigResource) readFeedbackConfig(ctx context.Context, data *F
 	}
 	if v, ok := found.FeedbackConfig["min"].(float64); ok {
 		data.Min = types.Float64Value(v)
+	} else {
+		data.Min = types.Float64Null()
 	}
 	if v, ok := found.FeedbackConfig["max"].(float64); ok {
 		data.Max = types.Float64Value(v)
+	} else {
+		data.Max = types.Float64Null()
 	}
 	if cats, ok := found.FeedbackConfig["categories"]; ok {
 		catsJSON, err := json.Marshal(cats)
 		if err == nil {
 			data.Categories = types.StringValue(string(catsJSON))
 		}
+	} else {
+		data.Categories = types.StringNull()
 	}
 }
 

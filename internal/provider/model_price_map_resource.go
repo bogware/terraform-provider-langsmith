@@ -41,7 +41,7 @@ type ModelPriceMapResourceModel struct {
 	MatchPattern   types.String  `tfsdk:"match_pattern"`
 	PromptCost     types.Float64 `tfsdk:"prompt_cost"`
 	CompletionCost types.Float64 `tfsdk:"completion_cost"`
-	Provider       types.String  `tfsdk:"provider"`
+	Provider       types.String  `tfsdk:"model_provider"`
 	StartTime      types.String  `tfsdk:"start_time"`
 	MatchPath      types.List    `tfsdk:"match_path"`
 }
@@ -100,8 +100,8 @@ func (r *ModelPriceMapResource) Schema(ctx context.Context, req resource.SchemaR
 				MarkdownDescription: "The cost per completion token.",
 				Required:            true,
 			},
-			"provider": schema.StringAttribute{
-				MarkdownDescription: "The model provider name.",
+			"model_provider": schema.StringAttribute{
+				MarkdownDescription: "The model provider name (e.g., `openai`, `anthropic`).",
 				Optional:            true,
 			},
 			"start_time": schema.StringAttribute{

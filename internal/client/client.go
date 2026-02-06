@@ -18,14 +18,16 @@ import (
 type Client struct {
 	BaseURL    string
 	APIKey     string
+	TenantID   string
 	HTTPClient *http.Client
 }
 
 // NewClient creates a new LangSmith API client.
-func NewClient(baseURL, apiKey string) *Client {
+func NewClient(baseURL, apiKey, tenantID string) *Client {
 	return &Client{
-		BaseURL: baseURL,
-		APIKey:  apiKey,
+		BaseURL:  baseURL,
+		APIKey:   apiKey,
+		TenantID: tenantID,
 		HTTPClient: &http.Client{
 			Timeout: 120 * time.Second,
 		},
@@ -53,6 +55,9 @@ func (c *Client) doRequest(ctx context.Context, method, path string, query url.V
 	}
 
 	req.Header.Set("X-API-Key", c.APIKey)
+	if c.TenantID != "" {
+		req.Header.Set("X-Tenant-Id", c.TenantID)
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 

@@ -33,21 +33,21 @@ type RunRuleResource struct {
 }
 
 type RunRuleResourceModel struct {
-	ID                          types.String  `tfsdk:"id"`
-	DisplayName                 types.String  `tfsdk:"display_name"`
-	SamplingRate                types.Float64 `tfsdk:"sampling_rate"`
-	SessionID                   types.String  `tfsdk:"session_id"`
-	IsEnabled                   types.Bool    `tfsdk:"is_enabled"`
-	Filter                      types.String  `tfsdk:"filter"`
-	TraceFilter                 types.String  `tfsdk:"trace_filter"`
-	TreeFilter                  types.String  `tfsdk:"tree_filter"`
-	AddToAnnotationQueueID      types.String  `tfsdk:"add_to_annotation_queue_id"`
-	AddToDatasetID              types.String  `tfsdk:"add_to_dataset_id"`
-	AddToDatasetPreferCorrection types.Bool   `tfsdk:"add_to_dataset_prefer_correction"`
-	NumFewShotExamples          types.Int64   `tfsdk:"num_few_shot_examples"`
-	TenantID                    types.String  `tfsdk:"tenant_id"`
-	CreatedAt                   types.String  `tfsdk:"created_at"`
-	UpdatedAt                   types.String  `tfsdk:"updated_at"`
+	ID                           types.String  `tfsdk:"id"`
+	DisplayName                  types.String  `tfsdk:"display_name"`
+	SamplingRate                 types.Float64 `tfsdk:"sampling_rate"`
+	SessionID                    types.String  `tfsdk:"session_id"`
+	IsEnabled                    types.Bool    `tfsdk:"is_enabled"`
+	Filter                       types.String  `tfsdk:"filter"`
+	TraceFilter                  types.String  `tfsdk:"trace_filter"`
+	TreeFilter                   types.String  `tfsdk:"tree_filter"`
+	AddToAnnotationQueueID       types.String  `tfsdk:"add_to_annotation_queue_id"`
+	AddToDatasetID               types.String  `tfsdk:"add_to_dataset_id"`
+	AddToDatasetPreferCorrection types.Bool    `tfsdk:"add_to_dataset_prefer_correction"`
+	NumFewShotExamples           types.Int64   `tfsdk:"num_few_shot_examples"`
+	TenantID                     types.String  `tfsdk:"tenant_id"`
+	CreatedAt                    types.String  `tfsdk:"created_at"`
+	UpdatedAt                    types.String  `tfsdk:"updated_at"`
 }
 
 type runRuleCreateRequest struct {
@@ -65,21 +65,21 @@ type runRuleCreateRequest struct {
 }
 
 type runRuleAPIResponse struct {
-	ID                          string  `json:"id"`
-	DisplayName                 string  `json:"display_name"`
-	SamplingRate                float64 `json:"sampling_rate"`
-	SessionID                   string  `json:"session_id"`
-	IsEnabled                   bool    `json:"is_enabled"`
-	Filter                      string  `json:"filter"`
-	TraceFilter                 string  `json:"trace_filter"`
-	TreeFilter                  string  `json:"tree_filter"`
-	AddToAnnotationQueueID      string  `json:"add_to_annotation_queue_id"`
-	AddToDatasetID              string  `json:"add_to_dataset_id"`
-	AddToDatasetPreferCorrection bool   `json:"add_to_dataset_prefer_correction"`
-	NumFewShotExamples          int64   `json:"num_few_shot_examples"`
-	TenantID                    string  `json:"tenant_id"`
-	CreatedAt                   string  `json:"created_at"`
-	UpdatedAt                   string  `json:"updated_at"`
+	ID                           string  `json:"id"`
+	DisplayName                  string  `json:"display_name"`
+	SamplingRate                 float64 `json:"sampling_rate"`
+	SessionID                    string  `json:"session_id"`
+	IsEnabled                    bool    `json:"is_enabled"`
+	Filter                       string  `json:"filter"`
+	TraceFilter                  string  `json:"trace_filter"`
+	TreeFilter                   string  `json:"tree_filter"`
+	AddToAnnotationQueueID       string  `json:"add_to_annotation_queue_id"`
+	AddToDatasetID               string  `json:"add_to_dataset_id"`
+	AddToDatasetPreferCorrection bool    `json:"add_to_dataset_prefer_correction"`
+	NumFewShotExamples           int64   `json:"num_few_shot_examples"`
+	TenantID                     string  `json:"tenant_id"`
+	CreatedAt                    string  `json:"created_at"`
+	UpdatedAt                    string  `json:"updated_at"`
 }
 
 func (r *RunRuleResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -326,20 +326,34 @@ func (r *RunRuleResource) mapResponseToModel(result *runRuleAPIResponse, data *R
 
 	if result.SessionID != "" {
 		data.SessionID = types.StringValue(result.SessionID)
+	} else {
+		data.SessionID = types.StringNull()
 	}
 	if result.Filter != "" {
 		data.Filter = types.StringValue(result.Filter)
+	} else {
+		data.Filter = types.StringNull()
 	}
 	if result.TraceFilter != "" {
 		data.TraceFilter = types.StringValue(result.TraceFilter)
+	} else {
+		data.TraceFilter = types.StringNull()
 	}
 	if result.TreeFilter != "" {
 		data.TreeFilter = types.StringValue(result.TreeFilter)
+	} else {
+		data.TreeFilter = types.StringNull()
 	}
 	if result.AddToAnnotationQueueID != "" {
 		data.AddToAnnotationQueueID = types.StringValue(result.AddToAnnotationQueueID)
+	} else {
+		data.AddToAnnotationQueueID = types.StringNull()
 	}
 	if result.AddToDatasetID != "" {
 		data.AddToDatasetID = types.StringValue(result.AddToDatasetID)
+	} else {
+		data.AddToDatasetID = types.StringNull()
 	}
+	data.AddToDatasetPreferCorrection = types.BoolValue(result.AddToDatasetPreferCorrection)
+	data.NumFewShotExamples = types.Int64Value(result.NumFewShotExamples)
 }

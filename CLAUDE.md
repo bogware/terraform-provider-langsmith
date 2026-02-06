@@ -80,6 +80,8 @@ The provider authenticates via `x-api-key` header. Configuration:
 - Provider attribute: `api_key` (sensitive)
 - Environment variable: `LANGSMITH_API_KEY`
 - API URL defaults to `https://api.smith.langchain.com`, override with `api_url` attribute or `LANGSMITH_API_URL` env var
+- Tenant ID (required for org-scoped API keys): `tenant_id` attribute or `LANGSMITH_TENANT_ID` env var
+- The client sends `X-Tenant-Id` header when tenant_id is configured
 
 ## Code Conventions
 

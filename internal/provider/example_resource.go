@@ -99,6 +99,9 @@ func (r *ExampleResource) Schema(ctx context.Context, req resource.SchemaRequest
 			"dataset_id": schema.StringAttribute{
 				MarkdownDescription: "The UUID of the dataset this example belongs to.",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"inputs": schema.StringAttribute{
 				MarkdownDescription: "JSON string containing the input data for the example.",

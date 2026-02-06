@@ -6,6 +6,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/url"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -37,17 +38,17 @@ type AnnotationQueueResource struct {
 
 // AnnotationQueueResourceModel describes the resource data model.
 type AnnotationQueueResourceModel struct {
-	ID                   types.String `tfsdk:"id"`
-	Name                 types.String `tfsdk:"name"`
-	Description          types.String `tfsdk:"description"`
-	EnableReservations   types.Bool   `tfsdk:"enable_reservations"`
-	NumReviewersPerItem  types.Int64  `tfsdk:"num_reviewers_per_item"`
-	ReservationMinutes   types.Int64  `tfsdk:"reservation_minutes"`
-	DefaultDataset       types.String `tfsdk:"default_dataset"`
-	RubricInstructions   types.String `tfsdk:"rubric_instructions"`
-	TenantID             types.String `tfsdk:"tenant_id"`
-	CreatedAt            types.String `tfsdk:"created_at"`
-	UpdatedAt            types.String `tfsdk:"updated_at"`
+	ID                  types.String `tfsdk:"id"`
+	Name                types.String `tfsdk:"name"`
+	Description         types.String `tfsdk:"description"`
+	EnableReservations  types.Bool   `tfsdk:"enable_reservations"`
+	NumReviewersPerItem types.Int64  `tfsdk:"num_reviewers_per_item"`
+	ReservationMinutes  types.Int64  `tfsdk:"reservation_minutes"`
+	DefaultDataset      types.String `tfsdk:"default_dataset"`
+	RubricInstructions  types.String `tfsdk:"rubric_instructions"`
+	TenantID            types.String `tfsdk:"tenant_id"`
+	CreatedAt           types.String `tfsdk:"created_at"`
+	UpdatedAt           types.String `tfsdk:"updated_at"`
 }
 
 // annotationQueueAPIRequest is the request body for creating/updating an annotation queue.
@@ -266,10 +267,17 @@ func (r *AnnotationQueueResource) Update(ctx context.Context, req resource.Updat
 		body.RubricInstructions = &v
 	}
 
-	var result annotationQueueAPIResponse
-	err := r.client.Patch(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), body, &result)
+	err := r.client.Patch(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), body, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating annotation queue", err.Error())
+		return
+	}
+
+	// PATCH returns a message, not the full resource - re-read to get updated state
+	var result annotationQueueAPIResponse
+	err = r.client.Get(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), nil, &result)
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading annotation queue after update", err.Error())
 		return
 	}
 
@@ -286,7 +294,9 @@ func (r *AnnotationQueueResource) Delete(ctx context.Context, req resource.Delet
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString())
+	q := url.Values{}
+	q.Set("queue_ids", data.ID.ValueString())
+	err := r.client.DeleteWithQuery(ctx, "/api/v1/annotation-queues", q)
 	if err != nil {
 		resp.Diagnostics.AddError("Error deleting annotation queue", err.Error())
 		return

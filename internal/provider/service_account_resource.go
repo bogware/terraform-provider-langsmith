@@ -35,12 +35,12 @@ type ServiceAccountResource struct {
 
 // ServiceAccountResourceModel describes the resource data model.
 type ServiceAccountResourceModel struct {
-	ID                  types.String `tfsdk:"id"`
-	Name                types.String `tfsdk:"name"`
-	OrganizationID      types.String `tfsdk:"organization_id"`
-	DefaultWorkspaceID  types.String `tfsdk:"default_workspace_id"`
-	CreatedAt           types.String `tfsdk:"created_at"`
-	UpdatedAt           types.String `tfsdk:"updated_at"`
+	ID                 types.String `tfsdk:"id"`
+	Name               types.String `tfsdk:"name"`
+	OrganizationID     types.String `tfsdk:"organization_id"`
+	DefaultWorkspaceID types.String `tfsdk:"default_workspace_id"`
+	CreatedAt          types.String `tfsdk:"created_at"`
+	UpdatedAt          types.String `tfsdk:"updated_at"`
 }
 
 // serviceAccountAPICreateRequest is the request body for creating a service account.

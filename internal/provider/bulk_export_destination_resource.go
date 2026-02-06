@@ -36,26 +36,26 @@ type BulkExportDestinationResource struct {
 
 // BulkExportDestinationResourceModel describes the resource data model.
 type BulkExportDestinationResourceModel struct {
-	ID               types.String `tfsdk:"id"`
-	DisplayName      types.String `tfsdk:"display_name"`
-	DestinationType  types.String `tfsdk:"destination_type"`
-	BucketName       types.String `tfsdk:"bucket_name"`
-	Prefix           types.String `tfsdk:"prefix"`
-	Region           types.String `tfsdk:"region"`
-	EndpointURL      types.String `tfsdk:"endpoint_url"`
-	AccessKeyID      types.String `tfsdk:"access_key_id"`
-	SecretAccessKey   types.String `tfsdk:"secret_access_key"`
-	TenantID         types.String `tfsdk:"tenant_id"`
-	CreatedAt        types.String `tfsdk:"created_at"`
-	UpdatedAt        types.String `tfsdk:"updated_at"`
+	ID              types.String `tfsdk:"id"`
+	DisplayName     types.String `tfsdk:"display_name"`
+	DestinationType types.String `tfsdk:"destination_type"`
+	BucketName      types.String `tfsdk:"bucket_name"`
+	Prefix          types.String `tfsdk:"prefix"`
+	Region          types.String `tfsdk:"region"`
+	EndpointURL     types.String `tfsdk:"endpoint_url"`
+	AccessKeyID     types.String `tfsdk:"access_key_id"`
+	SecretAccessKey types.String `tfsdk:"secret_access_key"`
+	TenantID        types.String `tfsdk:"tenant_id"`
+	CreatedAt       types.String `tfsdk:"created_at"`
+	UpdatedAt       types.String `tfsdk:"updated_at"`
 }
 
 // bulkExportDestinationAPICreateRequest is the request body for creating a bulk export destination.
 type bulkExportDestinationAPICreateRequest struct {
-	DisplayName     string                                  `json:"display_name"`
-	DestinationType string                                  `json:"destination_type"`
-	Config          bulkExportDestinationConfig             `json:"config"`
-	Credentials     *bulkExportDestinationCredentials       `json:"credentials,omitempty"`
+	DisplayName     string                            `json:"display_name"`
+	DestinationType string                            `json:"destination_type"`
+	Config          bulkExportDestinationConfig       `json:"config"`
+	Credentials     *bulkExportDestinationCredentials `json:"credentials,omitempty"`
 }
 
 type bulkExportDestinationConfig struct {
