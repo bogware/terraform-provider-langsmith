@@ -24,17 +24,20 @@ var (
 	_ resource.ResourceWithImportState = &ProjectResource{}
 )
 
-// NewProjectResource returns a new ProjectResource.
+// NewProjectResource constructs a fresh ProjectResource, ready to wrangle
+// LangSmith tracer sessions.
 func NewProjectResource() resource.Resource {
 	return &ProjectResource{}
 }
 
-// ProjectResource defines the resource implementation.
+// ProjectResource manages a LangSmith project (tracer session) — the corral
+// where your traces are rounded up and accounted for.
 type ProjectResource struct {
 	client *client.Client
 }
 
-// ProjectResourceModel describes the resource data model.
+// ProjectResourceModel holds the Terraform state for a project. Every field
+// maps to a brand on the hide — change one and Terraform will know.
 type ProjectResourceModel struct {
 	ID                 types.String `tfsdk:"id"`
 	Name               types.String `tfsdk:"name"`
@@ -46,7 +49,8 @@ type ProjectResourceModel struct {
 	StartTime          types.String `tfsdk:"start_time"`
 }
 
-// projectAPIRequest is the request body for creating/updating a project.
+// projectAPIRequest is the wire format for creating or updating a project via
+// the LangSmith API.
 type projectAPIRequest struct {
 	Name               string          `json:"name"`
 	Description        *string         `json:"description,omitempty"`
@@ -55,7 +59,8 @@ type projectAPIRequest struct {
 	Extra              json.RawMessage `json:"extra,omitempty"`
 }
 
-// projectAPIResponse is the API response for a project.
+// projectAPIResponse is what the LangSmith API sends back when a project is
+// read or created — the full deed of ownership.
 type projectAPIResponse struct {
 	ID                 string          `json:"id"`
 	Name               string          `json:"name"`
@@ -254,7 +259,8 @@ func (r *ProjectResource) ImportState(ctx context.Context, req resource.ImportSt
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-// mapProjectResponseToState maps an API response to the Terraform state model.
+// mapProjectResponseToState translates the API response into Terraform state,
+// branding each field so Terraform can track it on the open range.
 func mapProjectResponseToState(data *ProjectResourceModel, result *projectAPIResponse) {
 	data.ID = types.StringValue(result.ID)
 	data.Name = types.StringValue(result.Name)

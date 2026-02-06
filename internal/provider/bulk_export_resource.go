@@ -25,17 +25,21 @@ var (
 	_ resource.ResourceWithImportState = &BulkExportResource{}
 )
 
-// NewBulkExportResource returns a new BulkExportResource.
+// NewBulkExportResource returns a new BulkExportResource, ready to drive a herd of data
+// from LangSmith out to your chosen destination.
 func NewBulkExportResource() resource.Resource {
 	return &BulkExportResource{}
 }
 
-// BulkExportResource defines the resource implementation.
+// BulkExportResource manages a LangSmith bulk export job. There is no true delete on
+// the trail -- destroying this resource cancels the export, which is the next best thing
+// to running it out of town.
 type BulkExportResource struct {
 	client *client.Client
 }
 
-// BulkExportResourceModel describes the resource data model.
+// BulkExportResourceModel describes the resource data model, covering the destination,
+// session, time range, format, and current status of the export job.
 type BulkExportResourceModel struct {
 	ID                      types.String `tfsdk:"id"`
 	BulkExportDestinationID types.String `tfsdk:"bulk_export_destination_id"`
@@ -293,7 +297,8 @@ func (r *BulkExportResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	// Cancel the bulk export instead of deleting it.
+	// No delete endpoint exists, so we cancel the export instead -- the marshal's
+	// way of telling a rowdy export to settle down and go home.
 	body := bulkExportAPIUpdateRequest{
 		Status: "Cancelled",
 	}
@@ -314,7 +319,8 @@ func (r *BulkExportResource) ImportState(ctx context.Context, req resource.Impor
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-// mapBulkExportResponseToState maps an API response to the Terraform state model.
+// mapBulkExportResponseToState transfers the API response into Terraform state,
+// carefully setting null for any optional fields the API left empty on the prairie.
 func mapBulkExportResponseToState(data *BulkExportResourceModel, result *bulkExportAPIResponse) {
 	data.ID = types.StringValue(result.ID)
 	data.BulkExportDestinationID = types.StringValue(result.BulkExportDestinationID)

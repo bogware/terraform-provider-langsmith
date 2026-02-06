@@ -26,17 +26,20 @@ var (
 	_ resource.ResourceWithImportState = &DatasetResource{}
 )
 
-// NewDatasetResource returns a new DatasetResource.
+// NewDatasetResource constructs a fresh DatasetResource for managing LangSmith
+// datasets.
 func NewDatasetResource() resource.Resource {
 	return &DatasetResource{}
 }
 
-// DatasetResource defines the resource implementation.
+// DatasetResource manages a LangSmith dataset — a well-organized stockyard for
+// your evaluation data.
 type DatasetResource struct {
 	client *client.Client
 }
 
-// DatasetResourceModel describes the resource data model.
+// DatasetResourceModel holds the Terraform state for a dataset, from its name
+// and schema down to who's managing the herd.
 type DatasetResourceModel struct {
 	ID                      types.String `tfsdk:"id"`
 	Name                    types.String `tfsdk:"name"`
@@ -49,7 +52,8 @@ type DatasetResourceModel struct {
 	CreatedAt               types.String `tfsdk:"created_at"`
 }
 
-// datasetAPIRequest is the request body for creating/updating a dataset.
+// datasetAPIRequest is the wire format for creating or updating a dataset on
+// the LangSmith API.
 type datasetAPIRequest struct {
 	Name                    string          `json:"name"`
 	Description             *string         `json:"description,omitempty"`
@@ -59,7 +63,8 @@ type datasetAPIRequest struct {
 	ExternallyManaged       *bool           `json:"externally_managed,omitempty"`
 }
 
-// datasetAPIResponse is the API response for a dataset.
+// datasetAPIResponse is what the LangSmith API sends back about a dataset —
+// the full bill of lading.
 type datasetAPIResponse struct {
 	ID                      string          `json:"id"`
 	Name                    string          `json:"name"`
@@ -275,7 +280,8 @@ func (r *DatasetResource) ImportState(ctx context.Context, req resource.ImportSt
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-// mapDatasetResponseToState maps an API response to the Terraform state model.
+// mapDatasetResponseToState translates the API response into Terraform state.
+// Mind the nulls — an absent field means nothing's there, not that it's empty.
 func mapDatasetResponseToState(data *DatasetResourceModel, result *datasetAPIResponse) {
 	data.ID = types.StringValue(result.ID)
 	data.Name = types.StringValue(result.Name)

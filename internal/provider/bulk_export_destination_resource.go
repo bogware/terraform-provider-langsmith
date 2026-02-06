@@ -24,17 +24,20 @@ var (
 	_ resource.ResourceWithImportState = &BulkExportDestinationResource{}
 )
 
-// NewBulkExportDestinationResource returns a new BulkExportDestinationResource.
+// NewBulkExportDestinationResource sets up a fresh outpost for shipping data out of Dodge.
 func NewBulkExportDestinationResource() resource.Resource {
 	return &BulkExportDestinationResource{}
 }
 
-// BulkExportDestinationResource defines the resource implementation.
+// BulkExportDestinationResource manages an S3-compatible destination where LangSmith
+// ships its bulk export cargo. Once created, the API offers no way to tear it down --
+// like a building on Front Street, it stays standing whether you want it or not.
 type BulkExportDestinationResource struct {
 	client *client.Client
 }
 
-// BulkExportDestinationResourceModel describes the resource data model.
+// BulkExportDestinationResourceModel holds the Terraform state for a bulk export destination,
+// including S3 bucket coordinates, credentials, and timestamps.
 type BulkExportDestinationResourceModel struct {
 	ID              types.String `tfsdk:"id"`
 	DisplayName     types.String `tfsdk:"display_name"`
@@ -299,8 +302,8 @@ func (r *BulkExportDestinationResource) Update(ctx context.Context, req resource
 }
 
 func (r *BulkExportDestinationResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	// The LangSmith API does not support deleting bulk export destinations.
-	// Removing from Terraform state only.
+	// The LangSmith API has no delete endpoint for destinations -- some things
+	// in this town you just can't get rid of. We tip our hat and walk away.
 	tflog.Trace(ctx, "bulk export destination delete is a no-op (API does not support deletion)")
 }
 
@@ -308,7 +311,9 @@ func (r *BulkExportDestinationResource) ImportState(ctx context.Context, req res
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-// mapBulkExportDestinationResponseToState maps an API response to the Terraform state model.
+// mapBulkExportDestinationResponseToState rounds up the API response fields and
+// brands them onto the Terraform state model. Absent optional fields get null values
+// to keep Terraform from reporting phantom drift.
 func mapBulkExportDestinationResponseToState(data *BulkExportDestinationResourceModel, result *bulkExportDestinationAPIResponse) {
 	data.ID = types.StringValue(result.ID)
 	data.DisplayName = types.StringValue(result.DisplayName)

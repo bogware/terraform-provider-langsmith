@@ -11,6 +11,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
+// TestAccDatasetDataSource_basic confirms the dataset data source can track
+// down a dataset by name — like checking the brand on a steer before you claim it.
 func TestAccDatasetDataSource_basic(t *testing.T) {
 	rName := fmt.Sprintf("tf-test-%s", acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum))
 
@@ -32,6 +34,8 @@ func TestAccDatasetDataSource_basic(t *testing.T) {
 	})
 }
 
+// testAccDatasetDataSourceConfig returns HCL that creates a dataset and then
+// looks it up — a good lawman always verifies the evidence firsthand.
 func testAccDatasetDataSourceConfig(name string) string {
 	return fmt.Sprintf(`
 resource "langsmith_dataset" "test" {

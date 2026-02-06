@@ -23,17 +23,18 @@ var (
 	_ resource.ResourceWithImportState = &TagKeyResource{}
 )
 
-// NewTagKeyResource returns a new TagKeyResource.
+// NewTagKeyResource returns a new TagKeyResource, fresh from the smithy.
 func NewTagKeyResource() resource.Resource {
 	return &TagKeyResource{}
 }
 
-// TagKeyResource defines the resource implementation.
+// TagKeyResource manages tag keys in LangSmith -- the branding irons
+// you use to mark and organize your resources.
 type TagKeyResource struct {
 	client *client.Client
 }
 
-// TagKeyResourceModel describes the resource data model.
+// TagKeyResourceModel describes the Terraform state for a tag key.
 type TagKeyResourceModel struct {
 	ID          types.String `tfsdk:"id"`
 	Key         types.String `tfsdk:"key"`
@@ -42,19 +43,19 @@ type TagKeyResourceModel struct {
 	UpdatedAt   types.String `tfsdk:"updated_at"`
 }
 
-// tagKeyCreateRequest is the request body for creating a tag key.
+// tagKeyCreateRequest is the order form for forging a new tag key.
 type tagKeyCreateRequest struct {
 	Key         string  `json:"key"`
 	Description *string `json:"description,omitempty"`
 }
 
-// tagKeyUpdateRequest is the request body for updating a tag key.
+// tagKeyUpdateRequest is the request for re-stamping an existing tag key.
 type tagKeyUpdateRequest struct {
 	Key         string  `json:"key"`
 	Description *string `json:"description,omitempty"`
 }
 
-// tagKeyAPIResponse is the API response for a tag key.
+// tagKeyAPIResponse is the API's account of a tag key and its particulars.
 type tagKeyAPIResponse struct {
 	ID          string `json:"id"`
 	Key         string `json:"key"`
@@ -216,7 +217,8 @@ func (r *TagKeyResource) ImportState(ctx context.Context, req resource.ImportSta
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-// mapTagKeyResponseToState maps an API response to the Terraform state model.
+// mapTagKeyResponseToState brands the Terraform state with values from the API response,
+// leaving description null if the API came back empty-handed.
 func mapTagKeyResponseToState(data *TagKeyResourceModel, result *tagKeyAPIResponse) {
 	data.ID = types.StringValue(result.ID)
 	data.Key = types.StringValue(result.Key)

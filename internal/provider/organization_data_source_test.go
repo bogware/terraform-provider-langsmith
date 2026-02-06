@@ -9,6 +9,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
+// TestAccOrganizationDataSource_basic verifies the organization data source
+// returns the current org's details. Knowing who owns the ranch is half the battle.
 func TestAccOrganizationDataSource_basic(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },

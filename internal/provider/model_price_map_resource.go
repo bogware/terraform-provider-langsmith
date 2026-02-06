@@ -24,17 +24,22 @@ var (
 	_ resource.ResourceWithImportState = &ModelPriceMapResource{}
 )
 
-// NewModelPriceMapResource returns a new ModelPriceMapResource.
+// NewModelPriceMapResource returns a new ModelPriceMapResource -- because even on the
+// frontier, somebody has to keep the books straight.
 func NewModelPriceMapResource() resource.Resource {
 	return &ModelPriceMapResource{}
 }
 
-// ModelPriceMapResource defines the resource implementation.
+// ModelPriceMapResource manages per-model token pricing in LangSmith, letting you
+// track what each LLM charges for prompt and completion tokens. Think of it as the
+// general store's price list for every model passing through town.
 type ModelPriceMapResource struct {
 	client *client.Client
 }
 
-// ModelPriceMapResourceModel describes the resource data model.
+// ModelPriceMapResourceModel holds the Terraform state for a model price map entry:
+// name, regex match pattern, per-token costs, provider, and optional match paths.
+// Note: "provider" is a reserved word in Terraform, so we use "model_provider" in the schema.
 type ModelPriceMapResourceModel struct {
 	ID             types.String  `tfsdk:"id"`
 	Name           types.String  `tfsdk:"name"`
@@ -278,7 +283,8 @@ func (r *ModelPriceMapResource) ImportState(ctx context.Context, req resource.Im
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-// mapModelPriceMapResponseToState maps an API response to the Terraform state model.
+// mapModelPriceMapResponseToState settles up the API response into Terraform state,
+// converting nullable fields to proper types so Terraform does not detect ghost drift.
 func mapModelPriceMapResponseToState(ctx context.Context, data *ModelPriceMapResourceModel, result *modelPriceMapAPIResponse, diagnostics *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.Name = types.StringValue(result.Name)

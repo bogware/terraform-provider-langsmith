@@ -18,17 +18,20 @@ import (
 
 var _ datasource.DataSource = &InfoDataSource{}
 
-// NewInfoDataSource returns a new InfoDataSource.
+// NewInfoDataSource returns a new InfoDataSource for checking the lay of the land --
+// server version, license status, and ingest configuration.
 func NewInfoDataSource() datasource.DataSource {
 	return &InfoDataSource{}
 }
 
-// InfoDataSource defines the data source implementation.
+// InfoDataSource retrieves LangSmith server information from the /info endpoint.
+// Takes no inputs -- just rides into town and asks what is going on.
 type InfoDataSource struct {
 	client *client.Client
 }
 
-// InfoDataSourceModel describes the data source data model.
+// InfoDataSourceModel holds the server intel: version string, license expiration,
+// and the batch ingest configuration as a raw JSON string.
 type InfoDataSourceModel struct {
 	ID                    types.String `tfsdk:"id"`
 	Version               types.String `tfsdk:"version"`

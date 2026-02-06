@@ -26,17 +26,21 @@ var (
 	_ resource.ResourceWithImportState = &ServiceKeyResource{}
 )
 
-// NewServiceKeyResource returns a new ServiceKeyResource.
+// NewServiceKeyResource constructs a fresh ServiceKeyResource. Like a one-time
+// telegraph code, the full key is only revealed at creation.
 func NewServiceKeyResource() resource.Resource {
 	return &ServiceKeyResource{}
 }
 
-// ServiceKeyResource defines the resource implementation.
+// ServiceKeyResource manages a LangSmith service key (API key) — the
+// credential that gets you through the door at the Long Branch.
 type ServiceKeyResource struct {
 	client *client.Client
 }
 
-// ServiceKeyResourceModel describes the resource data model.
+// ServiceKeyResourceModel holds the Terraform state for a service key. The
+// full key is sensitive and only surfaces once — like a whispered password at
+// the saloon door.
 type ServiceKeyResourceModel struct {
 	ID          types.String `tfsdk:"id"`
 	Description types.String `tfsdk:"description"`
@@ -46,13 +50,14 @@ type ServiceKeyResourceModel struct {
 	CreatedAt   types.String `tfsdk:"created_at"`
 }
 
-// serviceKeyAPICreateRequest is the request body for creating a service key.
+// serviceKeyAPICreateRequest is the wire format for minting a new service key.
 type serviceKeyAPICreateRequest struct {
 	Description string `json:"description"`
 	ReadOnly    bool   `json:"read_only"`
 }
 
-// serviceKeyAPICreateResponse is the API response for creating a service key.
+// serviceKeyAPICreateResponse is the one-time response that includes the full
+// API key — guard it like gold dust.
 type serviceKeyAPICreateResponse struct {
 	ID          string `json:"id"`
 	Description string `json:"description"`
@@ -62,7 +67,8 @@ type serviceKeyAPICreateResponse struct {
 	CreatedAt   string `json:"created_at"`
 }
 
-// serviceKeyAPIListItem is a single item in the service keys list response.
+// serviceKeyAPIListItem is a single service key from the list response. The
+// full key is long gone — only the short key remains as a calling card.
 type serviceKeyAPIListItem struct {
 	ID          string `json:"id"`
 	Description string `json:"description"`
@@ -71,7 +77,8 @@ type serviceKeyAPIListItem struct {
 	CreatedAt   string `json:"created_at"`
 }
 
-// serviceKeyAPIListResponse is the API response for listing service keys.
+// serviceKeyAPIListResponse is the full roster of service keys, minus their
+// secrets.
 type serviceKeyAPIListResponse []serviceKeyAPIListItem
 
 func (r *ServiceKeyResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -207,7 +214,8 @@ func (r *ServiceKeyResource) Read(ctx context.Context, req resource.ReadRequest,
 	data.ReadOnly = types.BoolValue(found.ReadOnly)
 	data.ShortKey = types.StringValue(found.ShortKey)
 	data.CreatedAt = types.StringValue(found.CreatedAt)
-	// key is not returned on read; preserve existing state value (UseStateForUnknown handles this)
+	// The full key is never returned on read — that was a one-time reveal.
+	// UseStateForUnknown keeps the original safe in state.
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

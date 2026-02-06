@@ -24,14 +24,18 @@ var (
 	_ resource.ResourceWithImportState = &WebhookResource{}
 )
 
+// NewWebhookResource returns a new WebhookResource, ready to keep watch.
 func NewWebhookResource() resource.Resource {
 	return &WebhookResource{}
 }
 
+// WebhookResource manages prompt webhooks in LangSmith --
+// the telegraph wires that notify downstream systems when prompts change.
 type WebhookResource struct {
 	client *client.Client
 }
 
+// WebhookResourceModel is the Terraform state for a prompt webhook.
 type WebhookResourceModel struct {
 	ID             types.String `tfsdk:"id"`
 	URL            types.String `tfsdk:"url"`
@@ -44,6 +48,7 @@ type WebhookResourceModel struct {
 	UpdatedAt      types.String `tfsdk:"updated_at"`
 }
 
+// webhookCreateRequest is the payload for stringing up a new webhook.
 type webhookCreateRequest struct {
 	URL            string            `json:"url"`
 	Headers        map[string]string `json:"headers,omitempty"`
@@ -52,6 +57,7 @@ type webhookCreateRequest struct {
 	ExcludePrompts []string          `json:"exclude_prompts,omitempty"`
 }
 
+// webhookAPIResponse is the API's full account of a webhook configuration.
 type webhookAPIResponse struct {
 	ID             string            `json:"id"`
 	URL            string            `json:"url"`
@@ -279,6 +285,8 @@ func (r *WebhookResource) ImportState(ctx context.Context, req resource.ImportSt
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
+// mapResponseToModel wrangles the API response into Terraform state,
+// converting empty collections to proper nulls so Terraform doesn't see phantom drift.
 func (r *WebhookResource) mapResponseToModel(ctx context.Context, result *webhookAPIResponse, data *WebhookResourceModel, diagnostics *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.URL = types.StringValue(result.URL)

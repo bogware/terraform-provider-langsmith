@@ -24,17 +24,18 @@ var (
 	_ resource.ResourceWithImportState = &TagValueResource{}
 )
 
-// NewTagValueResource returns a new TagValueResource.
+// NewTagValueResource returns a new TagValueResource, one more notch on the tag key's belt.
 func NewTagValueResource() resource.Resource {
 	return &TagValueResource{}
 }
 
-// TagValueResource defines the resource implementation.
+// TagValueResource manages tag values within a parent tag key --
+// the specific marks you can burn onto resources using a given branding iron.
 type TagValueResource struct {
 	client *client.Client
 }
 
-// TagValueResourceModel describes the resource data model.
+// TagValueResourceModel describes the Terraform state for a tag value.
 type TagValueResourceModel struct {
 	ID          types.String `tfsdk:"id"`
 	TagKeyID    types.String `tfsdk:"tag_key_id"`
@@ -44,19 +45,19 @@ type TagValueResourceModel struct {
 	UpdatedAt   types.String `tfsdk:"updated_at"`
 }
 
-// tagValueCreateRequest is the request body for creating a tag value.
+// tagValueCreateRequest is the payload for minting a new tag value.
 type tagValueCreateRequest struct {
 	Value       string  `json:"value"`
 	Description *string `json:"description,omitempty"`
 }
 
-// tagValueUpdateRequest is the request body for updating a tag value.
+// tagValueUpdateRequest is the payload for changing an existing tag value.
 type tagValueUpdateRequest struct {
 	Value       string  `json:"value"`
 	Description *string `json:"description,omitempty"`
 }
 
-// tagValueAPIResponse is the API response for a tag value.
+// tagValueAPIResponse is the API's record of a tag value.
 type tagValueAPIResponse struct {
 	ID          string `json:"id"`
 	Value       string `json:"value"`
@@ -233,7 +234,7 @@ func (r *TagValueResource) Delete(ctx context.Context, req resource.DeleteReques
 }
 
 // ImportState handles importing a tag value resource.
-// The import ID format is "tag_key_id/tag_value_id".
+// The import ID format is "tag_key_id/tag_value_id" -- two-part brand, one slash.
 func (r *TagValueResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	parts := strings.SplitN(req.ID, "/", 2)
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
@@ -248,7 +249,8 @@ func (r *TagValueResource) ImportState(ctx context.Context, req resource.ImportS
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), parts[1])...)
 }
 
-// mapTagValueResponseToState maps an API response to the Terraform state model.
+// mapTagValueResponseToState corrals API response data into the Terraform state model,
+// leaving description null when the API has nothing to say.
 func mapTagValueResponseToState(data *TagValueResourceModel, result *tagValueAPIResponse) {
 	data.ID = types.StringValue(result.ID)
 	data.Value = types.StringValue(result.Value)

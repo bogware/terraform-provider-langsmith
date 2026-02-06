@@ -18,17 +18,20 @@ import (
 
 var _ datasource.DataSource = &DatasetDataSource{}
 
-// NewDatasetDataSource returns a new DatasetDataSource.
+// NewDatasetDataSource returns a new DatasetDataSource for tracking down
+// an existing LangSmith dataset by ID or name.
 func NewDatasetDataSource() datasource.DataSource {
 	return &DatasetDataSource{}
 }
 
-// DatasetDataSource defines the data source implementation.
+// DatasetDataSource reads a LangSmith dataset by ID or name, returning its
+// metadata without altering a single record. A peaceful visit to the ranch.
 type DatasetDataSource struct {
 	client *client.Client
 }
 
-// DatasetDataSourceModel describes the data source data model.
+// DatasetDataSourceModel holds the read-only attributes for a dataset lookup:
+// name, description, data type, and the tally of examples it contains.
 type DatasetDataSourceModel struct {
 	ID           types.String `tfsdk:"id"`
 	Name         types.String `tfsdk:"name"`

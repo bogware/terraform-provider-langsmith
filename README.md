@@ -1,57 +1,58 @@
+<p align="center">
+  <img src="https://img.shields.io/github/license/bogware/terraform-provider-langsmith?style=flat-square" alt="License">
+  <img src="https://img.shields.io/github/v/release/bogware/terraform-provider-langsmith?style=flat-square" alt="Release">
+  <img src="https://img.shields.io/github/actions/workflow/status/bogware/terraform-provider-langsmith/test.yml?branch=main&style=flat-square&label=tests" alt="Tests">
+  <img src="https://img.shields.io/badge/terraform-%3E%3D1.0-blue?style=flat-square&logo=terraform" alt="Terraform">
+</p>
+
 # Terraform Provider for LangSmith
 
-The LangSmith Terraform provider allows you to manage [LangSmith](https://smith.langchain.com/) resources as infrastructure-as-code. LangSmith is an observability, evaluation, and deployment platform for LLM applications.
+Manage your [LangSmith](https://smith.langchain.com/) infrastructure as code. This provider gives you full control over projects, datasets, annotation queues, prompts, automation rules, workspaces, and more through Terraform.
 
-## Requirements
-
-- [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
-- [Go](https://golang.org/doc/install) >= 1.24 (to build the provider)
-- A [LangSmith](https://smith.langchain.com/) account and API key
-
-## Example Usage
+## Quick Start
 
 ```hcl
 terraform {
   required_providers {
     langsmith = {
       source  = "bogware/langsmith"
-      version = "~> 0.1"
+      version = "~> 0.5"
     }
   }
 }
 
 provider "langsmith" {
-  # Set via LANGSMITH_API_KEY environment variable, or:
+  # API key: set here or via LANGSMITH_API_KEY env var
   # api_key = "lsv2_..."
 
-  # Required for org-scoped API keys:
+  # Workspace ID: required for org-scoped keys
+  # Set here or via LANGSMITH_TENANT_ID env var
   # tenant_id = "your-workspace-uuid"
-  # Or set via LANGSMITH_TENANT_ID environment variable
 }
 
-# Create a project for tracing
+# Create a tracing project
 resource "langsmith_project" "production" {
   name        = "production"
   description = "Production LLM tracing"
 }
 
-# Create a dataset for evaluation
-resource "langsmith_dataset" "eval" {
-  name        = "evaluation-set"
-  description = "Golden dataset for model evaluation"
+# Create an evaluation dataset
+resource "langsmith_dataset" "golden" {
+  name        = "golden-dataset"
+  description = "Curated examples for model evaluation"
   data_type   = "kv"
 }
 
-# Create an annotation queue for human review
+# Set up human review
 resource "langsmith_annotation_queue" "review" {
   name                   = "human-review"
   description            = "Queue for reviewing flagged outputs"
   num_reviewers_per_item = 2
 }
 
-# Set up an automation rule
-resource "langsmith_run_rule" "sample" {
-  display_name               = "sample-errors"
+# Route errors to the review queue automatically
+resource "langsmith_run_rule" "errors" {
+  display_name               = "route-errors"
   sampling_rate              = 1.0
   session_id                 = langsmith_project.production.id
   filter                     = "eq(status, \"error\")"
@@ -61,40 +62,53 @@ resource "langsmith_run_rule" "sample" {
 
 ## Authentication
 
-The provider requires a LangSmith API key. You can provide it in two ways:
+| Method | Details |
+|--------|---------|
+| **Environment variable** (recommended) | `export LANGSMITH_API_KEY="lsv2_..."` |
+| **Provider attribute** | `api_key = "lsv2_..."` |
 
-1. **Environment variable** (recommended): Set `LANGSMITH_API_KEY`
-2. **Provider configuration**: Set the `api_key` attribute
+### Org-Scoped API Keys
 
-For **org-scoped API keys**, you must also provide a tenant/workspace ID:
+If you're using an organization-scoped service key, you **must** also provide your workspace ID:
 
-1. **Environment variable**: Set `LANGSMITH_TENANT_ID`
-2. **Provider configuration**: Set the `tenant_id` attribute
+| Method | Details |
+|--------|---------|
+| **Environment variable** | `export LANGSMITH_TENANT_ID="your-workspace-uuid"` |
+| **Provider attribute** | `tenant_id = "your-workspace-uuid"` |
 
-For self-hosted LangSmith instances, set the `api_url` attribute or `LANGSMITH_API_URL` environment variable.
+To find your workspace ID: **LangSmith Settings > Workspaces**, or:
+
+```bash
+curl -s -H "X-API-Key: $LANGSMITH_API_KEY" \
+  https://api.smith.langchain.com/api/v1/workspaces | jq '.[].id'
+```
+
+### Self-Hosted Instances
+
+Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
 
 ## Resources
 
 | Resource | Description |
 |----------|-------------|
-| `langsmith_project` | Manage tracing projects (tracer sessions) |
-| `langsmith_dataset` | Manage evaluation datasets |
-| `langsmith_example` | Manage dataset examples |
-| `langsmith_annotation_queue` | Manage annotation queues for human review |
-| `langsmith_service_account` | Manage service accounts |
-| `langsmith_service_key` | Manage API service keys |
-| `langsmith_prompt` | Manage prompts in the LangSmith Hub |
-| `langsmith_run_rule` | Manage automation rules for runs |
-| `langsmith_webhook` | Manage prompt webhooks |
-| `langsmith_feedback_config` | Manage feedback score configurations |
-| `langsmith_workspace` | Manage workspaces |
-| `langsmith_tag_key` | Manage tag keys |
-| `langsmith_tag_value` | Manage tag values |
-| `langsmith_bulk_export_destination` | Manage bulk export destinations (S3) |
-| `langsmith_bulk_export` | Manage bulk export jobs |
-| `langsmith_model_price_map` | Manage model pricing configuration |
-| `langsmith_usage_limit` | Manage usage limits |
-| `langsmith_playground_settings` | Manage playground settings |
+| `langsmith_project` | Tracing projects (tracer sessions) |
+| `langsmith_dataset` | Evaluation datasets |
+| `langsmith_example` | Dataset examples (input/output pairs) |
+| `langsmith_annotation_queue` | Annotation queues for human review |
+| `langsmith_service_account` | Service accounts (create + delete only) |
+| `langsmith_service_key` | API service keys (create + delete only, key is sensitive) |
+| `langsmith_prompt` | Prompts in the LangSmith Hub |
+| `langsmith_run_rule` | Automation rules for run routing |
+| `langsmith_webhook` | Prompt webhooks |
+| `langsmith_feedback_config` | Feedback score configurations |
+| `langsmith_workspace` | Workspaces |
+| `langsmith_tag_key` | Tag keys for resource tagging |
+| `langsmith_tag_value` | Tag values (nested under tag keys) |
+| `langsmith_bulk_export_destination` | Bulk export S3 destinations |
+| `langsmith_bulk_export` | Bulk export jobs |
+| `langsmith_model_price_map` | Model pricing configuration |
+| `langsmith_usage_limit` | Usage limits |
+| `langsmith_playground_settings` | Playground settings |
 
 ## Data Sources
 
@@ -103,127 +117,128 @@ For self-hosted LangSmith instances, set the `api_url` attribute or `LANGSMITH_A
 | `langsmith_project` | Look up a project by name or ID |
 | `langsmith_dataset` | Look up a dataset by name or ID |
 | `langsmith_workspace` | Look up a workspace by name or ID |
-| `langsmith_info` | Retrieve LangSmith server information |
-| `langsmith_organization` | Retrieve current organization information |
+| `langsmith_info` | LangSmith server information |
+| `langsmith_organization` | Current organization details |
 
-## Developing the Provider
+## Development
 
-### Building
+### Requirements
 
-```shell
-make build
+- [Go](https://golang.org/doc/install) >= 1.24
+- [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
+
+### Build & Test
+
+```bash
+make build        # Build the provider
+make test         # Run unit tests
+make testacc      # Run acceptance tests (needs LANGSMITH_API_KEY + LANGSMITH_TENANT_ID)
+make lint         # Run golangci-lint
+make generate     # Regenerate docs from schemas + examples
 ```
 
-### Testing
+### Local Development
 
-```shell
-# Unit tests
-make test
-
-# Acceptance tests (requires API key and tenant ID)
-export LANGSMITH_API_KEY="lsv2_..."
-export LANGSMITH_TENANT_ID="your-workspace-uuid"
-make testacc
-```
-
-### Generating Documentation
-
-After changing any resource schemas or examples, regenerate the docs:
-
-```shell
-make generate
-```
-
-Commit the resulting changes in `docs/`. CI will fail if generated files are out of date.
-
-### Local Development with Terraform
-
-To test the provider locally without publishing, add a dev override to your `~/.terraformrc`:
+Add a dev override to `~/.terraformrc` to test without publishing:
 
 ```hcl
 provider_installation {
   dev_overrides {
-    "bogware/langsmith" = "/path/to/go/bin"  # GOBIN path where 'go install' places binaries
+    "bogware/langsmith" = "/path/to/your/GOBIN"
   }
   direct {}
 }
 ```
 
-Then run `make install` to compile and install the provider binary, and use Terraform normally (skip `terraform init`).
+Then `make install` and use Terraform normally (skip `terraform init`).
 
-## Publishing to the Terraform Registry
+### Running Acceptance Tests
+
+Acceptance tests create real resources against the LangSmith API:
+
+```bash
+export LANGSMITH_API_KEY="lsv2_..."
+export LANGSMITH_TENANT_ID="your-workspace-uuid"
+make testacc
+```
+
+### Documentation
+
+Docs in `docs/` are auto-generated from schemas and `examples/`. After modifying any resource schema or example config:
+
+```bash
+make generate
+git add docs/
+```
+
+CI will fail if generated docs are stale.
+
+## Publishing & Releases
 
 ### Prerequisites
 
-1. **GPG Key**: Generate a GPG key pair for signing releases:
-   ```shell
-   gpg --full-generate-key   # Choose RSA, 4096 bits
-   gpg --armor --export "<key-email>"  # Get public key for registry
+1. **GPG signing key** for release artifact signing:
+   ```bash
+   gpg --full-generate-key         # RSA, 4096 bits recommended
+   gpg --armor --export "<email>"  # Public key for the registry
    ```
 
-2. **GitHub Secrets**: Add these secrets to the GitHub repository:
-   - `GPG_PRIVATE_KEY`: Your GPG private key (`gpg --armor --export-secret-keys "<key-id>"`)
-   - `PASSPHRASE`: GPG key passphrase
-   - `LANGSMITH_API_KEY`: API key for acceptance tests
-   - `LANGSMITH_TENANT_ID`: Tenant ID for acceptance tests
+2. **GitHub repository secrets** (Settings > Secrets > Actions):
 
-3. **Terraform Registry Account**: Sign in at [registry.terraform.io](https://registry.terraform.io/) with your GitHub account.
+   | Secret | Value |
+   |--------|-------|
+   | `GPG_PRIVATE_KEY` | `gpg --armor --export-secret-keys "<key-id>"` |
+   | `PASSPHRASE` | GPG key passphrase |
+   | `LANGSMITH_API_KEY` | API key for CI acceptance tests |
+   | `LANGSMITH_TENANT_ID` | Workspace ID for CI acceptance tests |
+
+3. **Terraform Registry account** at [registry.terraform.io](https://registry.terraform.io/) (sign in with GitHub).
 
 ### Creating a Release
 
-1. **Ensure all tests pass**:
-   ```shell
-   make test
-   make testacc
-   ```
+```bash
+# 1. Ensure everything is clean
+make generate
+git diff --exit-code       # No uncommitted changes
+make test && make testacc  # All tests pass
 
-2. **Verify generated docs are up to date**:
-   ```shell
-   make generate
-   git diff --exit-code  # Should show no changes
-   ```
+# 2. Tag and push
+git tag v0.5.0
+git push origin v0.5.0
+```
 
-3. **Update CHANGELOG.md** with the release version and date.
+The [Release workflow](.github/workflows/release.yml) automatically:
+- Builds multi-platform binaries (Linux, macOS, Windows / amd64, arm64, 386, arm)
+- Signs SHA256SUMS with your GPG key
+- Creates a GitHub release with all artifacts
 
-4. **Tag the release** with a semver tag:
-   ```shell
-   git tag v0.1.0
-   git push origin v0.1.0
-   ```
-
-5. The **Release workflow** will automatically:
-   - Build multi-platform binaries (Linux, macOS, Windows / amd64, arm64, 386, arm)
-   - Sign the SHA256SUMS with your GPG key
-   - Create a GitHub release with all artifacts and the registry manifest
-
-### Submitting to the Terraform Registry
+### Submitting to the Registry
 
 1. Go to [registry.terraform.io/publish/provider](https://registry.terraform.io/publish/provider)
-2. Select the `bogware/terraform-provider-langsmith` repository
-3. Add your **GPG public key** (the one used for signing releases)
-4. The registry will automatically detect your GitHub releases and publish new versions
+2. Select `bogware/terraform-provider-langsmith`
+3. Add your GPG **public key**
+4. Future releases are detected and published automatically
 
 ### Release Checklist
 
-- [ ] All acceptance tests pass
-- [ ] `make generate` produces no diff
-- [ ] CHANGELOG.md is updated
-- [ ] Version tag follows semver (e.g., `v0.1.0`)
-- [ ] GitHub release was created by the Release workflow
-- [ ] Release contains: zip archives, SHA256SUMS, SHA256SUMS.sig, manifest.json
-- [ ] GPG public key is registered at registry.terraform.io
+- [ ] All acceptance tests pass (`make testacc`)
+- [ ] Generated docs are up to date (`make generate && git diff --exit-code`)
+- [ ] `CHANGELOG.md` updated with new version
+- [ ] Tag follows semver (`v0.5.0`)
+- [ ] GitHub release created by CI with: zip archives, SHA256SUMS, SHA256SUMS.sig, manifest.json
+- [ ] GPG public key registered at [registry.terraform.io](https://registry.terraform.io)
 
-### Required Repository Files for Registry
+## Registry Files
 
-These files must exist and are already included in this repository:
+These required files are already included:
 
 | File | Purpose |
 |------|---------|
 | `terraform-registry-manifest.json` | Declares protocol version (v6) |
-| `.goreleaser.yml` | Multi-platform build, signing, and release config |
-| `docs/` | Auto-generated documentation (from `make generate`) |
-| `examples/` | Example Terraform configs (used by doc generator) |
+| `.goreleaser.yml` | Multi-platform build + GPG signing config |
+| `docs/` | Auto-generated documentation |
+| `examples/` | Example Terraform configs |
 
 ## License
 
-MPL-2.0
+[MPL-2.0](LICENSE)

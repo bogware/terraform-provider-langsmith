@@ -14,7 +14,8 @@ import (
 	"time"
 )
 
-// Client is the LangSmith API client.
+// Client is the LangSmith API client — the trusty horse that carries every
+// request across the wire to the LangSmith frontier.
 type Client struct {
 	BaseURL    string
 	APIKey     string
@@ -22,7 +23,8 @@ type Client struct {
 	HTTPClient *http.Client
 }
 
-// NewClient creates a new LangSmith API client.
+// NewClient saddles up a fresh LangSmith API client with the given base URL,
+// API key, and optional tenant ID.
 func NewClient(baseURL, apiKey, tenantID string) *Client {
 	return &Client{
 		BaseURL:  baseURL,
@@ -88,47 +90,49 @@ func (c *Client) doRequest(ctx context.Context, method, path string, query url.V
 	return nil
 }
 
-// Get performs an HTTP GET request.
+// Get rides out with an HTTP GET request and brings back whatever the API has to say.
 func (c *Client) Get(ctx context.Context, path string, query url.Values, result interface{}) error {
 	return c.doRequest(ctx, http.MethodGet, path, query, nil, result)
 }
 
-// Post performs an HTTP POST request.
+// Post sends an HTTP POST request — staking a new claim on the LangSmith API.
 func (c *Client) Post(ctx context.Context, path string, body interface{}, result interface{}) error {
 	return c.doRequest(ctx, http.MethodPost, path, nil, body, result)
 }
 
-// PostWithQuery performs an HTTP POST request with query parameters.
+// PostWithQuery sends an HTTP POST with query parameters riding shotgun.
 func (c *Client) PostWithQuery(ctx context.Context, path string, query url.Values, body interface{}, result interface{}) error {
 	return c.doRequest(ctx, http.MethodPost, path, query, body, result)
 }
 
-// Patch performs an HTTP PATCH request.
+// Patch sends an HTTP PATCH request to mend what needs mending.
 func (c *Client) Patch(ctx context.Context, path string, body interface{}, result interface{}) error {
 	return c.doRequest(ctx, http.MethodPatch, path, nil, body, result)
 }
 
-// Put performs an HTTP PUT request.
+// Put sends an HTTP PUT request, replacing the whole lot in one go.
 func (c *Client) Put(ctx context.Context, path string, body interface{}, result interface{}) error {
 	return c.doRequest(ctx, http.MethodPut, path, nil, body, result)
 }
 
-// Delete performs an HTTP DELETE request.
+// Delete sends an HTTP DELETE request. No trial, no appeal.
 func (c *Client) Delete(ctx context.Context, path string) error {
 	return c.doRequest(ctx, http.MethodDelete, path, nil, nil, nil)
 }
 
-// DeleteWithQuery performs an HTTP DELETE request with query parameters.
+// DeleteWithQuery sends an HTTP DELETE with query parameters to help identify the outlaw.
 func (c *Client) DeleteWithQuery(ctx context.Context, path string, query url.Values) error {
 	return c.doRequest(ctx, http.MethodDelete, path, query, nil, nil)
 }
 
-// DeleteWithBody performs an HTTP DELETE with a request body.
+// DeleteWithBody sends an HTTP DELETE with a request body, for when you need
+// to spell out exactly what you're putting down.
 func (c *Client) DeleteWithBody(ctx context.Context, path string, body interface{}) error {
 	return c.doRequest(ctx, http.MethodDelete, path, nil, body, nil)
 }
 
-// APIError represents an error from the LangSmith API.
+// APIError represents trouble from the LangSmith API — the kind Doc Adams
+// would shake his head at. Carries the HTTP status code and raw response body.
 type APIError struct {
 	StatusCode int
 	Body       string
@@ -138,7 +142,8 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("LangSmith API error (status %d): %s", e.StatusCode, e.Body)
 }
 
-// IsNotFound returns true if the error is a 404 Not Found.
+// IsNotFound checks whether the error is a 404 — the resource has skipped town
+// and left no forwarding address.
 func IsNotFound(err error) bool {
 	if apiErr, ok := err.(*APIError); ok {
 		return apiErr.StatusCode == 404

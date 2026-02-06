@@ -23,17 +23,18 @@ var (
 	_ resource.ResourceWithImportState = &WorkspaceResource{}
 )
 
-// NewWorkspaceResource returns a new WorkspaceResource.
+// NewWorkspaceResource returns a new WorkspaceResource -- your own plot of land in LangSmith.
 func NewWorkspaceResource() resource.Resource {
 	return &WorkspaceResource{}
 }
 
-// WorkspaceResource defines the resource implementation.
+// WorkspaceResource implements CRUD for LangSmith workspaces,
+// the territories where teams stake their claims and do their work.
 type WorkspaceResource struct {
 	client *client.Client
 }
 
-// WorkspaceResourceModel describes the resource data model.
+// WorkspaceResourceModel describes the Terraform state for a workspace.
 type WorkspaceResourceModel struct {
 	ID           types.String `tfsdk:"id"`
 	DisplayName  types.String `tfsdk:"display_name"`
@@ -41,18 +42,18 @@ type WorkspaceResourceModel struct {
 	CreatedAt    types.String `tfsdk:"created_at"`
 }
 
-// workspaceCreateRequest is the request body for creating a workspace.
+// workspaceCreateRequest is the deed for establishing a new workspace.
 type workspaceCreateRequest struct {
 	DisplayName  string  `json:"display_name"`
 	TenantHandle *string `json:"tenant_handle,omitempty"`
 }
 
-// workspaceUpdateRequest is the request body for updating a workspace.
+// workspaceUpdateRequest carries the fields allowed when renaming your territory.
 type workspaceUpdateRequest struct {
 	DisplayName string `json:"display_name"`
 }
 
-// workspaceAPIResponse is the API response for a workspace.
+// workspaceAPIResponse is what the API returns when you inquire about a workspace.
 type workspaceAPIResponse struct {
 	ID           string `json:"id"`
 	DisplayName  string `json:"display_name"`
@@ -222,7 +223,8 @@ func (r *WorkspaceResource) ImportState(ctx context.Context, req resource.Import
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-// mapWorkspaceResponseToState maps an API response to the Terraform state model.
+// mapWorkspaceResponseToState translates the API response into Terraform state,
+// plain and simple like a deputy filing a report.
 func mapWorkspaceResponseToState(data *WorkspaceResourceModel, result *workspaceAPIResponse) {
 	data.ID = types.StringValue(result.ID)
 	data.DisplayName = types.StringValue(result.DisplayName)

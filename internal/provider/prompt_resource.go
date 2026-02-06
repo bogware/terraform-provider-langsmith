@@ -24,14 +24,18 @@ var (
 	_ resource.ResourceWithImportState = &PromptResource{}
 )
 
+// NewPromptResource saddles up a fresh PromptResource, ready to ride.
 func NewPromptResource() resource.Resource {
 	return &PromptResource{}
 }
 
+// PromptResource manages prompt repos in the LangSmith Hub --
+// the general store of reusable prompt templates.
 type PromptResource struct {
 	client *client.Client
 }
 
+// PromptResourceModel maps the Terraform schema to Go types for a prompt repo.
 type PromptResourceModel struct {
 	ID          types.String `tfsdk:"id"`
 	RepoHandle  types.String `tfsdk:"repo_handle"`
@@ -45,6 +49,7 @@ type PromptResourceModel struct {
 	UpdatedAt   types.String `tfsdk:"updated_at"`
 }
 
+// promptCreateRequest is the payload for staking a new claim in the Hub.
 type promptCreateRequest struct {
 	RepoHandle  string   `json:"repo_handle"`
 	IsPublic    bool     `json:"is_public"`
@@ -53,6 +58,7 @@ type promptCreateRequest struct {
 	Tags        []string `json:"tags,omitempty"`
 }
 
+// promptUpdateRequest carries the fields that can be amended after the initial filing.
 type promptUpdateRequest struct {
 	Description *string  `json:"description,omitempty"`
 	Readme      *string  `json:"readme,omitempty"`
@@ -60,6 +66,7 @@ type promptUpdateRequest struct {
 	Tags        []string `json:"tags,omitempty"`
 }
 
+// promptAPIResponse is what the LangSmith API sends back when you come asking about a prompt.
 type promptAPIResponse struct {
 	Repo struct {
 		ID          string   `json:"id"`
@@ -289,7 +296,7 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	// Re-read to get updated state
+	// PATCH doesn't return the full resource, so we ride back to the API for the latest state
 	var result promptAPIResponse
 	err = r.client.Get(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", owner, data.RepoHandle.ValueString()), nil, &result)
 	if err != nil {

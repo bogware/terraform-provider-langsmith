@@ -11,6 +11,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
+// TestAccAnnotationQueueResource_basic runs the annotation queue through the
+// full trial — create, import, and update. Every queue deserves its day in court.
 func TestAccAnnotationQueueResource_basic(t *testing.T) {
 	rName := fmt.Sprintf("tf-test-%s", acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum))
 	rNameUpdated := fmt.Sprintf("tf-test-%s", acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum))
@@ -52,6 +54,9 @@ func TestAccAnnotationQueueResource_basic(t *testing.T) {
 	})
 }
 
+// testAccAnnotationQueueResourceConfig builds the HCL for an annotation queue.
+// A description is welcome but not mandatory — some queues, like some men, let
+// their actions do the talking.
 func testAccAnnotationQueueResourceConfig(name, description string) string {
 	if description != "" {
 		return fmt.Sprintf(`

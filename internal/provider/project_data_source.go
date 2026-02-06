@@ -18,17 +18,20 @@ import (
 
 var _ datasource.DataSource = &ProjectDataSource{}
 
-// NewProjectDataSource returns a new ProjectDataSource.
+// NewProjectDataSource returns a new ProjectDataSource for scouting out
+// an existing LangSmith project by ID or name.
 func NewProjectDataSource() datasource.DataSource {
 	return &ProjectDataSource{}
 }
 
-// ProjectDataSource defines the data source implementation.
+// ProjectDataSource reads a LangSmith project (TracerSession) by ID or name.
+// It is read-only -- purely a reconnaissance mission, no cattle get moved.
 type ProjectDataSource struct {
 	client *client.Client
 }
 
-// ProjectDataSourceModel describes the data source data model.
+// ProjectDataSourceModel holds the read-only attributes returned for a project:
+// name, description, tenant, start time, and run count.
 type ProjectDataSourceModel struct {
 	ID          types.String `tfsdk:"id"`
 	Name        types.String `tfsdk:"name"`

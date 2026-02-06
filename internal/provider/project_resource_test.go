@@ -11,6 +11,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
+// TestAccProjectResource_basic walks the project resource through the full
+// frontier: creation, import, and update. If any step draws on an empty
+// holster, the test fails — no second chances on Front Street.
 func TestAccProjectResource_basic(t *testing.T) {
 	rName := fmt.Sprintf("tf-test-%s", acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum))
 	rNameUpdated := fmt.Sprintf("tf-test-%s", acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum))
@@ -48,6 +51,8 @@ func TestAccProjectResource_basic(t *testing.T) {
 	})
 }
 
+// testAccProjectResourceConfig returns HCL for a project resource — plain or
+// with a description, depending on what the situation calls for.
 func testAccProjectResourceConfig(name, description string) string {
 	if description != "" {
 		return fmt.Sprintf(`

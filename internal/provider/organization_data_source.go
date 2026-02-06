@@ -17,17 +17,21 @@ import (
 
 var _ datasource.DataSource = &OrganizationDataSource{}
 
-// NewOrganizationDataSource returns a new OrganizationDataSource.
+// NewOrganizationDataSource returns a new OrganizationDataSource for finding out
+// who runs this outfit and what they are paying for the privilege.
 func NewOrganizationDataSource() datasource.DataSource {
 	return &OrganizationDataSource{}
 }
 
-// OrganizationDataSource defines the data source implementation.
+// OrganizationDataSource reads the current LangSmith organization's details from
+// the /orgs/current endpoint. No parameters needed -- your API key tells them
+// which ranch you belong to.
 type OrganizationDataSource struct {
 	client *client.Client
 }
 
-// OrganizationDataSourceModel describes the data source data model.
+// OrganizationDataSourceModel holds the read-only attributes for the current org:
+// display name, whether it is a personal account, and the plan tier.
 type OrganizationDataSourceModel struct {
 	ID          types.String `tfsdk:"id"`
 	DisplayName types.String `tfsdk:"display_name"`

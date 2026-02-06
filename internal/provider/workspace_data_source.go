@@ -17,17 +17,21 @@ import (
 
 var _ datasource.DataSource = &WorkspaceDataSource{}
 
-// NewWorkspaceDataSource returns a new WorkspaceDataSource.
+// NewWorkspaceDataSource returns a new WorkspaceDataSource for looking up which
+// corner of the territory you are working in.
 func NewWorkspaceDataSource() datasource.DataSource {
 	return &WorkspaceDataSource{}
 }
 
-// WorkspaceDataSource defines the data source implementation.
+// WorkspaceDataSource reads a LangSmith workspace by ID or display name.
+// Fetches the full list from the API and finds the matching one -- no shortcut
+// endpoint exists, so we ride the long trail.
 type WorkspaceDataSource struct {
 	client *client.Client
 }
 
-// WorkspaceDataSourceModel describes the data source data model.
+// WorkspaceDataSourceModel holds the read-only attributes for a workspace:
+// display name, tenant handle, and creation timestamp.
 type WorkspaceDataSourceModel struct {
 	ID           types.String `tfsdk:"id"`
 	DisplayName  types.String `tfsdk:"display_name"`

@@ -27,14 +27,19 @@ var (
 	_ resource.ResourceWithImportState = &FeedbackConfigResource{}
 )
 
+// NewFeedbackConfigResource returns a new FeedbackConfigResource.
 func NewFeedbackConfigResource() resource.Resource {
 	return &FeedbackConfigResource{}
 }
 
+// FeedbackConfigResource manages feedback score configurations in LangSmith --
+// the rules of engagement for how folks rate what comes out of the models.
 type FeedbackConfigResource struct {
 	client *client.Client
 }
 
+// FeedbackConfigResourceModel is the Terraform state for a feedback config.
+// Keyed by feedback_key rather than a UUID -- this one marches to its own drum.
 type FeedbackConfigResourceModel struct {
 	ID                 types.String  `tfsdk:"id"`
 	FeedbackKey        types.String  `tfsdk:"feedback_key"`
@@ -47,12 +52,14 @@ type FeedbackConfigResourceModel struct {
 	ModifiedAt         types.String  `tfsdk:"modified_at"`
 }
 
+// feedbackConfigCreateRequest is the request body for creating or updating a feedback config.
 type feedbackConfigCreateRequest struct {
 	FeedbackKey        string                 `json:"feedback_key"`
 	FeedbackConfig     map[string]interface{} `json:"feedback_config"`
 	IsLowerScoreBetter *bool                  `json:"is_lower_score_better,omitempty"`
 }
 
+// feedbackConfigAPIResponse is what the API returns when you ask about a feedback config.
 type feedbackConfigAPIResponse struct {
 	FeedbackKey        string                 `json:"feedback_key"`
 	FeedbackConfig     map[string]interface{} `json:"feedback_config"`
@@ -125,6 +132,8 @@ func (r *FeedbackConfigResource) Configure(ctx context.Context, req resource.Con
 	r.client = c
 }
 
+// buildFeedbackConfig assembles the nested config map from flat Terraform attributes,
+// like a frontier doc mixing up the right tincture from separate ingredients.
 func (r *FeedbackConfigResource) buildFeedbackConfig(data *FeedbackConfigResourceModel) map[string]interface{} {
 	config := map[string]interface{}{
 		"type": data.FeedbackType.ValueString(),
@@ -168,7 +177,7 @@ func (r *FeedbackConfigResource) Create(ctx context.Context, req resource.Create
 
 	data.ID = types.StringValue(data.FeedbackKey.ValueString())
 
-	// Read back to get computed fields
+	// POST doesn't return the resource, so we circle back to read the computed fields
 	found := r.readFeedbackConfig(ctx, &data, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
@@ -202,6 +211,8 @@ func (r *FeedbackConfigResource) Read(ctx context.Context, req resource.ReadRequ
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
+// readFeedbackConfig searches the full list of configs to find ours by key.
+// The API doesn't offer a direct lookup, so we ride through the whole herd.
 func (r *FeedbackConfigResource) readFeedbackConfig(ctx context.Context, data *FeedbackConfigResourceModel, diags *diag.Diagnostics) bool {
 	var configs []feedbackConfigAPIResponse
 	err := r.client.Get(ctx, "/api/v1/feedback-configs", nil, &configs)

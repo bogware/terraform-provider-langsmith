@@ -18,12 +18,14 @@ import (
 
 var _ provider.Provider = &LangSmithProvider{}
 
-// LangSmithProvider defines the provider implementation.
+// LangSmithProvider defines the provider implementation. This is the marshal's
+// office — where all resources and data sources report for duty.
 type LangSmithProvider struct {
 	version string
 }
 
-// LangSmithProviderModel describes the provider data model.
+// LangSmithProviderModel describes the provider configuration: API key, base
+// URL, and tenant ID. The credentials every lawman carries on the frontier.
 type LangSmithProviderModel struct {
 	APIKey   types.String `tfsdk:"api_key"`
 	APIURL   types.String `tfsdk:"api_url"`
@@ -128,7 +130,8 @@ func (p *LangSmithProvider) DataSources(ctx context.Context) []func() datasource
 	}
 }
 
-// New returns a new provider factory function.
+// New returns a provider factory function, ready to pin on the badge and start
+// serving Terraform requests.
 func New(version string) func() provider.Provider {
 	return func() provider.Provider {
 		return &LangSmithProvider{

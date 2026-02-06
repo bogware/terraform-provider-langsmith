@@ -25,17 +25,20 @@ var (
 	_ resource.ResourceWithImportState = &ExampleResource{}
 )
 
-// NewExampleResource returns a new ExampleResource.
+// NewExampleResource constructs a fresh ExampleResource for managing individual
+// entries in a LangSmith dataset.
 func NewExampleResource() resource.Resource {
 	return &ExampleResource{}
 }
 
-// ExampleResource defines the resource implementation.
+// ExampleResource manages a single example within a LangSmith dataset — one
+// head of cattle in the herd, each with its own brand of inputs and outputs.
 type ExampleResource struct {
 	client *client.Client
 }
 
-// ExampleResourceModel describes the resource data model.
+// ExampleResourceModel holds the Terraform state for a dataset example,
+// including its inputs, outputs, and metadata.
 type ExampleResourceModel struct {
 	ID          types.String `tfsdk:"id"`
 	DatasetID   types.String `tfsdk:"dataset_id"`
@@ -48,7 +51,8 @@ type ExampleResourceModel struct {
 	ModifiedAt  types.String `tfsdk:"modified_at"`
 }
 
-// exampleAPICreateRequest is the request body for creating an example.
+// exampleAPICreateRequest is the wire format for branding a new example into
+// a dataset.
 type exampleAPICreateRequest struct {
 	DatasetID   string          `json:"dataset_id"`
 	Inputs      json.RawMessage `json:"inputs"`
@@ -58,7 +62,8 @@ type exampleAPICreateRequest struct {
 	SourceRunID *string         `json:"source_run_id,omitempty"`
 }
 
-// exampleAPIUpdateRequest is the request body for updating an example.
+// exampleAPIUpdateRequest is the wire format for re-branding an existing
+// example's fields.
 type exampleAPIUpdateRequest struct {
 	DatasetID   *string         `json:"dataset_id,omitempty"`
 	Inputs      json.RawMessage `json:"inputs,omitempty"`
@@ -68,7 +73,8 @@ type exampleAPIUpdateRequest struct {
 	SourceRunID *string         `json:"source_run_id,omitempty"`
 }
 
-// exampleAPIResponse is the API response for an example.
+// exampleAPIResponse is the full record the LangSmith API returns for a
+// dataset example.
 type exampleAPIResponse struct {
 	ID          string          `json:"id"`
 	DatasetID   string          `json:"dataset_id"`
@@ -280,7 +286,8 @@ func (r *ExampleResource) ImportState(ctx context.Context, req resource.ImportSt
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-// mapExampleResponseToState maps an API response to the Terraform state model.
+// mapExampleResponseToState translates the API response into Terraform state,
+// handling the JSON fields with the care of a good trail cook.
 func mapExampleResponseToState(data *ExampleResourceModel, result *exampleAPIResponse) {
 	data.ID = types.StringValue(result.ID)
 	data.DatasetID = types.StringValue(result.DatasetID)

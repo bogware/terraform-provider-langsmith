@@ -24,17 +24,21 @@ var (
 	_ resource.ResourceWithImportState = &PlaygroundSettingsResource{}
 )
 
-// NewPlaygroundSettingsResource returns a new PlaygroundSettingsResource.
+// NewPlaygroundSettingsResource returns a new PlaygroundSettingsResource for
+// wrangling the LangSmith playground configuration.
 func NewPlaygroundSettingsResource() resource.Resource {
 	return &PlaygroundSettingsResource{}
 }
 
-// PlaygroundSettingsResource defines the resource implementation.
+// PlaygroundSettingsResource manages LangSmith playground settings -- the saloon
+// where folks go to try out prompts before taking them into the real world.
 type PlaygroundSettingsResource struct {
 	client *client.Client
 }
 
-// PlaygroundSettingsResourceModel describes the resource data model.
+// PlaygroundSettingsResourceModel holds the Terraform state for playground settings.
+// The "settings" field is a JSON string -- flexible enough to carry whatever
+// configuration the playground needs without a rigid schema.
 type PlaygroundSettingsResourceModel struct {
 	ID          types.String `tfsdk:"id"`
 	Name        types.String `tfsdk:"name"`
@@ -239,7 +243,8 @@ func (r *PlaygroundSettingsResource) ImportState(ctx context.Context, req resour
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-// mapPlaygroundSettingsResponseToState maps an API response to the Terraform state model.
+// mapPlaygroundSettingsResponseToState corrals the API response into the Terraform
+// state model, handling nullable name/description fields and raw JSON settings.
 func mapPlaygroundSettingsResponseToState(data *PlaygroundSettingsResourceModel, result *playgroundSettingsAPIResponse) {
 	data.ID = types.StringValue(result.ID)
 

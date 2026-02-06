@@ -11,6 +11,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
+// TestAccProjectDataSource_basic verifies we can look up a project by name.
+// Even Marshal Dillon checks the wanted posters before riding out.
 func TestAccProjectDataSource_basic(t *testing.T) {
 	rName := fmt.Sprintf("tf-test-%s", acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum))
 
@@ -31,6 +33,8 @@ func TestAccProjectDataSource_basic(t *testing.T) {
 	})
 }
 
+// testAccProjectDataSourceConfig returns HCL that creates a project and then
+// looks it up by name — trust, but verify, as Doc Adams would say.
 func testAccProjectDataSourceConfig(name string) string {
 	return fmt.Sprintf(`
 resource "langsmith_project" "test" {

@@ -13,10 +13,15 @@ import (
 	"github.com/bogware/terraform-provider-langsmith/internal/provider"
 )
 
+// version is set at build time via ldflags. During development it rides under
+// the "dev" brand — like a deputy who hasn't earned his badge yet.
 var (
 	version string = "dev"
 )
 
+// main fires up the Terraform provider server for LangSmith. Pass -debug to
+// hitch it to a debugger like delve — handy for tracking down outlaws in your
+// provider code.
 func main() {
 	var debug bool
 

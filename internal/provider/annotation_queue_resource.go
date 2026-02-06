@@ -26,17 +26,21 @@ var (
 	_ resource.ResourceWithImportState = &AnnotationQueueResource{}
 )
 
-// NewAnnotationQueueResource returns a new AnnotationQueueResource.
+// NewAnnotationQueueResource returns a new AnnotationQueueResource, ready to
+// line up items for human review like cattle at the stockyard chute.
 func NewAnnotationQueueResource() resource.Resource {
 	return &AnnotationQueueResource{}
 }
 
-// AnnotationQueueResource defines the resource implementation.
+// AnnotationQueueResource manages a LangSmith annotation queue for organizing
+// human review of LLM runs. Supports reservations, reviewer counts, rubric
+// instructions, and an optional default dataset for collected annotations.
 type AnnotationQueueResource struct {
 	client *client.Client
 }
 
-// AnnotationQueueResourceModel describes the resource data model.
+// AnnotationQueueResourceModel describes the resource data model, including
+// reservation settings, reviewer configuration, and rubric instructions.
 type AnnotationQueueResourceModel struct {
 	ID                  types.String `tfsdk:"id"`
 	Name                types.String `tfsdk:"name"`
@@ -273,7 +277,8 @@ func (r *AnnotationQueueResource) Update(ctx context.Context, req resource.Updat
 		return
 	}
 
-	// PATCH returns a message, not the full resource - re-read to get updated state
+	// The PATCH response only returns {"message": "..."}, not the full resource.
+	// Like Festus reporting back with half the story, we need to go get the rest ourselves.
 	var result annotationQueueAPIResponse
 	err = r.client.Get(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), nil, &result)
 	if err != nil {
@@ -309,7 +314,8 @@ func (r *AnnotationQueueResource) ImportState(ctx context.Context, req resource.
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-// mapAnnotationQueueResponseToState maps an API response to the Terraform state model.
+// mapAnnotationQueueResponseToState maps the API response onto the Terraform state,
+// setting null for any optional fields the API left unspoken.
 func mapAnnotationQueueResponseToState(data *AnnotationQueueResourceModel, result *annotationQueueAPIResponse) {
 	data.ID = types.StringValue(result.ID)
 	data.Name = types.StringValue(result.Name)

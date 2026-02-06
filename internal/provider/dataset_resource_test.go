@@ -11,6 +11,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
+// TestAccDatasetResource_basic puts the dataset resource through its paces —
+// create, import, and update — like a new deputy proving his worth in Dodge.
 func TestAccDatasetResource_basic(t *testing.T) {
 	rName := fmt.Sprintf("tf-test-%s", acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum))
 	rNameUpdated := fmt.Sprintf("tf-test-%s", acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum))
@@ -50,6 +52,8 @@ func TestAccDatasetResource_basic(t *testing.T) {
 	})
 }
 
+// testAccDatasetResourceConfig wrangles together the HCL for a dataset resource.
+// Description's optional — some datasets speak for themselves, like Festus at suppertime.
 func testAccDatasetResourceConfig(name, dataType, description string) string {
 	if description != "" {
 		return fmt.Sprintf(`

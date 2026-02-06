@@ -1,4 +1,4 @@
-## 0.1.0 (Unreleased)
+## 0.5.0 (Unreleased)
 
 FEATURES:
 
@@ -25,3 +25,11 @@ FEATURES:
 * **New Data Source:** `langsmith_workspace` - Look up a workspace by name or ID
 * **New Data Source:** `langsmith_info` - Retrieve LangSmith server information
 * **New Data Source:** `langsmith_organization` - Retrieve current organization information
+
+ENHANCEMENTS:
+
+* Provider supports `tenant_id` for org-scoped API key authentication
+* Immutable fields marked with `RequiresReplace` plan modifiers across all resources
+* Proper null handling in all response-to-state mappers to prevent drift
+* Feedback config resource gracefully handles external deletion via `RemoveResource`
+* Run rule defaults for `add_to_dataset_prefer_correction` and `num_few_shot_examples` prevent perpetual diffs

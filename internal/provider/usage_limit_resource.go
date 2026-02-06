@@ -23,17 +23,21 @@ var (
 	_ resource.ResourceWithImportState = &UsageLimitResource{}
 )
 
-// NewUsageLimitResource returns a new UsageLimitResource.
+// NewUsageLimitResource returns a new UsageLimitResource for putting fences around
+// how much your organization can consume.
 func NewUsageLimitResource() resource.Resource {
 	return &UsageLimitResource{}
 }
 
-// UsageLimitResource defines the resource implementation.
+// UsageLimitResource manages a LangSmith usage limit. Like the law in Dodge City,
+// it sets hard boundaries that even the most ambitious users must respect.
+// Create and Update both use PUT (upsert), keyed by limit_type.
 type UsageLimitResource struct {
 	client *client.Client
 }
 
-// UsageLimitResourceModel describes the resource data model.
+// UsageLimitResourceModel holds the Terraform state for a usage limit,
+// including the limit type, value, and audit timestamps.
 type UsageLimitResourceModel struct {
 	ID         types.String `tfsdk:"id"`
 	LimitType  types.String `tfsdk:"limit_type"`
@@ -224,7 +228,8 @@ func (r *UsageLimitResource) ImportState(ctx context.Context, req resource.Impor
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-// mapUsageLimitResponseToState maps an API response to the Terraform state model.
+// mapUsageLimitResponseToState maps the API response fields into Terraform state --
+// a straightforward transfer with no surprises, which is how Doc Adams prefers things.
 func mapUsageLimitResponseToState(data *UsageLimitResourceModel, result *usageLimitAPIResponse) {
 	data.ID = types.StringValue(result.ID)
 	data.LimitType = types.StringValue(result.LimitType)

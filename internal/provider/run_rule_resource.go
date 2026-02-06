@@ -25,14 +25,19 @@ var (
 	_ resource.ResourceWithImportState = &RunRuleResource{}
 )
 
+// NewRunRuleResource returns a new RunRuleResource, badge and all.
 func NewRunRuleResource() resource.Resource {
 	return &RunRuleResource{}
 }
 
+// RunRuleResource implements CRUD for LangSmith automation rules --
+// the law that governs which runs get rounded up and where they end up.
 type RunRuleResource struct {
 	client *client.Client
 }
 
+// RunRuleResourceModel is the Terraform state for an automation rule,
+// tracking everything from sampling rates to which corral the runs land in.
 type RunRuleResourceModel struct {
 	ID                           types.String  `tfsdk:"id"`
 	DisplayName                  types.String  `tfsdk:"display_name"`
@@ -51,6 +56,7 @@ type RunRuleResourceModel struct {
 	UpdatedAt                    types.String  `tfsdk:"updated_at"`
 }
 
+// runRuleCreateRequest is the warrant for establishing a new automation rule.
 type runRuleCreateRequest struct {
 	DisplayName                  string  `json:"display_name"`
 	SamplingRate                 float64 `json:"sampling_rate"`
@@ -65,6 +71,7 @@ type runRuleCreateRequest struct {
 	NumFewShotExamples           int64   `json:"num_few_shot_examples,omitempty"`
 }
 
+// runRuleAPIResponse is the full dossier the API returns on a run rule.
 type runRuleAPIResponse struct {
 	ID                           string  `json:"id"`
 	DisplayName                  string  `json:"display_name"`
@@ -320,6 +327,8 @@ func (r *RunRuleResource) ImportState(ctx context.Context, req resource.ImportSt
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
+// mapResponseToModel translates the API's response into Terraform state,
+// setting null for any optional fields that came back empty from the territory.
 func (r *RunRuleResource) mapResponseToModel(result *runRuleAPIResponse, data *RunRuleResourceModel) {
 	data.ID = types.StringValue(result.ID)
 	data.DisplayName = types.StringValue(result.DisplayName)

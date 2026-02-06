@@ -23,17 +23,21 @@ var (
 	_ resource.ResourceWithImportState = &ServiceAccountResource{}
 )
 
-// NewServiceAccountResource returns a new ServiceAccountResource.
+// NewServiceAccountResource constructs a fresh ServiceAccountResource. Service
+// accounts are create-or-destroy — no half measures on this frontier.
 func NewServiceAccountResource() resource.Resource {
 	return &ServiceAccountResource{}
 }
 
-// ServiceAccountResource defines the resource implementation.
+// ServiceAccountResource manages a LangSmith service account — a deputy that
+// works the API on your behalf. Updates are not supported; any change means
+// tearing down the old and swearing in a new one.
 type ServiceAccountResource struct {
 	client *client.Client
 }
 
-// ServiceAccountResourceModel describes the resource data model.
+// ServiceAccountResourceModel holds the Terraform state for a service account,
+// including its organization and workspace ties.
 type ServiceAccountResourceModel struct {
 	ID                 types.String `tfsdk:"id"`
 	Name               types.String `tfsdk:"name"`
@@ -43,12 +47,14 @@ type ServiceAccountResourceModel struct {
 	UpdatedAt          types.String `tfsdk:"updated_at"`
 }
 
-// serviceAccountAPICreateRequest is the request body for creating a service account.
+// serviceAccountAPICreateRequest is the wire format for deputizing a new
+// service account.
 type serviceAccountAPICreateRequest struct {
 	Name string `json:"name"`
 }
 
-// serviceAccountAPIResponse is the API response for a single service account.
+// serviceAccountAPIResponse is the full dossier the API returns for a single
+// service account.
 type serviceAccountAPIResponse struct {
 	ID                 string `json:"id"`
 	Name               string `json:"name"`
@@ -58,7 +64,8 @@ type serviceAccountAPIResponse struct {
 	UpdatedAt          string `json:"updated_at"`
 }
 
-// serviceAccountListAPIResponse is the API response for listing service accounts.
+// serviceAccountListAPIResponse is the full posse — every service account the
+// API knows about.
 type serviceAccountListAPIResponse []serviceAccountAPIResponse
 
 func (r *ServiceAccountResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -203,7 +210,8 @@ func (r *ServiceAccountResource) ImportState(ctx context.Context, req resource.I
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-// mapServiceAccountResponseToState maps an API response to the Terraform state model.
+// mapServiceAccountResponseToState translates the API response into Terraform
+// state for a service account.
 func mapServiceAccountResponseToState(data *ServiceAccountResourceModel, result *serviceAccountAPIResponse) {
 	data.ID = types.StringValue(result.ID)
 	data.Name = types.StringValue(result.Name)
