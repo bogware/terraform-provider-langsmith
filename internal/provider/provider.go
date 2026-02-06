@@ -1,108 +1,140 @@
-// Copyright IBM Corp. 2021, 2025
+// Copyright (c) Bogware, Inc. 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package provider
 
 import (
 	"context"
-	"net/http"
+	"os"
 
-	"github.com/hashicorp/terraform-plugin-framework/action"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
-	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
-	"github.com/hashicorp/terraform-plugin-framework/function"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"github.com/bogware/terraform-provider-langsmith/internal/client"
 )
 
-// Ensure ScaffoldingProvider satisfies various provider interfaces.
-var _ provider.Provider = &ScaffoldingProvider{}
-var _ provider.ProviderWithFunctions = &ScaffoldingProvider{}
-var _ provider.ProviderWithEphemeralResources = &ScaffoldingProvider{}
-var _ provider.ProviderWithActions = &ScaffoldingProvider{}
+var _ provider.Provider = &LangSmithProvider{}
 
-// ScaffoldingProvider defines the provider implementation.
-type ScaffoldingProvider struct {
-	// version is set to the provider version on release, "dev" when the
-	// provider is built and ran locally, and "test" when running acceptance
-	// testing.
+// LangSmithProvider defines the provider implementation. This is the marshal's
+// office — where all resources and data sources report for duty.
+type LangSmithProvider struct {
 	version string
 }
 
-// ScaffoldingProviderModel describes the provider data model.
-type ScaffoldingProviderModel struct {
-	Endpoint types.String `tfsdk:"endpoint"`
+// LangSmithProviderModel describes the provider configuration: API key, base
+// URL, and tenant ID. The credentials every lawman carries on the frontier.
+type LangSmithProviderModel struct {
+	APIKey   types.String `tfsdk:"api_key"`
+	APIURL   types.String `tfsdk:"api_url"`
+	TenantID types.String `tfsdk:"tenant_id"`
 }
 
-func (p *ScaffoldingProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
-	resp.TypeName = "scaffolding"
+func (p *LangSmithProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
+	resp.TypeName = "langsmith"
 	resp.Version = p.version
 }
 
-func (p *ScaffoldingProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
+func (p *LangSmithProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		MarkdownDescription: "The LangSmith provider allows you to manage LangSmith resources such as projects, datasets, annotation queues, prompts, and more.",
 		Attributes: map[string]schema.Attribute{
-			"endpoint": schema.StringAttribute{
-				MarkdownDescription: "Example provider attribute",
+			"api_key": schema.StringAttribute{
+				MarkdownDescription: "The LangSmith API key. Can also be set with the `LANGSMITH_API_KEY` environment variable.",
+				Optional:            true,
+				Sensitive:           true,
+			},
+			"api_url": schema.StringAttribute{
+				MarkdownDescription: "The LangSmith API base URL. Defaults to `https://api.smith.langchain.com`. Can also be set with the `LANGSMITH_API_URL` environment variable.",
+				Optional:            true,
+			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "The LangSmith workspace/tenant ID. Required for org-scoped API keys. Can also be set with the `LANGSMITH_TENANT_ID` environment variable.",
 				Optional:            true,
 			},
 		},
 	}
 }
 
-func (p *ScaffoldingProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
-	var data ScaffoldingProviderModel
+func (p *LangSmithProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
+	var data LangSmithProviderModel
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Configuration values are now available.
-	// if data.Endpoint.IsNull() { /* ... */ }
+	apiKey := os.Getenv("LANGSMITH_API_KEY")
+	if !data.APIKey.IsNull() {
+		apiKey = data.APIKey.ValueString()
+	}
 
-	// Example client configuration for data sources and resources
-	client := http.DefaultClient
-	resp.DataSourceData = client
-	resp.ResourceData = client
+	if apiKey == "" {
+		resp.Diagnostics.AddError(
+			"Missing API Key",
+			"The LangSmith API key must be set in the provider configuration or via the LANGSMITH_API_KEY environment variable.",
+		)
+		return
+	}
+
+	apiURL := "https://api.smith.langchain.com"
+	if envURL := os.Getenv("LANGSMITH_API_URL"); envURL != "" {
+		apiURL = envURL
+	}
+	if !data.APIURL.IsNull() {
+		apiURL = data.APIURL.ValueString()
+	}
+
+	tenantID := os.Getenv("LANGSMITH_TENANT_ID")
+	if !data.TenantID.IsNull() {
+		tenantID = data.TenantID.ValueString()
+	}
+
+	c := client.NewClient(apiURL, apiKey, tenantID)
+	resp.DataSourceData = c
+	resp.ResourceData = c
 }
 
-func (p *ScaffoldingProvider) Resources(ctx context.Context) []func() resource.Resource {
+func (p *LangSmithProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
+		NewProjectResource,
+		NewDatasetResource,
 		NewExampleResource,
+		NewAnnotationQueueResource,
+		NewServiceAccountResource,
+		NewServiceKeyResource,
+		NewPromptResource,
+		NewRunRuleResource,
+		NewWebhookResource,
+		NewFeedbackConfigResource,
+		NewWorkspaceResource,
+		NewTagKeyResource,
+		NewTagValueResource,
+		NewBulkExportDestinationResource,
+		NewBulkExportResource,
+		NewModelPriceMapResource,
+		NewUsageLimitResource,
+		NewPlaygroundSettingsResource,
 	}
 }
 
-func (p *ScaffoldingProvider) EphemeralResources(ctx context.Context) []func() ephemeral.EphemeralResource {
-	return []func() ephemeral.EphemeralResource{
-		NewExampleEphemeralResource,
-	}
-}
-
-func (p *ScaffoldingProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
+func (p *LangSmithProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
-		NewExampleDataSource,
+		NewProjectDataSource,
+		NewDatasetDataSource,
+		NewWorkspaceDataSource,
+		NewInfoDataSource,
+		NewOrganizationDataSource,
 	}
 }
 
-func (p *ScaffoldingProvider) Functions(ctx context.Context) []func() function.Function {
-	return []func() function.Function{
-		NewExampleFunction,
-	}
-}
-
-func (p *ScaffoldingProvider) Actions(ctx context.Context) []func() action.Action {
-	return []func() action.Action{
-		NewExampleAction,
-	}
-}
-
+// New returns a provider factory function, ready to pin on the badge and start
+// serving Terraform requests.
 func New(version string) func() provider.Provider {
 	return func() provider.Provider {
-		return &ScaffoldingProvider{
+		return &LangSmithProvider{
 			version: version,
 		}
 	}

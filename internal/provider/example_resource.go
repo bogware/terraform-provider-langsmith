@@ -1,12 +1,12 @@
-// Copyright IBM Corp. 2021, 2025
+// Copyright (c) Bogware, Inc. 2025
 // SPDX-License-Identifier: MPL-2.0
 
 package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -16,26 +16,75 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+
+	"github.com/bogware/terraform-provider-langsmith/internal/client"
 )
 
-// Ensure provider defined types fully satisfy framework interfaces.
-var _ resource.Resource = &ExampleResource{}
-var _ resource.ResourceWithImportState = &ExampleResource{}
+var (
+	_ resource.Resource                = &ExampleResource{}
+	_ resource.ResourceWithImportState = &ExampleResource{}
+)
 
+// NewExampleResource constructs a fresh ExampleResource for managing individual
+// entries in a LangSmith dataset.
 func NewExampleResource() resource.Resource {
 	return &ExampleResource{}
 }
 
-// ExampleResource defines the resource implementation.
+// ExampleResource manages a single example within a LangSmith dataset — one
+// head of cattle in the herd, each with its own brand of inputs and outputs.
 type ExampleResource struct {
-	client *http.Client
+	client *client.Client
 }
 
-// ExampleResourceModel describes the resource data model.
+// ExampleResourceModel holds the Terraform state for a dataset example,
+// including its inputs, outputs, and metadata.
 type ExampleResourceModel struct {
-	ConfigurableAttribute types.String `tfsdk:"configurable_attribute"`
-	Defaulted             types.String `tfsdk:"defaulted"`
-	Id                    types.String `tfsdk:"id"`
+	ID          types.String `tfsdk:"id"`
+	DatasetID   types.String `tfsdk:"dataset_id"`
+	Inputs      types.String `tfsdk:"inputs"`
+	Outputs     types.String `tfsdk:"outputs"`
+	Metadata    types.String `tfsdk:"metadata"`
+	Split       types.String `tfsdk:"split"`
+	SourceRunID types.String `tfsdk:"source_run_id"`
+	CreatedAt   types.String `tfsdk:"created_at"`
+	ModifiedAt  types.String `tfsdk:"modified_at"`
+}
+
+// exampleAPICreateRequest is the wire format for branding a new example into
+// a dataset.
+type exampleAPICreateRequest struct {
+	DatasetID   string          `json:"dataset_id"`
+	Inputs      json.RawMessage `json:"inputs"`
+	Outputs     json.RawMessage `json:"outputs,omitempty"`
+	Metadata    json.RawMessage `json:"metadata,omitempty"`
+	Split       *string         `json:"split,omitempty"`
+	SourceRunID *string         `json:"source_run_id,omitempty"`
+}
+
+// exampleAPIUpdateRequest is the wire format for re-branding an existing
+// example's fields.
+type exampleAPIUpdateRequest struct {
+	DatasetID   *string         `json:"dataset_id,omitempty"`
+	Inputs      json.RawMessage `json:"inputs,omitempty"`
+	Outputs     json.RawMessage `json:"outputs,omitempty"`
+	Metadata    json.RawMessage `json:"metadata,omitempty"`
+	Split       *string         `json:"split,omitempty"`
+	SourceRunID *string         `json:"source_run_id,omitempty"`
+}
+
+// exampleAPIResponse is the full record the LangSmith API returns for a
+// dataset example.
+type exampleAPIResponse struct {
+	ID          string          `json:"id"`
+	DatasetID   string          `json:"dataset_id"`
+	Inputs      json.RawMessage `json:"inputs"`
+	Outputs     json.RawMessage `json:"outputs"`
+	Metadata    json.RawMessage `json:"metadata"`
+	Split       *string         `json:"split"`
+	SourceRunID *string         `json:"source_run_id"`
+	CreatedAt   string          `json:"created_at"`
+	ModifiedAt  string          `json:"modified_at"`
 }
 
 func (r *ExampleResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -44,144 +93,233 @@ func (r *ExampleResource) Metadata(ctx context.Context, req resource.MetadataReq
 
 func (r *ExampleResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		// This description is used by the documentation generator and the language server.
-		MarkdownDescription: "Example resource",
-
+		MarkdownDescription: "Manages a LangSmith example within a dataset.",
 		Attributes: map[string]schema.Attribute{
-			"configurable_attribute": schema.StringAttribute{
-				MarkdownDescription: "Example configurable attribute",
-				Optional:            true,
-			},
-			"defaulted": schema.StringAttribute{
-				MarkdownDescription: "Example configurable attribute with default value",
-				Optional:            true,
-				Computed:            true,
-				Default:             stringdefault.StaticString("example value when not configured"),
-			},
 			"id": schema.StringAttribute{
+				MarkdownDescription: "The unique identifier of the example.",
 				Computed:            true,
-				MarkdownDescription: "Example identifier",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
+			},
+			"dataset_id": schema.StringAttribute{
+				MarkdownDescription: "The UUID of the dataset this example belongs to.",
+				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"inputs": schema.StringAttribute{
+				MarkdownDescription: "JSON string containing the input data for the example.",
+				Required:            true,
+			},
+			"outputs": schema.StringAttribute{
+				MarkdownDescription: "JSON string containing the output data for the example.",
+				Optional:            true,
+			},
+			"metadata": schema.StringAttribute{
+				MarkdownDescription: "JSON string containing metadata for the example.",
+				Optional:            true,
+			},
+			"split": schema.StringAttribute{
+				MarkdownDescription: "The split for the example (e.g., `base`, `train`, `test`).",
+				Optional:            true,
+				Computed:            true,
+				Default:             stringdefault.StaticString("base"),
+			},
+			"source_run_id": schema.StringAttribute{
+				MarkdownDescription: "The UUID of the source run for this example.",
+				Optional:            true,
+			},
+			"created_at": schema.StringAttribute{
+				MarkdownDescription: "The creation timestamp of the example.",
+				Computed:            true,
+			},
+			"modified_at": schema.StringAttribute{
+				MarkdownDescription: "The last modification timestamp of the example.",
+				Computed:            true,
 			},
 		},
 	}
 }
 
 func (r *ExampleResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	// Prevent panic if the provider has not been configured.
 	if req.ProviderData == nil {
 		return
 	}
 
-	client, ok := req.ProviderData.(*http.Client)
-
+	c, ok := req.ProviderData.(*client.Client)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *http.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected *client.Client, got: %T", req.ProviderData),
 		)
-
 		return
 	}
 
-	r.client = client
+	r.client = c
 }
 
 func (r *ExampleResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data ExampleResourceModel
-
-	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create example, got error: %s", err))
-	//     return
-	// }
+	body := exampleAPICreateRequest{
+		DatasetID: data.DatasetID.ValueString(),
+		Inputs:    json.RawMessage(data.Inputs.ValueString()),
+	}
 
-	// For the purposes of this example code, hardcoding a response value to
-	// save into the Terraform state.
-	data.Id = types.StringValue("example-id")
+	if !data.Outputs.IsNull() && !data.Outputs.IsUnknown() {
+		body.Outputs = json.RawMessage(data.Outputs.ValueString())
+	}
+	if !data.Metadata.IsNull() && !data.Metadata.IsUnknown() {
+		body.Metadata = json.RawMessage(data.Metadata.ValueString())
+	}
+	if !data.Split.IsNull() && !data.Split.IsUnknown() {
+		v := data.Split.ValueString()
+		body.Split = &v
+	}
+	if !data.SourceRunID.IsNull() && !data.SourceRunID.IsUnknown() {
+		v := data.SourceRunID.ValueString()
+		body.SourceRunID = &v
+	}
 
-	// Write logs using the tflog package
-	// Documentation: https://terraform.io/plugin/log
-	tflog.Trace(ctx, "created a resource")
+	var result exampleAPIResponse
+	err := r.client.Post(ctx, "/api/v1/examples", body, &result)
+	if err != nil {
+		resp.Diagnostics.AddError("Error creating example", err.Error())
+		return
+	}
 
-	// Save data into Terraform state
+	mapExampleResponseToState(&data, &result)
+	tflog.Trace(ctx, "created example resource", map[string]interface{}{"id": result.ID})
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *ExampleResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var data ExampleResourceModel
-
-	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read example, got error: %s", err))
-	//     return
-	// }
+	var result exampleAPIResponse
+	err := r.client.Get(ctx, "/api/v1/examples/"+data.ID.ValueString(), nil, &result)
+	if err != nil {
+		if client.IsNotFound(err) {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		resp.Diagnostics.AddError("Error reading example", err.Error())
+		return
+	}
 
-	// Save updated data into Terraform state
+	mapExampleResponseToState(&data, &result)
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *ExampleResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data ExampleResourceModel
-
-	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update example, got error: %s", err))
-	//     return
-	// }
+	body := exampleAPIUpdateRequest{
+		Inputs: json.RawMessage(data.Inputs.ValueString()),
+	}
 
-	// Save updated data into Terraform state
+	if !data.DatasetID.IsNull() && !data.DatasetID.IsUnknown() {
+		v := data.DatasetID.ValueString()
+		body.DatasetID = &v
+	}
+	if !data.Outputs.IsNull() && !data.Outputs.IsUnknown() {
+		body.Outputs = json.RawMessage(data.Outputs.ValueString())
+	}
+	if !data.Metadata.IsNull() && !data.Metadata.IsUnknown() {
+		body.Metadata = json.RawMessage(data.Metadata.ValueString())
+	}
+	if !data.Split.IsNull() && !data.Split.IsUnknown() {
+		v := data.Split.ValueString()
+		body.Split = &v
+	}
+	if !data.SourceRunID.IsNull() && !data.SourceRunID.IsUnknown() {
+		v := data.SourceRunID.ValueString()
+		body.SourceRunID = &v
+	}
+
+	var result exampleAPIResponse
+	err := r.client.Patch(ctx, "/api/v1/examples/"+data.ID.ValueString(), body, &result)
+	if err != nil {
+		resp.Diagnostics.AddError("Error updating example", err.Error())
+		return
+	}
+
+	mapExampleResponseToState(&data, &result)
+	tflog.Trace(ctx, "updated example resource", map[string]interface{}{"id": result.ID})
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *ExampleResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var data ExampleResourceModel
-
-	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete example, got error: %s", err))
-	//     return
-	// }
+	err := r.client.Delete(ctx, "/api/v1/examples/"+data.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Error deleting example", err.Error())
+		return
+	}
+
+	tflog.Trace(ctx, "deleted example resource", map[string]interface{}{"id": data.ID.ValueString()})
 }
 
 func (r *ExampleResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+// mapExampleResponseToState translates the API response into Terraform state,
+// handling the JSON fields with the care of a good trail cook.
+func mapExampleResponseToState(data *ExampleResourceModel, result *exampleAPIResponse) {
+	data.ID = types.StringValue(result.ID)
+	data.DatasetID = types.StringValue(result.DatasetID)
+
+	if len(result.Inputs) > 0 && string(result.Inputs) != "null" {
+		data.Inputs = types.StringValue(string(result.Inputs))
+	}
+
+	if len(result.Outputs) > 0 && string(result.Outputs) != "null" {
+		data.Outputs = types.StringValue(string(result.Outputs))
+	} else {
+		data.Outputs = types.StringNull()
+	}
+
+	if len(result.Metadata) > 0 && string(result.Metadata) != "null" {
+		data.Metadata = types.StringValue(string(result.Metadata))
+	} else {
+		data.Metadata = types.StringNull()
+	}
+
+	if result.Split != nil {
+		data.Split = types.StringValue(*result.Split)
+	} else {
+		data.Split = types.StringNull()
+	}
+
+	if result.SourceRunID != nil {
+		data.SourceRunID = types.StringValue(*result.SourceRunID)
+	} else {
+		data.SourceRunID = types.StringNull()
+	}
+
+	data.CreatedAt = types.StringValue(result.CreatedAt)
+	data.ModifiedAt = types.StringValue(result.ModifiedAt)
 }

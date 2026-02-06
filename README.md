@@ -1,64 +1,244 @@
-# Terraform Provider Scaffolding (Terraform Plugin Framework)
+<p align="center">
+  <img src="https://img.shields.io/github/license/bogware/terraform-provider-langsmith?style=flat-square" alt="License">
+  <img src="https://img.shields.io/github/v/release/bogware/terraform-provider-langsmith?style=flat-square" alt="Release">
+  <img src="https://img.shields.io/github/actions/workflow/status/bogware/terraform-provider-langsmith/test.yml?branch=main&style=flat-square&label=tests" alt="Tests">
+  <img src="https://img.shields.io/badge/terraform-%3E%3D1.0-blue?style=flat-square&logo=terraform" alt="Terraform">
+</p>
 
-_This template repository is built on the [Terraform Plugin Framework](https://github.com/hashicorp/terraform-plugin-framework). The template repository built on the [Terraform Plugin SDK](https://github.com/hashicorp/terraform-plugin-sdk) can be found at [terraform-provider-scaffolding](https://github.com/hashicorp/terraform-provider-scaffolding). See [Which SDK Should I Use?](https://developer.hashicorp.com/terraform/plugin/framework-benefits) in the Terraform documentation for additional information._
+# Terraform Provider for LangSmith
 
-This repository is a *template* for a [Terraform](https://www.terraform.io) provider. It is intended as a starting point for creating Terraform providers, containing:
+Manage your [LangSmith](https://smith.langchain.com/) infrastructure as code. This provider gives you full control over projects, datasets, annotation queues, prompts, automation rules, workspaces, and more through Terraform.
 
-- A resource and a data source (`internal/provider/`),
-- Examples (`examples/`) and generated documentation (`docs/`),
-- Miscellaneous meta files.
+## Quick Start
 
-These files contain boilerplate code that you will need to edit to create your own Terraform provider. Tutorials for creating Terraform providers can be found on the [HashiCorp Developer](https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework) platform. _Terraform Plugin Framework specific guides are titled accordingly._
+```hcl
+terraform {
+  required_providers {
+    langsmith = {
+      source  = "bogware/langsmith"
+      version = "~> 0.5"
+    }
+  }
+}
 
-Please see the [GitHub template repository documentation](https://help.github.com/en/github/creating-cloning-and-archiving-repositories/creating-a-repository-from-a-template) for how to create a new repository from this template on GitHub.
+provider "langsmith" {
+  # API key: set here or via LANGSMITH_API_KEY env var
+  # api_key = "lsv2_..."
 
-Once you've written your provider, you'll want to [publish it on the Terraform Registry](https://developer.hashicorp.com/terraform/registry/providers/publishing) so that others can use it.
+  # Workspace ID: required for org-scoped keys
+  # Set here or via LANGSMITH_TENANT_ID env var
+  # tenant_id = "your-workspace-uuid"
+}
 
-## Requirements
+# Create a tracing project
+resource "langsmith_project" "production" {
+  name        = "production"
+  description = "Production LLM tracing"
+}
 
-- [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
+# Create an evaluation dataset
+resource "langsmith_dataset" "golden" {
+  name        = "golden-dataset"
+  description = "Curated examples for model evaluation"
+  data_type   = "kv"
+}
+
+# Set up human review
+resource "langsmith_annotation_queue" "review" {
+  name                   = "human-review"
+  description            = "Queue for reviewing flagged outputs"
+  num_reviewers_per_item = 2
+}
+
+# Route errors to the review queue automatically
+resource "langsmith_run_rule" "errors" {
+  display_name               = "route-errors"
+  sampling_rate              = 1.0
+  session_id                 = langsmith_project.production.id
+  filter                     = "eq(status, \"error\")"
+  add_to_annotation_queue_id = langsmith_annotation_queue.review.id
+}
+```
+
+## Authentication
+
+| Method | Details |
+|--------|---------|
+| **Environment variable** (recommended) | `export LANGSMITH_API_KEY="lsv2_..."` |
+| **Provider attribute** | `api_key = "lsv2_..."` |
+
+### Org-Scoped API Keys
+
+If you're using an organization-scoped service key, you **must** also provide your workspace ID:
+
+| Method | Details |
+|--------|---------|
+| **Environment variable** | `export LANGSMITH_TENANT_ID="your-workspace-uuid"` |
+| **Provider attribute** | `tenant_id = "your-workspace-uuid"` |
+
+To find your workspace ID: **LangSmith Settings > Workspaces**, or:
+
+```bash
+curl -s -H "X-API-Key: $LANGSMITH_API_KEY" \
+  https://api.smith.langchain.com/api/v1/workspaces | jq '.[].id'
+```
+
+### Self-Hosted Instances
+
+Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
+
+## Resources
+
+| Resource | Description |
+|----------|-------------|
+| `langsmith_project` | Tracing projects (tracer sessions) |
+| `langsmith_dataset` | Evaluation datasets |
+| `langsmith_example` | Dataset examples (input/output pairs) |
+| `langsmith_annotation_queue` | Annotation queues for human review |
+| `langsmith_service_account` | Service accounts (create + delete only) |
+| `langsmith_service_key` | API service keys (create + delete only, key is sensitive) |
+| `langsmith_prompt` | Prompts in the LangSmith Hub |
+| `langsmith_run_rule` | Automation rules for run routing |
+| `langsmith_webhook` | Prompt webhooks |
+| `langsmith_feedback_config` | Feedback score configurations |
+| `langsmith_workspace` | Workspaces |
+| `langsmith_tag_key` | Tag keys for resource tagging |
+| `langsmith_tag_value` | Tag values (nested under tag keys) |
+| `langsmith_bulk_export_destination` | Bulk export S3 destinations |
+| `langsmith_bulk_export` | Bulk export jobs |
+| `langsmith_model_price_map` | Model pricing configuration |
+| `langsmith_usage_limit` | Usage limits |
+| `langsmith_playground_settings` | Playground settings |
+
+## Data Sources
+
+| Data Source | Description |
+|-------------|-------------|
+| `langsmith_project` | Look up a project by name or ID |
+| `langsmith_dataset` | Look up a dataset by name or ID |
+| `langsmith_workspace` | Look up a workspace by name or ID |
+| `langsmith_info` | LangSmith server information |
+| `langsmith_organization` | Current organization details |
+
+## Development
+
+### Requirements
+
 - [Go](https://golang.org/doc/install) >= 1.24
+- [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
 
-## Building The Provider
+### Build & Test
 
-1. Clone the repository
-1. Enter the repository directory
-1. Build the provider using the Go `install` command:
-
-```shell
-go install
+```bash
+make build        # Build the provider
+make test         # Run unit tests
+make testacc      # Run acceptance tests (needs LANGSMITH_API_KEY + LANGSMITH_TENANT_ID)
+make lint         # Run golangci-lint
+make generate     # Regenerate docs from schemas + examples
 ```
 
-## Adding Dependencies
+### Local Development
 
-This provider uses [Go modules](https://github.com/golang/go/wiki/Modules).
-Please see the Go documentation for the most up to date information about using Go modules.
+Add a dev override to `~/.terraformrc` to test without publishing:
 
-To add a new dependency `github.com/author/dependency` to your Terraform provider:
-
-```shell
-go get github.com/author/dependency
-go mod tidy
+```hcl
+provider_installation {
+  dev_overrides {
+    "bogware/langsmith" = "/path/to/your/GOBIN"
+  }
+  direct {}
+}
 ```
 
-Then commit the changes to `go.mod` and `go.sum`.
+Then `make install` and use Terraform normally (skip `terraform init`).
 
-## Using the provider
+### Running Acceptance Tests
 
-Fill this in for each provider
+Acceptance tests create real resources against the LangSmith API:
 
-## Developing the Provider
-
-If you wish to work on the provider, you'll first need [Go](http://www.golang.org) installed on your machine (see [Requirements](#requirements) above).
-
-To compile the provider, run `go install`. This will build the provider and put the provider binary in the `$GOPATH/bin` directory.
-
-To generate or update documentation, run `make generate`.
-
-In order to run the full suite of Acceptance tests, run `make testacc`.
-
-*Note:* Acceptance tests create real resources, and often cost money to run.
-
-```shell
+```bash
+export LANGSMITH_API_KEY="lsv2_..."
+export LANGSMITH_TENANT_ID="your-workspace-uuid"
 make testacc
 ```
+
+### Documentation
+
+Docs in `docs/` are auto-generated from schemas and `examples/`. After modifying any resource schema or example config:
+
+```bash
+make generate
+git add docs/
+```
+
+CI will fail if generated docs are stale.
+
+## Publishing & Releases
+
+### Prerequisites
+
+1. **GPG signing key** for release artifact signing:
+   ```bash
+   gpg --full-generate-key         # RSA, 4096 bits recommended
+   gpg --armor --export "<email>"  # Public key for the registry
+   ```
+
+2. **GitHub repository secrets** (Settings > Secrets > Actions):
+
+   | Secret | Value |
+   |--------|-------|
+   | `GPG_PRIVATE_KEY` | `gpg --armor --export-secret-keys "<key-id>"` |
+   | `PASSPHRASE` | GPG key passphrase |
+   | `LANGSMITH_API_KEY` | API key for CI acceptance tests |
+   | `LANGSMITH_TENANT_ID` | Workspace ID for CI acceptance tests |
+
+3. **Terraform Registry account** at [registry.terraform.io](https://registry.terraform.io/) (sign in with GitHub).
+
+### Creating a Release
+
+```bash
+# 1. Ensure everything is clean
+make generate
+git diff --exit-code       # No uncommitted changes
+make test && make testacc  # All tests pass
+
+# 2. Tag and push
+git tag v0.5.0
+git push origin v0.5.0
+```
+
+The [Release workflow](.github/workflows/release.yml) automatically:
+- Builds multi-platform binaries (Linux, macOS, Windows / amd64, arm64, 386, arm)
+- Signs SHA256SUMS with your GPG key
+- Creates a GitHub release with all artifacts
+
+### Submitting to the Registry
+
+1. Go to [registry.terraform.io/publish/provider](https://registry.terraform.io/publish/provider)
+2. Select `bogware/terraform-provider-langsmith`
+3. Add your GPG **public key**
+4. Future releases are detected and published automatically
+
+### Release Checklist
+
+- [ ] All acceptance tests pass (`make testacc`)
+- [ ] Generated docs are up to date (`make generate && git diff --exit-code`)
+- [ ] `CHANGELOG.md` updated with new version
+- [ ] Tag follows semver (`v0.5.0`)
+- [ ] GitHub release created by CI with: zip archives, SHA256SUMS, SHA256SUMS.sig, manifest.json
+- [ ] GPG public key registered at [registry.terraform.io](https://registry.terraform.io)
+
+## Registry Files
+
+These required files are already included:
+
+| File | Purpose |
+|------|---------|
+| `terraform-registry-manifest.json` | Declares protocol version (v6) |
+| `.goreleaser.yml` | Multi-platform build + GPG signing config |
+| `docs/` | Auto-generated documentation |
+| `examples/` | Example Terraform configs |
+
+## License
+
+[MPL-2.0](LICENSE)
