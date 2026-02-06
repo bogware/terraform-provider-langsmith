@@ -1,64 +1,124 @@
-# Terraform Provider Scaffolding (Terraform Plugin Framework)
+# Terraform Provider for LangSmith
 
-_This template repository is built on the [Terraform Plugin Framework](https://github.com/hashicorp/terraform-plugin-framework). The template repository built on the [Terraform Plugin SDK](https://github.com/hashicorp/terraform-plugin-sdk) can be found at [terraform-provider-scaffolding](https://github.com/hashicorp/terraform-provider-scaffolding). See [Which SDK Should I Use?](https://developer.hashicorp.com/terraform/plugin/framework-benefits) in the Terraform documentation for additional information._
-
-This repository is a *template* for a [Terraform](https://www.terraform.io) provider. It is intended as a starting point for creating Terraform providers, containing:
-
-- A resource and a data source (`internal/provider/`),
-- Examples (`examples/`) and generated documentation (`docs/`),
-- Miscellaneous meta files.
-
-These files contain boilerplate code that you will need to edit to create your own Terraform provider. Tutorials for creating Terraform providers can be found on the [HashiCorp Developer](https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework) platform. _Terraform Plugin Framework specific guides are titled accordingly._
-
-Please see the [GitHub template repository documentation](https://help.github.com/en/github/creating-cloning-and-archiving-repositories/creating-a-repository-from-a-template) for how to create a new repository from this template on GitHub.
-
-Once you've written your provider, you'll want to [publish it on the Terraform Registry](https://developer.hashicorp.com/terraform/registry/providers/publishing) so that others can use it.
+The LangSmith Terraform provider allows you to manage [LangSmith](https://smith.langchain.com/) resources as infrastructure-as-code. LangSmith is an observability, evaluation, and deployment platform for LLM applications.
 
 ## Requirements
 
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
-- [Go](https://golang.org/doc/install) >= 1.24
+- [Go](https://golang.org/doc/install) >= 1.24 (to build the provider)
+- A [LangSmith](https://smith.langchain.com/) account and API key
 
-## Building The Provider
+## Example Usage
 
-1. Clone the repository
-1. Enter the repository directory
-1. Build the provider using the Go `install` command:
+```hcl
+terraform {
+  required_providers {
+    langsmith = {
+      source = "bogware/langsmith"
+    }
+  }
+}
 
-```shell
-go install
+provider "langsmith" {
+  # Set via LANGSMITH_API_KEY environment variable, or:
+  # api_key = "lsv2_..."
+}
+
+# Create a project for tracing
+resource "langsmith_project" "production" {
+  name        = "production"
+  description = "Production LLM tracing"
+}
+
+# Create a dataset for evaluation
+resource "langsmith_dataset" "eval" {
+  name        = "evaluation-set"
+  description = "Golden dataset for model evaluation"
+  data_type   = "kv"
+}
+
+# Create an annotation queue for human review
+resource "langsmith_annotation_queue" "review" {
+  name                   = "human-review"
+  description            = "Queue for reviewing flagged outputs"
+  num_reviewers_per_item = 2
+}
+
+# Set up an automation rule
+resource "langsmith_run_rule" "sample" {
+  display_name               = "sample-errors"
+  sampling_rate              = 1.0
+  session_id                 = langsmith_project.production.id
+  filter                     = "eq(status, \"error\")"
+  add_to_annotation_queue_id = langsmith_annotation_queue.review.id
+}
 ```
 
-## Adding Dependencies
+## Authentication
 
-This provider uses [Go modules](https://github.com/golang/go/wiki/Modules).
-Please see the Go documentation for the most up to date information about using Go modules.
+The provider requires a LangSmith API key. You can provide it in two ways:
 
-To add a new dependency `github.com/author/dependency` to your Terraform provider:
+1. **Environment variable** (recommended): Set `LANGSMITH_API_KEY`
+2. **Provider configuration**: Set the `api_key` attribute
 
-```shell
-go get github.com/author/dependency
-go mod tidy
-```
+For self-hosted LangSmith instances, set the `api_url` attribute or `LANGSMITH_API_URL` environment variable.
 
-Then commit the changes to `go.mod` and `go.sum`.
+## Resources
 
-## Using the provider
+| Resource | Description |
+|----------|-------------|
+| `langsmith_project` | Manage tracing projects (tracer sessions) |
+| `langsmith_dataset` | Manage evaluation datasets |
+| `langsmith_example` | Manage dataset examples |
+| `langsmith_annotation_queue` | Manage annotation queues for human review |
+| `langsmith_service_account` | Manage service accounts |
+| `langsmith_service_key` | Manage API service keys |
+| `langsmith_prompt` | Manage prompts in the LangSmith Hub |
+| `langsmith_run_rule` | Manage automation rules for runs |
+| `langsmith_webhook` | Manage prompt webhooks |
+| `langsmith_feedback_config` | Manage feedback score configurations |
+| `langsmith_workspace` | Manage workspaces |
+| `langsmith_tag_key` | Manage tag keys |
+| `langsmith_tag_value` | Manage tag values |
+| `langsmith_bulk_export_destination` | Manage bulk export destinations (S3) |
+| `langsmith_bulk_export` | Manage bulk export jobs |
+| `langsmith_model_price_map` | Manage model pricing configuration |
+| `langsmith_usage_limit` | Manage usage limits |
+| `langsmith_playground_settings` | Manage playground settings |
 
-Fill this in for each provider
+## Data Sources
+
+| Data Source | Description |
+|-------------|-------------|
+| `langsmith_project` | Look up a project by name or ID |
+| `langsmith_dataset` | Look up a dataset by name or ID |
+| `langsmith_workspace` | Look up a workspace by name or ID |
+| `langsmith_info` | Retrieve LangSmith server information |
 
 ## Developing the Provider
 
-If you wish to work on the provider, you'll first need [Go](http://www.golang.org) installed on your machine (see [Requirements](#requirements) above).
-
-To compile the provider, run `go install`. This will build the provider and put the provider binary in the `$GOPATH/bin` directory.
-
-To generate or update documentation, run `make generate`.
-
-In order to run the full suite of Acceptance tests, run `make testacc`.
-
-*Note:* Acceptance tests create real resources, and often cost money to run.
+### Building
 
 ```shell
+make build
+```
+
+### Testing
+
+```shell
+# Unit tests
+make test
+
+# Acceptance tests (requires LANGSMITH_API_KEY)
 make testacc
 ```
+
+### Generating Documentation
+
+```shell
+make generate
+```
+
+## License
+
+MPL-2.0

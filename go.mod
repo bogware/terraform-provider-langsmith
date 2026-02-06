@@ -1,6 +1,6 @@
-module github.com/hashicorp/terraform-provider-scaffolding-framework
+module github.com/bogware/terraform-provider-langsmith
 
-go 1.25.5
+go 1.24.7
 
 require (
 	github.com/hashicorp/terraform-plugin-framework v1.17.0

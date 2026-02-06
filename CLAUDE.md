@@ -2,13 +2,14 @@
 
 ## Project Overview
 
-Terraform provider built on the **Terraform Plugin Framework** (not the legacy SDK v2). This is a scaffolding/template provider (`scaffolding`) that demonstrates all modern provider features: resources, data sources, ephemeral resources, functions, and actions. All provider logic lives in `internal/provider/`.
+Terraform provider for [LangSmith](https://smith.langchain.com/) built on the **Terraform Plugin Framework** (not the legacy SDK v2). Manages LangSmith resources including projects, datasets, annotation queues, prompts, automation rules, and more via the [LangSmith REST API](https://api.smith.langchain.com/redoc).
 
-- **Go module**: `github.com/hashicorp/terraform-provider-scaffolding-framework`
-- **Provider name**: `scaffolding`
-- **Registry address**: `registry.terraform.io/hashicorp/scaffolding`
+- **Go module**: `github.com/bogware/terraform-provider-langsmith`
+- **Provider name**: `langsmith`
+- **Registry address**: `registry.terraform.io/bogware/langsmith`
 - **Protocol**: Terraform Plugin Protocol v6 only
 - **License**: MPL-2.0
+- **LangSmith API**: `https://api.smith.langchain.com` (configurable for self-hosted)
 
 ## Build & Development Commands
 
@@ -23,59 +24,107 @@ make test         # Unit tests: go test -v -cover -timeout=120s -parallel=10 ./.
 make testacc      # Acceptance tests: TF_ACC=1 go test -v -cover -timeout 120m ./...
 ```
 
-**Important**: After adding or modifying resources/data sources/functions, run `make generate` and commit the resulting changes to `docs/`. CI will fail if generated files are out of date.
+**Important**: After adding or modifying resources/data sources, run `make generate` and commit the resulting changes to `docs/`. CI will fail if generated files are out of date.
 
 ## Project Structure
 
 ```
-main.go                              # Entry point, provider server setup
-internal/provider/
-  provider.go                        # Provider definition, schema, Configure(), resource/datasource registration
-  provider_test.go                   # Test helpers: provider factories, testAccPreCheck
-  example_resource.go                # Resource implementation (CRUD + ImportState)
-  example_resource_test.go           # Resource acceptance tests
-  example_data_source.go             # Data source implementation (Read)
-  example_data_source_test.go        # Data source acceptance tests
-  example_ephemeral_resource.go      # Ephemeral resource implementation (Open)
-  example_ephemeral_resource_test.go # Ephemeral resource acceptance tests
-  example_function.go                # Provider-defined function implementation
-  example_function_test.go           # Function unit tests
-  example_action.go                  # Action implementation (Invoke)
-  example_action_test.go             # Action acceptance tests
-tools/tools.go                       # Code generation: copywrite headers, terraform fmt, tfplugindocs
-examples/                            # Example .tf configs (used by doc generator)
-docs/                                # Auto-generated documentation (do NOT edit manually)
+main.go                                  # Entry point, provider server setup (registry.terraform.io/bogware/langsmith)
+internal/
+  client/
+    client.go                            # HTTP client for LangSmith API (auth, JSON, error handling)
+  provider/
+    provider.go                          # Provider definition: schema (api_key, api_url), Configure(), resource registration
+    provider_test.go                     # Test helpers: provider factories, testAccPreCheck
+
+    # Phase 1: Core Resources
+    project_resource.go                  # langsmith_project (TracerSession CRUD)
+    dataset_resource.go                  # langsmith_dataset (Dataset CRUD)
+    example_resource.go                  # langsmith_example (Dataset example CRUD)
+    annotation_queue_resource.go         # langsmith_annotation_queue (Annotation queue CRUD)
+    service_account_resource.go          # langsmith_service_account (Create + Delete only)
+    service_key_resource.go              # langsmith_service_key (Create + Delete only, key sensitive)
+
+    # Phase 2: Prompts & Automation
+    prompt_resource.go                   # langsmith_prompt (Hub repo CRUD, import via owner/handle)
+    run_rule_resource.go                 # langsmith_run_rule (Automation rule CRUD)
+    webhook_resource.go                  # langsmith_webhook (Prompt webhook CRUD)
+    feedback_config_resource.go          # langsmith_feedback_config (Feedback config, keyed by feedback_key)
+
+    # Phase 3: Workspace & Governance
+    workspace_resource.go                # langsmith_workspace (Workspace CRUD)
+    tag_key_resource.go                  # langsmith_tag_key (Tag key CRUD)
+    tag_value_resource.go                # langsmith_tag_value (Tag value CRUD, nested under tag_key)
+
+    # Phase 4: Export & Settings
+    bulk_export_destination_resource.go  # langsmith_bulk_export_destination (S3 destination, no API delete)
+    bulk_export_resource.go              # langsmith_bulk_export (Export job, cancel-as-delete)
+    model_price_map_resource.go          # langsmith_model_price_map (Model pricing CRUD)
+    usage_limit_resource.go              # langsmith_usage_limit (Usage limit upsert)
+    playground_settings_resource.go      # langsmith_playground_settings (Playground settings CRUD)
+
+    # Data Sources
+    project_data_source.go               # langsmith_project (lookup by name or id)
+    dataset_data_source.go               # langsmith_dataset (lookup by name or id)
+    workspace_data_source.go             # langsmith_workspace (lookup by name or id)
+    info_data_source.go                  # langsmith_info (server info, no inputs)
+
+tools/tools.go                           # Code generation: copywrite headers, terraform fmt, tfplugindocs
+examples/                                # Example .tf configs (used by doc generator)
+docs/                                    # Auto-generated documentation (do NOT edit manually)
 ```
+
+## Authentication
+
+The provider authenticates via `x-api-key` header. Configuration:
+- Provider attribute: `api_key` (sensitive)
+- Environment variable: `LANGSMITH_API_KEY`
+- API URL defaults to `https://api.smith.langchain.com`, override with `api_url` attribute or `LANGSMITH_API_URL` env var
 
 ## Code Conventions
 
 ### File Naming
-- Implementation: `<name>_<type>.go` (e.g., `example_resource.go`, `example_data_source.go`)
-- Tests: `<name>_<type>_test.go` (e.g., `example_resource_test.go`)
+- Resources: `<name>_resource.go` (e.g., `project_resource.go`, `dataset_resource.go`)
+- Data sources: `<name>_data_source.go` (e.g., `project_data_source.go`)
+- Tests: `<name>_<type>_test.go`
 
 ### Type Naming
-- Resource struct: `ExampleResource` with model `ExampleResourceModel`
-- Data source struct: `ExampleDataSource` with model `ExampleDataSourceModel`
-- Constructor: `NewExampleResource() resource.Resource`
-- Terraform type name: `req.ProviderTypeName + "_example"` (yields `scaffolding_example`)
+- Resource struct: `ProjectResource` with model `ProjectResourceModel`
+- Data source struct: `ProjectDataSource` with model `ProjectDataSourceModel`
+- Constructor: `NewProjectResource() resource.Resource`
+- Terraform type name: `req.ProviderTypeName + "_project"` (yields `langsmith_project`)
+- API structs: unexported, e.g., `projectCreateRequest`, `projectAPIResponse`
 
 ### Interface Compliance
 Every type must have a compile-time interface check at the top of the file:
 ```go
-var _ resource.Resource = &ExampleResource{}
-var _ resource.ResourceWithImportState = &ExampleResource{}
+var _ resource.Resource = &ProjectResource{}
+var _ resource.ResourceWithImportState = &ProjectResource{}
 ```
 
 ### Resource Implementation Pattern
-Each resource/data source/action follows this structure:
+Each resource follows this structure:
 1. Interface compliance var check
 2. Constructor function (`New...()`)
-3. Struct definition with client field
-4. Model struct with `tfsdk:` tags (snake_case attribute names)
-5. `Metadata()` - sets type name
-6. `Schema()` - defines attributes with `MarkdownDescription`
-7. `Configure()` - receives provider client from `req.ProviderData`
-8. CRUD methods (Create/Read/Update/Delete) or Read (data sources) or Open (ephemeral) or Invoke (actions)
+3. Struct definition with `client *client.Client` field
+4. Terraform model struct with `tfsdk:` tags (snake_case attribute names)
+5. Unexported API request/response structs for JSON marshaling
+6. `Metadata()` - sets type name
+7. `Schema()` - defines attributes with `MarkdownDescription`
+8. `Configure()` - casts `req.ProviderData` to `*client.Client`
+9. CRUD methods (Create/Read/Update/Delete)
+10. `ImportState()` - usually `resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)`
+
+### Client Usage
+The `internal/client` package provides a generic HTTP client:
+```go
+client.Get(ctx, "/api/v1/sessions/UUID", nil, &result)
+client.Post(ctx, "/api/v1/sessions", body, &result)
+client.Patch(ctx, "/api/v1/sessions/UUID", body, &result)
+client.Delete(ctx, "/api/v1/sessions/UUID")
+```
+- On 404, use `client.IsNotFound(err)` to check, then `resp.State.RemoveResource(ctx)`
+- JSON fields that map to API objects (inputs, outputs, metadata, extra, settings) are stored as JSON strings in Terraform state
 
 ### Error Handling
 - Use `resp.Diagnostics.AddError(summary, detail)` for errors
@@ -88,20 +137,26 @@ Use `tflog.Trace(ctx, "message")` from `github.com/hashicorp/terraform-plugin-lo
 ### License Headers
 All `.go` files must have the copyright header:
 ```go
-// Copyright IBM Corp. 2021, 2025
+// Copyright (c) Bogware, Inc. 2025
 // SPDX-License-Identifier: MPL-2.0
 ```
 Run `make generate` to auto-apply headers via copywrite.
+
+## LangSmith API Reference
+
+- **OpenAPI spec**: `https://api.smith.langchain.com/openapi.json` (697KB, comprehensive)
+- **Redoc UI**: `https://api.smith.langchain.com/redoc`
+- **Swagger UI**: `https://api.smith.langchain.com/docs`
+- **Auth header**: `X-API-Key: <api_key>`
+- **Key endpoint groups**: sessions, datasets, examples, annotation-queues, repos, runs/rules, prompt-webhooks, feedback-configs, workspaces, bulk-exports, model-price-map, service-accounts, orgs
 
 ## Testing
 
 ### Acceptance Tests
 - Use `resource.Test(t, resource.TestCase{...})` with `testAccProtoV6ProviderFactories`
-- For ephemeral resources, use `testAccProtoV6ProviderFactoriesWithEcho` (includes the echo provider)
-- Test function names: `TestAcc<ResourceName>` (e.g., `TestAccExampleResource`)
+- Test function names: `TestAcc<ResourceName>` (e.g., `TestAccProjectResource`)
 - Config helpers: `testAcc<Resource>Config(...)` functions returning HCL strings
-- State checks use `statecheck.ExpectKnownValue()` with `knownvalue` matchers and `tfjsonpath`
-- Version-gated tests use `tfversion.SkipBelow()` for features requiring newer Terraform versions
+- Requires `LANGSMITH_API_KEY` environment variable
 
 ### Running Tests
 ```bash
@@ -109,25 +164,16 @@ make test         # Unit tests only (no real infrastructure)
 make testacc      # Full acceptance tests (creates real resources, needs TF_ACC=1)
 ```
 
-CI runs acceptance tests against Terraform 1.13.x and 1.14.x.
-
-## Linting
-
-Configured via `.golangci.yml`. Key rules:
-- **depguard**: Blocks imports from `terraform-plugin-sdk/v2` — use Plugin Framework equivalents instead
-- Enabled linters: `errcheck`, `staticcheck`, `unused`, `misspell`, `forcetypeassert`, `usetesting`, among others
-- Run with `make lint` or `golangci-lint run`
-
 ## Adding a New Resource
 
 1. Create `internal/provider/<name>_resource.go` with the resource struct, model, and CRUD methods
 2. Create `internal/provider/<name>_resource_test.go` with acceptance tests
 3. Register in `provider.go` by adding to `Resources()` return slice
-4. Add example config in `examples/resources/<provider>_<name>/resource.tf`
+4. Add example config in `examples/resources/langsmith_<name>/resource.tf`
 5. Run `make generate` to regenerate docs
 6. Verify with `make lint && make test`
 
-The same pattern applies for data sources (`DataSources()`), ephemeral resources (`EphemeralResources()`), functions (`Functions()`), and actions (`Actions()`).
+The same pattern applies for data sources (`DataSources()`).
 
 ## Key Dependencies
 
@@ -143,11 +189,16 @@ The same pattern applies for data sources (`DataSources()`), ephemeral resources
 - **test.yml**: On push/PR — builds, lints, verifies `make generate` is clean, runs acceptance tests
 - **release.yml**: On version tags (`v*`) — GoReleaser builds multi-platform binaries with GPG signing
 - Go version is read from `go.mod` (`go 1.25.5`)
+- Registry-compatible: semver tags, SHA256SUMS + GPG signature, multi-platform binaries
 
 ## Common Pitfalls
 
 - Never import `terraform-plugin-sdk/v2` — the linter will reject it. Use `terraform-plugin-framework` equivalents.
 - Don't edit files in `docs/` manually — they are regenerated by `make generate` from schemas and `examples/`.
 - Always run `make generate` before committing if you changed schemas or examples.
-- Acceptance tests require `TF_ACC=1` environment variable to run.
-- The provider address in `main.go` needs updating when forking this template for a real provider.
+- Acceptance tests require `TF_ACC=1` and `LANGSMITH_API_KEY` environment variables.
+- Some resources (service_account, service_key) don't support update — they use RequiresReplace.
+- The feedback_config resource uses `feedback_key` as its identifier, not a UUID.
+- The prompt resource uses `owner/repo_handle` as its import ID format.
+- The bulk_export_destination has no API delete endpoint — delete is a state-only removal.
+- JSON string fields (inputs, outputs, metadata, settings, extra) must be marshaled/unmarshaled between Terraform strings and API objects.

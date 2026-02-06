@@ -1,14 +1,11 @@
-# NOTE: This file is for HashiCorp specific licensing automation and can be deleted after creating a new repo with this template.
 schema_version = 1
 
 project {
   license        = "MPL-2.0"
-  copyright_year = 2021
+  copyright_year = 2025
+  copyright_holder = "Bogware, Inc."
 
   header_ignore = [
-    # internal catalog metadata (prose)
-    "META.d/**/*.yaml",
-
     # examples used within documentation (prose)
     "examples/**",
 
