@@ -5,6 +5,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -39,6 +40,7 @@ type PromptResource struct {
 type PromptResourceModel struct {
 	ID             types.String `tfsdk:"id"`
 	RepoHandle     types.String `tfsdk:"repo_handle"`
+	Manifest       types.String `tfsdk:"manifest"`
 	IsPublic       types.Bool   `tfsdk:"is_public"`
 	Description    types.String `tfsdk:"description"`
 	Readme         types.String `tfsdk:"readme"`
@@ -46,6 +48,7 @@ type PromptResourceModel struct {
 	IsArchived     types.Bool   `tfsdk:"is_archived"`
 	Owner          types.String `tfsdk:"owner"`
 	FullName       types.String `tfsdk:"full_name"`
+	CommitHash     types.String `tfsdk:"commit_hash"`
 	TenantID       types.String `tfsdk:"tenant_id"`
 	NumCommits     types.Int64  `tfsdk:"num_commits"`
 	NumLikes       types.Int64  `tfsdk:"num_likes"`
@@ -72,6 +75,26 @@ type promptUpdateRequest struct {
 	IsPublic    *bool    `json:"is_public,omitempty"`
 	Tags        []string `json:"tags,omitempty"`
 	IsArchived  *bool    `json:"is_archived,omitempty"`
+}
+
+// promptCommitRequest is the payload for branding a new version of the prompt.
+type promptCommitRequest struct {
+	Manifest json.RawMessage `json:"manifest"`
+}
+
+// promptCommitResponse wraps the commit the API sends back after a successful brand.
+type promptCommitResponse struct {
+	Commit struct {
+		ID         string          `json:"id"`
+		CommitHash string          `json:"commit_hash"`
+		Manifest   json.RawMessage `json:"manifest"`
+	} `json:"commit"`
+}
+
+// promptLatestCommitResponse is the shape of GET /commits/-/{repo}/latest.
+type promptLatestCommitResponse struct {
+	CommitHash string          `json:"commit_hash"`
+	Manifest   json.RawMessage `json:"manifest"`
 }
 
 // promptAPIResponse is what the LangSmith API sends back when you come asking about a prompt.
@@ -118,6 +141,11 @@ func (r *PromptResource) Schema(ctx context.Context, req resource.SchemaRequest,
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
+			"manifest": schema.StringAttribute{
+				MarkdownDescription: "JSON string of the prompt manifest (LangChain serialization format). This is the actual prompt content — the template, messages, and variables. Setting this creates a new commit in the prompt repo.",
+				Optional:            true,
+				Computed:            true,
+			},
 			"is_public": schema.BoolAttribute{
 				MarkdownDescription: "Whether the prompt is publicly accessible.",
 				Required:            true,
@@ -149,6 +177,10 @@ func (r *PromptResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				MarkdownDescription: "The full name of the prompt (owner/repo_handle).",
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"commit_hash": schema.StringAttribute{
+				MarkdownDescription: "The hash of the current commit — the latest brand on the cattle.",
+				Computed:            true,
 			},
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "The tenant ID that owns this prompt.",
@@ -238,6 +270,34 @@ func (r *PromptResource) Create(ctx context.Context, req resource.CreateRequest,
 	data.CreatedAt = types.StringValue(result.Repo.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.Repo.UpdatedAt)
 
+	// If the trail boss brought a manifest, commit it to the repo right away.
+	if !data.Manifest.IsNull() && !data.Manifest.IsUnknown() {
+		commitBody := promptCommitRequest{
+			Manifest: json.RawMessage(data.Manifest.ValueString()),
+		}
+		var commitResult promptCommitResponse
+		err := r.client.Post(ctx, fmt.Sprintf("/commits/-/%s", data.RepoHandle.ValueString()), commitBody, &commitResult)
+		if err != nil {
+			resp.Diagnostics.AddError("Error creating prompt commit", err.Error())
+			return
+		}
+		data.CommitHash = types.StringValue(commitResult.Commit.CommitHash)
+		data.LastCommitHash = types.StringValue(commitResult.Commit.CommitHash)
+		data.NumCommits = types.Int64Value(1)
+	} else {
+		data.Manifest = types.StringNull()
+		data.CommitHash = types.StringNull()
+		data.LastCommitHash = types.StringNull()
+		data.NumCommits = types.Int64Value(0)
+	}
+
+	// Set remaining computed fields that the create response may not populate.
+	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
+	data.TenantID = types.StringValue(result.Repo.TenantID)
+	data.NumLikes = types.Int64Value(result.Repo.NumLikes)
+	data.NumViews = types.Int64Value(result.Repo.NumViews)
+	data.NumDownloads = types.Int64Value(result.Repo.NumDownloads)
+
 	tflog.Trace(ctx, "created prompt resource", map[string]interface{}{"id": result.Repo.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -309,6 +369,28 @@ func (r *PromptResource) Read(ctx context.Context, req resource.ReadRequest, res
 		data.Tags = types.ListNull(types.StringType)
 	}
 
+	// Ride over to the commits corral and fetch the latest manifest.
+	if result.Repo.NumCommits > 0 {
+		var latestCommit promptLatestCommitResponse
+		commitErr := r.client.Get(ctx, fmt.Sprintf("/commits/-/%s/latest", repoHandle), nil, &latestCommit)
+		if commitErr != nil {
+			resp.Diagnostics.AddWarning("Error reading prompt manifest", commitErr.Error())
+		} else {
+			data.CommitHash = types.StringValue(latestCommit.CommitHash)
+			if len(latestCommit.Manifest) > 0 && string(latestCommit.Manifest) != "null" {
+				data.Manifest = types.StringValue(string(latestCommit.Manifest))
+			} else {
+				data.Manifest = types.StringNull()
+			}
+		}
+	} else {
+		data.CommitHash = types.StringNull()
+		// Only null out manifest if user hasn't set it in config.
+		if data.Manifest.IsUnknown() {
+			data.Manifest = types.StringNull()
+		}
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -359,7 +441,23 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	// PATCH doesn't return the full resource, so we ride back to the API for the latest state
+	// If the manifest has changed, commit the new version.
+	if !data.Manifest.IsNull() && !data.Manifest.IsUnknown() &&
+		data.Manifest.ValueString() != state.Manifest.ValueString() {
+		commitBody := promptCommitRequest{
+			Manifest: json.RawMessage(data.Manifest.ValueString()),
+		}
+		var commitResult promptCommitResponse
+		commitErr := r.client.Post(ctx, fmt.Sprintf("/commits/-/%s", repoHandle), commitBody, &commitResult)
+		if commitErr != nil {
+			resp.Diagnostics.AddError("Error creating prompt commit", commitErr.Error())
+			return
+		}
+		data.CommitHash = types.StringValue(commitResult.Commit.CommitHash)
+		data.LastCommitHash = types.StringValue(commitResult.Commit.CommitHash)
+	}
+
+	// PATCH doesn't return the full resource, so we ride back to the API for the latest state.
 	var result promptAPIResponse
 	err = r.client.Get(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", owner, data.RepoHandle.ValueString()), nil, &result)
 	if err != nil {
@@ -384,6 +482,22 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 		data.LastCommitHash = types.StringValue(*result.Repo.LastCommitHash)
 	} else {
 		data.LastCommitHash = types.StringNull()
+	}
+
+	// Fetch the latest manifest if we haven't just committed one.
+	if data.CommitHash.IsNull() || data.CommitHash.IsUnknown() {
+		if result.Repo.NumCommits > 0 {
+			var latestCommit promptLatestCommitResponse
+			commitErr := r.client.Get(ctx, fmt.Sprintf("/commits/-/%s/latest", repoHandle), nil, &latestCommit)
+			if commitErr == nil {
+				data.CommitHash = types.StringValue(latestCommit.CommitHash)
+				if len(latestCommit.Manifest) > 0 && string(latestCommit.Manifest) != "null" {
+					data.Manifest = types.StringValue(string(latestCommit.Manifest))
+				}
+			}
+		} else {
+			data.CommitHash = types.StringNull()
+		}
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
