@@ -328,14 +328,20 @@ func mapAnnotationQueueResponseToState(data *AnnotationQueueResourceModel, resul
 
 	if result.EnableReservations != nil {
 		data.EnableReservations = types.BoolValue(*result.EnableReservations)
+	} else {
+		data.EnableReservations = types.BoolNull()
 	}
 
 	if result.NumReviewersPerItem != nil {
 		data.NumReviewersPerItem = types.Int64Value(*result.NumReviewersPerItem)
+	} else {
+		data.NumReviewersPerItem = types.Int64Null()
 	}
 
 	if result.ReservationMinutes != nil {
 		data.ReservationMinutes = types.Int64Value(*result.ReservationMinutes)
+	} else {
+		data.ReservationMinutes = types.Int64Null()
 	}
 
 	if result.DefaultDataset != nil {

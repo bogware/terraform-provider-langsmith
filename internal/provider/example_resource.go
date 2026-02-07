@@ -294,6 +294,8 @@ func mapExampleResponseToState(data *ExampleResourceModel, result *exampleAPIRes
 
 	if len(result.Inputs) > 0 && string(result.Inputs) != "null" {
 		data.Inputs = types.StringValue(string(result.Inputs))
+	} else {
+		data.Inputs = types.StringNull()
 	}
 
 	if len(result.Outputs) > 0 && string(result.Outputs) != "null" {
