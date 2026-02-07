@@ -261,7 +261,11 @@ func (r *BulkExportResource) Create(ctx context.Context, req resource.CreateRequ
 	if !data.ExportFields.IsNull() && !data.ExportFields.IsUnknown() {
 		var fields []string
 		for _, elem := range data.ExportFields.Elements() {
-			fields = append(fields, elem.(types.String).ValueString())
+			strVal, ok := elem.(types.String)
+			if !ok {
+				continue
+			}
+			fields = append(fields, strVal.ValueString())
 		}
 		body.ExportFields = fields
 	}
