@@ -31,12 +31,14 @@ type InfoDataSource struct {
 }
 
 // InfoDataSourceModel holds the server intel: version string, license expiration,
-// and the batch ingest configuration as a raw JSON string.
+// batch ingest configuration, and instance flags -- everything you need to know
+// before riding into town.
 type InfoDataSourceModel struct {
 	ID                    types.String `tfsdk:"id"`
 	Version               types.String `tfsdk:"version"`
 	LicenseExpirationTime types.String `tfsdk:"license_expiration_time"`
 	BatchIngestConfig     types.String `tfsdk:"batch_ingest_config"`
+	InstanceFlags         types.String `tfsdk:"instance_flags"`
 }
 
 // infoDataSourceAPIResponse is the API response for the info endpoint.
@@ -44,6 +46,7 @@ type infoDataSourceAPIResponse struct {
 	Version               string          `json:"version"`
 	LicenseExpirationTime *string         `json:"license_expiration_time"`
 	BatchIngestConfig     json.RawMessage `json:"batch_ingest_config"`
+	InstanceFlags         json.RawMessage `json:"instance_flags"`
 }
 
 func (d *InfoDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -68,6 +71,10 @@ func (d *InfoDataSource) Schema(ctx context.Context, req datasource.SchemaReques
 			},
 			"batch_ingest_config": schema.StringAttribute{
 				MarkdownDescription: "JSON string of the batch ingest configuration.",
+				Computed:            true,
+			},
+			"instance_flags": schema.StringAttribute{
+				MarkdownDescription: "JSON string of instance feature flags.",
 				Computed:            true,
 			},
 		},
@@ -118,6 +125,12 @@ func (d *InfoDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		data.BatchIngestConfig = types.StringValue(string(result.BatchIngestConfig))
 	} else {
 		data.BatchIngestConfig = types.StringNull()
+	}
+
+	if len(result.InstanceFlags) > 0 && string(result.InstanceFlags) != "null" {
+		data.InstanceFlags = types.StringValue(string(result.InstanceFlags))
+	} else {
+		data.InstanceFlags = types.StringNull()
 	}
 
 	tflog.Trace(ctx, "read info data source")

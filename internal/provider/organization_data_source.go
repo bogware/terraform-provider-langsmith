@@ -31,20 +31,27 @@ type OrganizationDataSource struct {
 }
 
 // OrganizationDataSourceModel holds the read-only attributes for the current org:
-// display name, whether it is a personal account, and the plan tier.
+// display name, whether it is a personal account, the plan tier, and how much
+// room is left on the ranch.
 type OrganizationDataSourceModel struct {
-	ID          types.String `tfsdk:"id"`
-	DisplayName types.String `tfsdk:"display_name"`
-	IsPersonal  types.Bool   `tfsdk:"is_personal"`
-	Tier        types.String `tfsdk:"tier"`
+	ID                   types.String `tfsdk:"id"`
+	DisplayName          types.String `tfsdk:"display_name"`
+	OrganizationHandle   types.String `tfsdk:"organization_handle"`
+	IsPersonal           types.Bool   `tfsdk:"is_personal"`
+	Tier                 types.String `tfsdk:"tier"`
+	ReachedMaxWorkspaces types.Bool   `tfsdk:"reached_max_workspaces"`
+	Disabled             types.Bool   `tfsdk:"disabled"`
 }
 
 // orgDataSourceAPIResponse is the API response for the org endpoint.
 type orgDataSourceAPIResponse struct {
-	ID          string `json:"id"`
-	DisplayName string `json:"display_name"`
-	IsPersonal  bool   `json:"is_personal"`
-	Tier        string `json:"tier"`
+	ID                   string  `json:"id"`
+	DisplayName          string  `json:"display_name"`
+	OrganizationHandle   *string `json:"organization_handle"`
+	IsPersonal           bool    `json:"is_personal"`
+	Tier                 string  `json:"tier"`
+	ReachedMaxWorkspaces *bool   `json:"reached_max_workspaces"`
+	Disabled             *bool   `json:"disabled"`
 }
 
 func (d *OrganizationDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -63,12 +70,24 @@ func (d *OrganizationDataSource) Schema(ctx context.Context, req datasource.Sche
 				MarkdownDescription: "The display name of the organization.",
 				Computed:            true,
 			},
+			"organization_handle": schema.StringAttribute{
+				MarkdownDescription: "The unique handle of the organization.",
+				Computed:            true,
+			},
 			"is_personal": schema.BoolAttribute{
 				MarkdownDescription: "Whether this is a personal organization.",
 				Computed:            true,
 			},
 			"tier": schema.StringAttribute{
 				MarkdownDescription: "The plan tier of the organization (e.g., `free`, `developer`, `plus`, `enterprise`).",
+				Computed:            true,
+			},
+			"reached_max_workspaces": schema.BoolAttribute{
+				MarkdownDescription: "Whether the organization has reached its maximum number of workspaces.",
+				Computed:            true,
+			},
+			"disabled": schema.BoolAttribute{
+				MarkdownDescription: "Whether the organization is disabled.",
 				Computed:            true,
 			},
 		},
@@ -108,8 +127,27 @@ func (d *OrganizationDataSource) Read(ctx context.Context, req datasource.ReadRe
 
 	data.ID = types.StringValue(result.ID)
 	data.DisplayName = types.StringValue(result.DisplayName)
+
+	if result.OrganizationHandle != nil {
+		data.OrganizationHandle = types.StringValue(*result.OrganizationHandle)
+	} else {
+		data.OrganizationHandle = types.StringNull()
+	}
+
 	data.IsPersonal = types.BoolValue(result.IsPersonal)
 	data.Tier = types.StringValue(result.Tier)
+
+	if result.ReachedMaxWorkspaces != nil {
+		data.ReachedMaxWorkspaces = types.BoolValue(*result.ReachedMaxWorkspaces)
+	} else {
+		data.ReachedMaxWorkspaces = types.BoolNull()
+	}
+
+	if result.Disabled != nil {
+		data.Disabled = types.BoolValue(*result.Disabled)
+	} else {
+		data.Disabled = types.BoolNull()
+	}
 
 	tflog.Trace(ctx, "read organization data source", map[string]interface{}{"id": result.ID})
 

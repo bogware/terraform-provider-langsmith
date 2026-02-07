@@ -5,6 +5,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 
@@ -33,22 +34,30 @@ type ProjectDataSource struct {
 // ProjectDataSourceModel holds the read-only attributes returned for a project:
 // name, description, tenant, start time, and run count.
 type ProjectDataSourceModel struct {
-	ID          types.String `tfsdk:"id"`
-	Name        types.String `tfsdk:"name"`
-	Description types.String `tfsdk:"description"`
-	TenantID    types.String `tfsdk:"tenant_id"`
-	StartTime   types.String `tfsdk:"start_time"`
-	RunCount    types.Int64  `tfsdk:"run_count"`
+	ID                 types.String `tfsdk:"id"`
+	Name               types.String `tfsdk:"name"`
+	Description        types.String `tfsdk:"description"`
+	DefaultDatasetID   types.String `tfsdk:"default_dataset_id"`
+	ReferenceDatasetID types.String `tfsdk:"reference_dataset_id"`
+	Extra              types.String `tfsdk:"extra"`
+	TraceTier          types.String `tfsdk:"trace_tier"`
+	TenantID           types.String `tfsdk:"tenant_id"`
+	StartTime          types.String `tfsdk:"start_time"`
+	RunCount           types.Int64  `tfsdk:"run_count"`
 }
 
 // projectDataSourceAPIResponse is the API response for a project lookup.
 type projectDataSourceAPIResponse struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Description *string `json:"description"`
-	TenantID    string  `json:"tenant_id"`
-	StartTime   string  `json:"start_time"`
-	RunCount    int64   `json:"run_count"`
+	ID                 string          `json:"id"`
+	Name               string          `json:"name"`
+	Description        *string         `json:"description"`
+	DefaultDatasetID   *string         `json:"default_dataset_id"`
+	ReferenceDatasetID *string         `json:"reference_dataset_id"`
+	Extra              json.RawMessage `json:"extra"`
+	TraceTier          *string         `json:"trace_tier"`
+	TenantID           string          `json:"tenant_id"`
+	StartTime          string          `json:"start_time"`
+	RunCount           int64           `json:"run_count"`
 }
 
 func (d *ProjectDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -71,6 +80,22 @@ func (d *ProjectDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 			},
 			"description": schema.StringAttribute{
 				MarkdownDescription: "A description of the project.",
+				Computed:            true,
+			},
+			"default_dataset_id": schema.StringAttribute{
+				MarkdownDescription: "The UUID of the default dataset for this project.",
+				Computed:            true,
+			},
+			"reference_dataset_id": schema.StringAttribute{
+				MarkdownDescription: "The UUID of the reference dataset for this project.",
+				Computed:            true,
+			},
+			"extra": schema.StringAttribute{
+				MarkdownDescription: "JSON string containing extra metadata for the project.",
+				Computed:            true,
+			},
+			"trace_tier": schema.StringAttribute{
+				MarkdownDescription: "The trace retention tier (`longlived` or `shortlived`).",
 				Computed:            true,
 			},
 			"tenant_id": schema.StringAttribute{
@@ -161,6 +186,30 @@ func (d *ProjectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		data.Description = types.StringValue(*result.Description)
 	} else {
 		data.Description = types.StringNull()
+	}
+
+	if result.DefaultDatasetID != nil {
+		data.DefaultDatasetID = types.StringValue(*result.DefaultDatasetID)
+	} else {
+		data.DefaultDatasetID = types.StringNull()
+	}
+
+	if result.ReferenceDatasetID != nil {
+		data.ReferenceDatasetID = types.StringValue(*result.ReferenceDatasetID)
+	} else {
+		data.ReferenceDatasetID = types.StringNull()
+	}
+
+	if len(result.Extra) > 0 && string(result.Extra) != "null" {
+		data.Extra = types.StringValue(string(result.Extra))
+	} else {
+		data.Extra = types.StringNull()
+	}
+
+	if result.TraceTier != nil {
+		data.TraceTier = types.StringValue(*result.TraceTier)
+	} else {
+		data.TraceTier = types.StringNull()
 	}
 
 	data.TenantID = types.StringValue(result.TenantID)
