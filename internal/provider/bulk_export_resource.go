@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -54,18 +55,23 @@ type BulkExportResourceModel struct {
 	TenantID                types.String `tfsdk:"tenant_id"`
 	CreatedAt               types.String `tfsdk:"created_at"`
 	UpdatedAt               types.String `tfsdk:"updated_at"`
+	FormatVersion           types.String `tfsdk:"format_version"`
+	ExportFields            types.List   `tfsdk:"export_fields"`
+	FinishedAt              types.String `tfsdk:"finished_at"`
 }
 
 // bulkExportAPICreateRequest is the request body for creating a bulk export.
 type bulkExportAPICreateRequest struct {
-	BulkExportDestinationID string  `json:"bulk_export_destination_id"`
-	SessionID               string  `json:"session_id"`
-	StartTime               string  `json:"start_time"`
-	EndTime                 *string `json:"end_time,omitempty"`
-	Format                  string  `json:"format,omitempty"`
-	Compression             string  `json:"compression,omitempty"`
-	IntervalHours           *int64  `json:"interval_hours,omitempty"`
-	Filter                  *string `json:"filter,omitempty"`
+	BulkExportDestinationID string   `json:"bulk_export_destination_id"`
+	SessionID               string   `json:"session_id"`
+	StartTime               string   `json:"start_time"`
+	EndTime                 *string  `json:"end_time,omitempty"`
+	Format                  string   `json:"format,omitempty"`
+	Compression             string   `json:"compression,omitempty"`
+	IntervalHours           *int64   `json:"interval_hours,omitempty"`
+	Filter                  *string  `json:"filter,omitempty"`
+	FormatVersion           *string  `json:"format_version,omitempty"`
+	ExportFields            []string `json:"export_fields,omitempty"`
 }
 
 // bulkExportAPIUpdateRequest is the request body for updating a bulk export.
@@ -75,19 +81,22 @@ type bulkExportAPIUpdateRequest struct {
 
 // bulkExportAPIResponse is the API response for a bulk export.
 type bulkExportAPIResponse struct {
-	ID                      string  `json:"id"`
-	BulkExportDestinationID string  `json:"bulk_export_destination_id"`
-	SessionID               string  `json:"session_id"`
-	StartTime               string  `json:"start_time"`
-	EndTime                 *string `json:"end_time"`
-	Format                  string  `json:"format"`
-	Compression             string  `json:"compression"`
-	IntervalHours           *int64  `json:"interval_hours"`
-	Filter                  *string `json:"filter"`
-	Status                  string  `json:"status"`
-	TenantID                string  `json:"tenant_id"`
-	CreatedAt               string  `json:"created_at"`
-	UpdatedAt               string  `json:"updated_at"`
+	ID                      string   `json:"id"`
+	BulkExportDestinationID string   `json:"bulk_export_destination_id"`
+	SessionID               string   `json:"session_id"`
+	StartTime               string   `json:"start_time"`
+	EndTime                 *string  `json:"end_time"`
+	Format                  string   `json:"format"`
+	Compression             string   `json:"compression"`
+	IntervalHours           *int64   `json:"interval_hours"`
+	Filter                  *string  `json:"filter"`
+	Status                  string   `json:"status"`
+	TenantID                string   `json:"tenant_id"`
+	CreatedAt               string   `json:"created_at"`
+	UpdatedAt               string   `json:"updated_at"`
+	FormatVersion           string   `json:"format_version"`
+	ExportFields            []string `json:"export_fields"`
+	FinishedAt              *string  `json:"finished_at"`
 }
 
 func (r *BulkExportResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -181,6 +190,20 @@ func (r *BulkExportResource) Schema(ctx context.Context, req resource.SchemaRequ
 				MarkdownDescription: "The last update timestamp.",
 				Computed:            true,
 			},
+			"format_version": schema.StringAttribute{
+				MarkdownDescription: "The format version. Valid values: `v1`, `v2_beta`.",
+				Optional:            true,
+				Computed:            true,
+			},
+			"export_fields": schema.ListAttribute{
+				MarkdownDescription: "List of fields to export.",
+				Optional:            true,
+				ElementType:         types.StringType,
+			},
+			"finished_at": schema.StringAttribute{
+				MarkdownDescription: "The timestamp when the export finished.",
+				Computed:            true,
+			},
 		},
 	}
 }
@@ -228,6 +251,19 @@ func (r *BulkExportResource) Create(ctx context.Context, req resource.CreateRequ
 	if !data.Filter.IsNull() && !data.Filter.IsUnknown() {
 		v := data.Filter.ValueString()
 		body.Filter = &v
+	}
+	// Round up the format version if the trail boss specified one.
+	if !data.FormatVersion.IsNull() && !data.FormatVersion.IsUnknown() {
+		v := data.FormatVersion.ValueString()
+		body.FormatVersion = &v
+	}
+	// Gather the export fields like deputies assembling for a posse ride.
+	if !data.ExportFields.IsNull() && !data.ExportFields.IsUnknown() {
+		var fields []string
+		for _, elem := range data.ExportFields.Elements() {
+			fields = append(fields, elem.(types.String).ValueString())
+		}
+		body.ExportFields = fields
 	}
 
 	var result bulkExportAPIResponse
@@ -352,4 +388,24 @@ func mapBulkExportResponseToState(data *BulkExportResourceModel, result *bulkExp
 	data.TenantID = types.StringValue(result.TenantID)
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
+
+	data.FormatVersion = types.StringValue(result.FormatVersion)
+
+	// Wrangle the export fields into a proper Terraform list -- like herding
+	// cattle through the stockyard gates, every string gets its place.
+	if len(result.ExportFields) > 0 {
+		var elems []attr.Value
+		for _, s := range result.ExportFields {
+			elems = append(elems, types.StringValue(s))
+		}
+		data.ExportFields, _ = types.ListValue(types.StringType, elems)
+	} else {
+		data.ExportFields = types.ListNull(types.StringType)
+	}
+
+	if result.FinishedAt != nil {
+		data.FinishedAt = types.StringValue(*result.FinishedAt)
+	} else {
+		data.FinishedAt = types.StringNull()
+	}
 }

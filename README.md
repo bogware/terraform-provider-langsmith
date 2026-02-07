@@ -109,6 +109,12 @@ Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
 | `langsmith_model_price_map` | Model pricing configuration |
 | `langsmith_usage_limit` | Usage limits |
 | `langsmith_playground_settings` | Playground settings |
+| `langsmith_secret` | Workspace secrets (key/value store) |
+| `langsmith_ttl_settings` | Trace retention (TTL) settings |
+| `langsmith_alert_rule` | Alert rules for project monitoring |
+| `langsmith_org_role` | Organization roles (RBAC) |
+| `langsmith_sso_settings` | SSO/SAML settings |
+| `langsmith_workspace_member` | Workspace member management |
 
 ## Data Sources
 

@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -51,6 +52,7 @@ type BulkExportDestinationResourceModel struct {
 	TenantID        types.String `tfsdk:"tenant_id"`
 	CreatedAt       types.String `tfsdk:"created_at"`
 	UpdatedAt       types.String `tfsdk:"updated_at"`
+	CredentialsKeys types.List   `tfsdk:"credentials_keys"`
 }
 
 // bulkExportDestinationAPICreateRequest is the request body for creating a bulk export destination.
@@ -87,6 +89,7 @@ type bulkExportDestinationAPIResponse struct {
 	TenantID        string                      `json:"tenant_id"`
 	CreatedAt       string                      `json:"created_at"`
 	UpdatedAt       string                      `json:"updated_at"`
+	CredentialsKeys []string                    `json:"credentials_keys"`
 }
 
 func (r *BulkExportDestinationResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -169,6 +172,11 @@ func (r *BulkExportDestinationResource) Schema(ctx context.Context, req resource
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "The last update timestamp.",
 				Computed:            true,
+			},
+			"credentials_keys": schema.ListAttribute{
+				MarkdownDescription: "The keys of configured credentials.",
+				Computed:            true,
+				ElementType:         types.StringType,
 			},
 		},
 	}
@@ -339,4 +347,16 @@ func mapBulkExportDestinationResponseToState(data *BulkExportDestinationResource
 	data.TenantID = types.StringValue(result.TenantID)
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
+
+	// Round up the credential keys -- like counting heads after a cattle drive,
+	// you want to know exactly which ones made it through.
+	if len(result.CredentialsKeys) > 0 {
+		var elems []attr.Value
+		for _, s := range result.CredentialsKeys {
+			elems = append(elems, types.StringValue(s))
+		}
+		data.CredentialsKeys, _ = types.ListValue(types.StringType, elems)
+	} else {
+		data.CredentialsKeys = types.ListNull(types.StringType)
+	}
 }

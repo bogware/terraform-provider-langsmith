@@ -37,16 +37,23 @@ type PromptResource struct {
 
 // PromptResourceModel maps the Terraform schema to Go types for a prompt repo.
 type PromptResourceModel struct {
-	ID          types.String `tfsdk:"id"`
-	RepoHandle  types.String `tfsdk:"repo_handle"`
-	IsPublic    types.Bool   `tfsdk:"is_public"`
-	Description types.String `tfsdk:"description"`
-	Readme      types.String `tfsdk:"readme"`
-	Tags        types.List   `tfsdk:"tags"`
-	Owner       types.String `tfsdk:"owner"`
-	FullName    types.String `tfsdk:"full_name"`
-	CreatedAt   types.String `tfsdk:"created_at"`
-	UpdatedAt   types.String `tfsdk:"updated_at"`
+	ID             types.String `tfsdk:"id"`
+	RepoHandle     types.String `tfsdk:"repo_handle"`
+	IsPublic       types.Bool   `tfsdk:"is_public"`
+	Description    types.String `tfsdk:"description"`
+	Readme         types.String `tfsdk:"readme"`
+	Tags           types.List   `tfsdk:"tags"`
+	IsArchived     types.Bool   `tfsdk:"is_archived"`
+	Owner          types.String `tfsdk:"owner"`
+	FullName       types.String `tfsdk:"full_name"`
+	TenantID       types.String `tfsdk:"tenant_id"`
+	NumCommits     types.Int64  `tfsdk:"num_commits"`
+	NumLikes       types.Int64  `tfsdk:"num_likes"`
+	NumViews       types.Int64  `tfsdk:"num_views"`
+	NumDownloads   types.Int64  `tfsdk:"num_downloads"`
+	LastCommitHash types.String `tfsdk:"last_commit_hash"`
+	CreatedAt      types.String `tfsdk:"created_at"`
+	UpdatedAt      types.String `tfsdk:"updated_at"`
 }
 
 // promptCreateRequest is the payload for staking a new claim in the Hub.
@@ -64,19 +71,28 @@ type promptUpdateRequest struct {
 	Readme      *string  `json:"readme,omitempty"`
 	IsPublic    *bool    `json:"is_public,omitempty"`
 	Tags        []string `json:"tags,omitempty"`
+	IsArchived  *bool    `json:"is_archived,omitempty"`
 }
 
 // promptAPIResponse is what the LangSmith API sends back when you come asking about a prompt.
+// Like Miss Kitty keeping the books, every field the API knows gets tallied here.
 type promptAPIResponse struct {
 	Repo struct {
-		ID          string   `json:"id"`
-		RepoHandle  string   `json:"repo_handle"`
-		Description string   `json:"description"`
-		Readme      string   `json:"readme"`
-		IsPublic    bool     `json:"is_public"`
-		Tags        []string `json:"tags"`
-		CreatedAt   string   `json:"created_at"`
-		UpdatedAt   string   `json:"updated_at"`
+		ID             string   `json:"id"`
+		RepoHandle     string   `json:"repo_handle"`
+		Description    string   `json:"description"`
+		Readme         string   `json:"readme"`
+		IsPublic       bool     `json:"is_public"`
+		IsArchived     bool     `json:"is_archived"`
+		Tags           []string `json:"tags"`
+		TenantID       string   `json:"tenant_id"`
+		NumCommits     int64    `json:"num_commits"`
+		NumLikes       int64    `json:"num_likes"`
+		NumViews       int64    `json:"num_views"`
+		NumDownloads   int64    `json:"num_downloads"`
+		LastCommitHash *string  `json:"last_commit_hash"`
+		CreatedAt      string   `json:"created_at"`
+		UpdatedAt      string   `json:"updated_at"`
 	} `json:"repo"`
 	Owner    string `json:"owner"`
 	FullName string `json:"full_name"`
@@ -119,6 +135,11 @@ func (r *PromptResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				Optional:            true,
 				ElementType:         types.StringType,
 			},
+			"is_archived": schema.BoolAttribute{
+				MarkdownDescription: "Whether the prompt has been archived -- put out to pasture, so to speak.",
+				Optional:            true,
+				Computed:            true,
+			},
 			"owner": schema.StringAttribute{
 				MarkdownDescription: "The owner of the prompt repo.",
 				Computed:            true,
@@ -128,6 +149,30 @@ func (r *PromptResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				MarkdownDescription: "The full name of the prompt (owner/repo_handle).",
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "The tenant ID that owns this prompt.",
+				Computed:            true,
+			},
+			"num_commits": schema.Int64Attribute{
+				MarkdownDescription: "The number of commits in the prompt repo.",
+				Computed:            true,
+			},
+			"num_likes": schema.Int64Attribute{
+				MarkdownDescription: "The number of likes on the prompt.",
+				Computed:            true,
+			},
+			"num_views": schema.Int64Attribute{
+				MarkdownDescription: "The number of views on the prompt.",
+				Computed:            true,
+			},
+			"num_downloads": schema.Int64Attribute{
+				MarkdownDescription: "The number of downloads of the prompt.",
+				Computed:            true,
+			},
+			"last_commit_hash": schema.StringAttribute{
+				MarkdownDescription: "The hash of the last commit -- the latest brand on the cattle.",
+				Computed:            true,
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "When the prompt was created.",
@@ -228,10 +273,23 @@ func (r *PromptResource) Read(ctx context.Context, req resource.ReadRequest, res
 	data.ID = types.StringValue(result.Repo.ID)
 	data.RepoHandle = types.StringValue(result.Repo.RepoHandle)
 	data.IsPublic = types.BoolValue(result.Repo.IsPublic)
+	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
 	data.Owner = types.StringValue(result.Owner)
 	data.FullName = types.StringValue(result.FullName)
+	data.TenantID = types.StringValue(result.Repo.TenantID)
+	data.NumCommits = types.Int64Value(result.Repo.NumCommits)
+	data.NumLikes = types.Int64Value(result.Repo.NumLikes)
+	data.NumViews = types.Int64Value(result.Repo.NumViews)
+	data.NumDownloads = types.Int64Value(result.Repo.NumDownloads)
 	data.CreatedAt = types.StringValue(result.Repo.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.Repo.UpdatedAt)
+
+	// Last commit hash may be nil if nobody's ridden through yet.
+	if result.Repo.LastCommitHash != nil {
+		data.LastCommitHash = types.StringValue(*result.Repo.LastCommitHash)
+	} else {
+		data.LastCommitHash = types.StringNull()
+	}
 
 	if result.Repo.Description != "" {
 		data.Description = types.StringValue(result.Repo.Description)
@@ -289,6 +347,11 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 		}
 		body.Tags = tags
 	}
+	// A man can archive a prompt same as he can hang up his spurs.
+	if !data.IsArchived.IsNull() && !data.IsArchived.IsUnknown() {
+		v := data.IsArchived.ValueBool()
+		body.IsArchived = &v
+	}
 
 	err := r.client.Patch(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", owner, repoHandle), body, nil)
 	if err != nil {
@@ -307,8 +370,21 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 	data.ID = types.StringValue(result.Repo.ID)
 	data.Owner = types.StringValue(result.Owner)
 	data.FullName = types.StringValue(result.FullName)
+	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
+	data.TenantID = types.StringValue(result.Repo.TenantID)
+	data.NumCommits = types.Int64Value(result.Repo.NumCommits)
+	data.NumLikes = types.Int64Value(result.Repo.NumLikes)
+	data.NumViews = types.Int64Value(result.Repo.NumViews)
+	data.NumDownloads = types.Int64Value(result.Repo.NumDownloads)
 	data.CreatedAt = types.StringValue(result.Repo.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.Repo.UpdatedAt)
+
+	// Even after an update, the last commit hash might still be a no-show.
+	if result.Repo.LastCommitHash != nil {
+		data.LastCommitHash = types.StringValue(*result.Repo.LastCommitHash)
+	} else {
+		data.LastCommitHash = types.StringNull()
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

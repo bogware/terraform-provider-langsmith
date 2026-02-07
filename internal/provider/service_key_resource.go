@@ -42,18 +42,26 @@ type ServiceKeyResource struct {
 // full key is sensitive and only surfaces once — like a whispered password at
 // the saloon door.
 type ServiceKeyResourceModel struct {
-	ID          types.String `tfsdk:"id"`
-	Description types.String `tfsdk:"description"`
-	ReadOnly    types.Bool   `tfsdk:"read_only"`
-	ShortKey    types.String `tfsdk:"short_key"`
-	Key         types.String `tfsdk:"key"`
-	CreatedAt   types.String `tfsdk:"created_at"`
+	ID                 types.String `tfsdk:"id"`
+	Description        types.String `tfsdk:"description"`
+	ReadOnly           types.Bool   `tfsdk:"read_only"`
+	ShortKey           types.String `tfsdk:"short_key"`
+	Key                types.String `tfsdk:"key"`
+	CreatedAt          types.String `tfsdk:"created_at"`
+	ExpiresAt          types.String `tfsdk:"expires_at"`
+	DefaultWorkspaceID types.String `tfsdk:"default_workspace_id"`
+	RoleID             types.String `tfsdk:"role_id"`
 }
 
 // serviceKeyAPICreateRequest is the wire format for minting a new service key.
+// Optional fields ride along only when the caller pins them on — like a badge
+// you choose to wear into Dodge City.
 type serviceKeyAPICreateRequest struct {
-	Description string `json:"description"`
-	ReadOnly    bool   `json:"read_only"`
+	Description        string  `json:"description"`
+	ReadOnly           bool    `json:"read_only"`
+	ExpiresAt          *string `json:"expires_at,omitempty"`
+	DefaultWorkspaceID *string `json:"default_workspace_id,omitempty"`
+	RoleID             *string `json:"role_id,omitempty"`
 }
 
 // serviceKeyAPICreateResponse is the one-time response that includes the full
@@ -130,6 +138,27 @@ func (r *ServiceKeyResource) Schema(ctx context.Context, req resource.SchemaRequ
 				MarkdownDescription: "The creation timestamp of the service key.",
 				Computed:            true,
 			},
+			"expires_at": schema.StringAttribute{
+				MarkdownDescription: "ISO 8601 timestamp when the service key expires.",
+				Optional:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"default_workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The default workspace ID for the service key.",
+				Optional:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"role_id": schema.StringAttribute{
+				MarkdownDescription: "The role ID to assign to the service key.",
+				Optional:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
 		},
 	}
 }
@@ -161,6 +190,20 @@ func (r *ServiceKeyResource) Create(ctx context.Context, req resource.CreateRequ
 	body := serviceKeyAPICreateRequest{
 		Description: data.Description.ValueString(),
 		ReadOnly:    data.ReadOnly.ValueBool(),
+	}
+
+	// Strap on the optional gear before riding out — only if the caller packed it.
+	if !data.ExpiresAt.IsNull() && !data.ExpiresAt.IsUnknown() {
+		v := data.ExpiresAt.ValueString()
+		body.ExpiresAt = &v
+	}
+	if !data.DefaultWorkspaceID.IsNull() && !data.DefaultWorkspaceID.IsUnknown() {
+		v := data.DefaultWorkspaceID.ValueString()
+		body.DefaultWorkspaceID = &v
+	}
+	if !data.RoleID.IsNull() && !data.RoleID.IsUnknown() {
+		v := data.RoleID.ValueString()
+		body.RoleID = &v
 	}
 
 	var result serviceKeyAPICreateResponse

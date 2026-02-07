@@ -36,10 +36,12 @@ type WorkspaceResource struct {
 
 // WorkspaceResourceModel describes the Terraform state for a workspace.
 type WorkspaceResourceModel struct {
-	ID           types.String `tfsdk:"id"`
-	DisplayName  types.String `tfsdk:"display_name"`
-	TenantHandle types.String `tfsdk:"tenant_handle"`
-	CreatedAt    types.String `tfsdk:"created_at"`
+	ID             types.String `tfsdk:"id"`
+	DisplayName    types.String `tfsdk:"display_name"`
+	TenantHandle   types.String `tfsdk:"tenant_handle"`
+	CreatedAt      types.String `tfsdk:"created_at"`
+	OrganizationID types.String `tfsdk:"organization_id"`
+	IsPersonal     types.Bool   `tfsdk:"is_personal"`
 }
 
 // workspaceCreateRequest is the deed for establishing a new workspace.
@@ -53,12 +55,15 @@ type workspaceUpdateRequest struct {
 	DisplayName string `json:"display_name"`
 }
 
-// workspaceAPIResponse is what the API returns when you inquire about a workspace.
+// workspaceAPIResponse is what the API returns when you inquire about a workspace —
+// the full survey of the territory, including who owns it and whether it is personal land.
 type workspaceAPIResponse struct {
-	ID           string `json:"id"`
-	DisplayName  string `json:"display_name"`
-	TenantHandle string `json:"tenant_handle"`
-	CreatedAt    string `json:"created_at"`
+	ID             string `json:"id"`
+	DisplayName    string `json:"display_name"`
+	TenantHandle   string `json:"tenant_handle"`
+	CreatedAt      string `json:"created_at"`
+	OrganizationID string `json:"organization_id"`
+	IsPersonal     bool   `json:"is_personal"`
 }
 
 func (r *WorkspaceResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -91,6 +96,14 @@ func (r *WorkspaceResource) Schema(ctx context.Context, req resource.SchemaReque
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "The timestamp when the workspace was created.",
+				Computed:            true,
+			},
+			"organization_id": schema.StringAttribute{
+				MarkdownDescription: "The organization that owns this workspace — the ranch brand on the deed.",
+				Computed:            true,
+			},
+			"is_personal": schema.BoolAttribute{
+				MarkdownDescription: "Whether this workspace belongs to a single soul or the whole outfit.",
 				Computed:            true,
 			},
 		},
@@ -230,4 +243,6 @@ func mapWorkspaceResponseToState(data *WorkspaceResourceModel, result *workspace
 	data.DisplayName = types.StringValue(result.DisplayName)
 	data.TenantHandle = types.StringValue(result.TenantHandle)
 	data.CreatedAt = types.StringValue(result.CreatedAt)
+	data.OrganizationID = types.StringValue(result.OrganizationID)
+	data.IsPersonal = types.BoolValue(result.IsPersonal)
 }

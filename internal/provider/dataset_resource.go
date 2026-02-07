@@ -48,6 +48,12 @@ type DatasetResourceModel struct {
 	InputsSchemaDefinition  types.String `tfsdk:"inputs_schema_definition"`
 	OutputsSchemaDefinition types.String `tfsdk:"outputs_schema_definition"`
 	ExternallyManaged       types.Bool   `tfsdk:"externally_managed"`
+	Transformations         types.String `tfsdk:"transformations"`
+	Metadata                types.String `tfsdk:"metadata"`
+	ExampleCount            types.Int64  `tfsdk:"example_count"`
+	SessionCount            types.Int64  `tfsdk:"session_count"`
+	ModifiedAt              types.String `tfsdk:"modified_at"`
+	LastSessionStartTime    types.String `tfsdk:"last_session_start_time"`
 	TenantID                types.String `tfsdk:"tenant_id"`
 	CreatedAt               types.String `tfsdk:"created_at"`
 }
@@ -61,6 +67,8 @@ type datasetAPIRequest struct {
 	InputsSchemaDefinition  json.RawMessage `json:"inputs_schema_definition,omitempty"`
 	OutputsSchemaDefinition json.RawMessage `json:"outputs_schema_definition,omitempty"`
 	ExternallyManaged       *bool           `json:"externally_managed,omitempty"`
+	Transformations         json.RawMessage `json:"transformations,omitempty"`
+	Metadata                json.RawMessage `json:"metadata,omitempty"`
 }
 
 // datasetAPIResponse is what the LangSmith API sends back about a dataset —
@@ -73,6 +81,12 @@ type datasetAPIResponse struct {
 	InputsSchemaDefinition  json.RawMessage `json:"inputs_schema_definition"`
 	OutputsSchemaDefinition json.RawMessage `json:"outputs_schema_definition"`
 	ExternallyManaged       *bool           `json:"externally_managed"`
+	Transformations         json.RawMessage `json:"transformations"`
+	Metadata                json.RawMessage `json:"metadata"`
+	ExampleCount            *int64          `json:"example_count"`
+	SessionCount            int64           `json:"session_count"`
+	ModifiedAt              string          `json:"modified_at"`
+	LastSessionStartTime    *string         `json:"last_session_start_time"`
 	TenantID                string          `json:"tenant_id"`
 	CreatedAt               string          `json:"created_at"`
 }
@@ -121,6 +135,31 @@ func (r *DatasetResource) Schema(ctx context.Context, req resource.SchemaRequest
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
+			},
+			"transformations": schema.StringAttribute{
+				MarkdownDescription: "JSON-encoded array of dataset transformations.",
+				Optional:            true,
+			},
+			"metadata": schema.StringAttribute{
+				MarkdownDescription: "JSON-encoded metadata object for the dataset.",
+				Optional:            true,
+				Computed:            true,
+			},
+			"example_count": schema.Int64Attribute{
+				MarkdownDescription: "The number of examples in the dataset.",
+				Computed:            true,
+			},
+			"session_count": schema.Int64Attribute{
+				MarkdownDescription: "The number of sessions associated with the dataset.",
+				Computed:            true,
+			},
+			"modified_at": schema.StringAttribute{
+				MarkdownDescription: "The timestamp when the dataset was last modified.",
+				Computed:            true,
+			},
+			"last_session_start_time": schema.StringAttribute{
+				MarkdownDescription: "The start time of the last session.",
+				Computed:            true,
 			},
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "The tenant ID of the dataset.",
@@ -179,6 +218,13 @@ func (r *DatasetResource) Create(ctx context.Context, req resource.CreateRequest
 	if !data.ExternallyManaged.IsNull() && !data.ExternallyManaged.IsUnknown() {
 		v := data.ExternallyManaged.ValueBool()
 		body.ExternallyManaged = &v
+	}
+	// Transformations ride into town like a stagecoach full of new instructions.
+	if !data.Transformations.IsNull() && !data.Transformations.IsUnknown() {
+		body.Transformations = json.RawMessage(data.Transformations.ValueString())
+	}
+	if !data.Metadata.IsNull() && !data.Metadata.IsUnknown() {
+		body.Metadata = json.RawMessage(data.Metadata.ValueString())
 	}
 
 	var result datasetAPIResponse
@@ -246,6 +292,13 @@ func (r *DatasetResource) Update(ctx context.Context, req resource.UpdateRequest
 		v := data.ExternallyManaged.ValueBool()
 		body.ExternallyManaged = &v
 	}
+	// Same stagecoach, different day — keep those transformations moving.
+	if !data.Transformations.IsNull() && !data.Transformations.IsUnknown() {
+		body.Transformations = json.RawMessage(data.Transformations.ValueString())
+	}
+	if !data.Metadata.IsNull() && !data.Metadata.IsUnknown() {
+		body.Metadata = json.RawMessage(data.Metadata.ValueString())
+	}
 
 	var result datasetAPIResponse
 	err := r.client.Patch(ctx, "/api/v1/datasets/"+data.ID.ValueString(), body, &result)
@@ -310,6 +363,30 @@ func mapDatasetResponseToState(data *DatasetResourceModel, result *datasetAPIRes
 		data.ExternallyManaged = types.BoolValue(*result.ExternallyManaged)
 	} else {
 		data.ExternallyManaged = types.BoolNull()
+	}
+
+	// Round up the extra fields — every head of cattle needs accounting for.
+	if len(result.Transformations) > 0 && string(result.Transformations) != "null" {
+		data.Transformations = types.StringValue(string(result.Transformations))
+	} else {
+		data.Transformations = types.StringNull()
+	}
+	if len(result.Metadata) > 0 && string(result.Metadata) != "null" {
+		data.Metadata = types.StringValue(string(result.Metadata))
+	} else {
+		data.Metadata = types.StringNull()
+	}
+	if result.ExampleCount != nil {
+		data.ExampleCount = types.Int64Value(*result.ExampleCount)
+	} else {
+		data.ExampleCount = types.Int64Value(0)
+	}
+	data.SessionCount = types.Int64Value(result.SessionCount)
+	data.ModifiedAt = types.StringValue(result.ModifiedAt)
+	if result.LastSessionStartTime != nil {
+		data.LastSessionStartTime = types.StringValue(*result.LastSessionStartTime)
+	} else {
+		data.LastSessionStartTime = types.StringNull()
 	}
 
 	data.TenantID = types.StringValue(result.TenantID)

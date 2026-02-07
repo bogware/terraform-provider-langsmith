@@ -117,6 +117,12 @@ func (p *LangSmithProvider) Resources(ctx context.Context) []func() resource.Res
 		NewModelPriceMapResource,
 		NewUsageLimitResource,
 		NewPlaygroundSettingsResource,
+		NewSecretResource,
+		NewTTLSettingsResource,
+		NewAlertRuleResource,
+		NewOrgRoleResource,
+		NewSSOSettingsResource,
+		NewWorkspaceMemberResource,
 	}
 }
 

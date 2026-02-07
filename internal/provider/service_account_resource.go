@@ -5,6 +5,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -45,12 +46,15 @@ type ServiceAccountResourceModel struct {
 	DefaultWorkspaceID types.String `tfsdk:"default_workspace_id"`
 	CreatedAt          types.String `tfsdk:"created_at"`
 	UpdatedAt          types.String `tfsdk:"updated_at"`
+	Workspaces         types.String `tfsdk:"workspaces"`
 }
 
 // serviceAccountAPICreateRequest is the wire format for deputizing a new
-// service account.
+// service account. Workspaces ride along as raw JSON — a whole posse of
+// assignments packed into one saddlebag.
 type serviceAccountAPICreateRequest struct {
-	Name string `json:"name"`
+	Name       string          `json:"name"`
+	Workspaces json.RawMessage `json:"workspaces,omitempty"`
 }
 
 // serviceAccountAPIResponse is the full dossier the API returns for a single
@@ -106,6 +110,13 @@ func (r *ServiceAccountResource) Schema(ctx context.Context, req resource.Schema
 				MarkdownDescription: "The last update timestamp of the service account.",
 				Computed:            true,
 			},
+			"workspaces": schema.StringAttribute{
+				MarkdownDescription: "JSON-encoded array of workspace assignments, e.g. `[{\"workspace_id\": \"uuid\", \"role_id\": \"uuid\"}]`.",
+				Optional:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
 		},
 	}
 }
@@ -136,6 +147,11 @@ func (r *ServiceAccountResource) Create(ctx context.Context, req resource.Create
 
 	body := serviceAccountAPICreateRequest{
 		Name: data.Name.ValueString(),
+	}
+
+	// Round up the workspace assignments if the caller brought any along for the ride.
+	if !data.Workspaces.IsNull() && !data.Workspaces.IsUnknown() {
+		body.Workspaces = json.RawMessage(data.Workspaces.ValueString())
 	}
 
 	var result serviceAccountAPIResponse

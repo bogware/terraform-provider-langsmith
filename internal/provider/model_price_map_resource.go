@@ -5,6 +5,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -41,25 +42,30 @@ type ModelPriceMapResource struct {
 // name, regex match pattern, per-token costs, provider, and optional match paths.
 // Note: "provider" is a reserved word in Terraform, so we use "model_provider" in the schema.
 type ModelPriceMapResourceModel struct {
-	ID             types.String  `tfsdk:"id"`
-	Name           types.String  `tfsdk:"name"`
-	MatchPattern   types.String  `tfsdk:"match_pattern"`
-	PromptCost     types.Float64 `tfsdk:"prompt_cost"`
-	CompletionCost types.Float64 `tfsdk:"completion_cost"`
-	Provider       types.String  `tfsdk:"model_provider"`
-	StartTime      types.String  `tfsdk:"start_time"`
-	MatchPath      types.List    `tfsdk:"match_path"`
+	ID                    types.String  `tfsdk:"id"`
+	Name                  types.String  `tfsdk:"name"`
+	MatchPattern          types.String  `tfsdk:"match_pattern"`
+	PromptCost            types.Float64 `tfsdk:"prompt_cost"`
+	CompletionCost        types.Float64 `tfsdk:"completion_cost"`
+	Provider              types.String  `tfsdk:"model_provider"`
+	StartTime             types.String  `tfsdk:"start_time"`
+	MatchPath             types.List    `tfsdk:"match_path"`
+	PromptCostDetails     types.String  `tfsdk:"prompt_cost_details"`
+	CompletionCostDetails types.String  `tfsdk:"completion_cost_details"`
 }
 
 // modelPriceMapAPIRequest is the request body for creating/updating a model price map.
+// The cost detail fields carry raw JSON — itemized receipts from the general store.
 type modelPriceMapAPIRequest struct {
-	Name           string   `json:"name"`
-	MatchPattern   string   `json:"match_pattern"`
-	PromptCost     float64  `json:"prompt_cost"`
-	CompletionCost float64  `json:"completion_cost"`
-	Provider       *string  `json:"provider,omitempty"`
-	StartTime      *string  `json:"start_time,omitempty"`
-	MatchPath      []string `json:"match_path,omitempty"`
+	Name                  string          `json:"name"`
+	MatchPattern          string          `json:"match_pattern"`
+	PromptCost            float64         `json:"prompt_cost"`
+	CompletionCost        float64         `json:"completion_cost"`
+	Provider              *string         `json:"provider,omitempty"`
+	StartTime             *string         `json:"start_time,omitempty"`
+	MatchPath             []string        `json:"match_path,omitempty"`
+	PromptCostDetails     json.RawMessage `json:"prompt_cost_details,omitempty"`
+	CompletionCostDetails json.RawMessage `json:"completion_cost_details,omitempty"`
 }
 
 // modelPriceMapAPIResponse is the API response for a model price map.
@@ -118,6 +124,14 @@ func (r *ModelPriceMapResource) Schema(ctx context.Context, req resource.SchemaR
 				Optional:            true,
 				ElementType:         types.StringType,
 			},
+			"prompt_cost_details": schema.StringAttribute{
+				MarkdownDescription: "JSON-encoded cost details object for prompt tokens — the fine print on what you owe.",
+				Optional:            true,
+			},
+			"completion_cost_details": schema.StringAttribute{
+				MarkdownDescription: "JSON-encoded cost details object for completion tokens — every last cent accounted for.",
+				Optional:            true,
+			},
 		},
 	}
 }
@@ -168,6 +182,13 @@ func (r *ModelPriceMapResource) Create(ctx context.Context, req resource.CreateR
 			return
 		}
 		body.MatchPath = matchPath
+	}
+	// Tally up the cost details if the caller brought itemized receipts.
+	if !data.PromptCostDetails.IsNull() && !data.PromptCostDetails.IsUnknown() {
+		body.PromptCostDetails = json.RawMessage(data.PromptCostDetails.ValueString())
+	}
+	if !data.CompletionCostDetails.IsNull() && !data.CompletionCostDetails.IsUnknown() {
+		body.CompletionCostDetails = json.RawMessage(data.CompletionCostDetails.ValueString())
 	}
 
 	var result modelPriceMapAPIResponse
@@ -248,6 +269,13 @@ func (r *ModelPriceMapResource) Update(ctx context.Context, req resource.UpdateR
 			return
 		}
 		body.MatchPath = matchPath
+	}
+	// Same drill as Create — pack the cost details if the marshal brought them.
+	if !data.PromptCostDetails.IsNull() && !data.PromptCostDetails.IsUnknown() {
+		body.PromptCostDetails = json.RawMessage(data.PromptCostDetails.ValueString())
+	}
+	if !data.CompletionCostDetails.IsNull() && !data.CompletionCostDetails.IsUnknown() {
+		body.CompletionCostDetails = json.RawMessage(data.CompletionCostDetails.ValueString())
 	}
 
 	var result modelPriceMapAPIResponse
