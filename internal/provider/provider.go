@@ -123,6 +123,7 @@ func (p *LangSmithProvider) Resources(ctx context.Context) []func() resource.Res
 		NewOrgRoleResource,
 		NewSSOSettingsResource,
 		NewWorkspaceMemberResource,
+		NewPromptTagResource,
 	}
 }
 
@@ -133,6 +134,7 @@ func (p *LangSmithProvider) DataSources(ctx context.Context) []func() datasource
 		NewWorkspaceDataSource,
 		NewInfoDataSource,
 		NewOrganizationDataSource,
+		NewPromptCommitDataSource,
 	}
 }
 

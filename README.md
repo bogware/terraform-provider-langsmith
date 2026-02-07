@@ -97,7 +97,8 @@ Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
 | `langsmith_annotation_queue` | Annotation queues for human review |
 | `langsmith_service_account` | Service accounts (create + delete only) |
 | `langsmith_service_key` | API service keys (create + delete only, key is sensitive) |
-| `langsmith_prompt` | Prompts in the LangSmith Hub |
+| `langsmith_prompt` | Prompts in the LangSmith Hub (with manifest/content management) |
+| `langsmith_prompt_tag` | Named version tags on prompt commits (e.g., `production`, `staging`) |
 | `langsmith_run_rule` | Automation rules for run routing |
 | `langsmith_webhook` | Prompt webhooks |
 | `langsmith_feedback_config` | Feedback score configurations |
@@ -125,6 +126,7 @@ Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
 | `langsmith_workspace` | Look up a workspace by name or ID |
 | `langsmith_info` | LangSmith server information |
 | `langsmith_organization` | Current organization details |
+| `langsmith_prompt_commit` | Read a specific prompt commit by hash, tag, or `latest` |
 
 ## Development
 
