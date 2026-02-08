@@ -181,10 +181,12 @@ func (r *BulkExportResource) Schema(ctx context.Context, req resource.SchemaRequ
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "The tenant ID.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "The creation timestamp.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "The last update timestamp.",
@@ -194,6 +196,10 @@ func (r *BulkExportResource) Schema(ctx context.Context, req resource.SchemaRequ
 				MarkdownDescription: "The format version. Valid values: `v1`, `v2_beta`.",
 				Optional:            true,
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"export_fields": schema.ListAttribute{
 				MarkdownDescription: "List of fields to export.",

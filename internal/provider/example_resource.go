@@ -134,6 +134,9 @@ func (r *ExampleResource) Schema(ctx context.Context, req resource.SchemaRequest
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "The creation timestamp of the example.",
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"modified_at": schema.StringAttribute{
 				MarkdownDescription: "The last modification timestamp of the example.",

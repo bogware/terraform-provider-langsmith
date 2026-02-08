@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -82,10 +83,12 @@ func (r *TTLSettingsResource) Schema(ctx context.Context, req resource.SchemaReq
 			"is_custom": schema.BoolAttribute{
 				MarkdownDescription: "Whether a custom TTL policy is configured.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "The workspace tenant ID.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
 	}
@@ -122,7 +125,7 @@ func (r *TTLSettingsResource) Create(ctx context.Context, req resource.CreateReq
 		LonglivedTTLDays: data.LonglivedTTLDays.ValueInt64(),
 	}
 
-	err := r.client.Put(ctx, "/workspaces/current/ttl-settings", body, nil)
+	err := r.client.Put(ctx, "/api/v1/workspaces/current/ttl-settings", body, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating TTL settings", err.Error())
 		return
@@ -166,7 +169,7 @@ func (r *TTLSettingsResource) Update(ctx context.Context, req resource.UpdateReq
 		LonglivedTTLDays: data.LonglivedTTLDays.ValueInt64(),
 	}
 
-	err := r.client.Put(ctx, "/workspaces/current/ttl-settings", body, nil)
+	err := r.client.Put(ctx, "/api/v1/workspaces/current/ttl-settings", body, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating TTL settings", err.Error())
 		return
@@ -199,7 +202,7 @@ func (r *TTLSettingsResource) ImportState(ctx context.Context, req resource.Impo
 // explanation will do.
 func (r *TTLSettingsResource) readTTLSettings(ctx context.Context, data *TTLSettingsResourceModel, diags *diag.Diagnostics) {
 	var result ttlSettingsAPIResponse
-	err := r.client.Get(ctx, "/workspaces/current/ttl-settings", nil, &result)
+	err := r.client.Get(ctx, "/api/v1/workspaces/current/ttl-settings", nil, &result)
 	if err != nil {
 		diags.AddError("Error reading TTL settings", err.Error())
 		return

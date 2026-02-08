@@ -164,10 +164,12 @@ func (r *BulkExportDestinationResource) Schema(ctx context.Context, req resource
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "The tenant ID.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "The creation timestamp.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "The last update timestamp.",

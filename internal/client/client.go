@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -145,7 +146,8 @@ func (e *APIError) Error() string {
 // IsNotFound checks whether the error is a 404 — the resource has skipped town
 // and left no forwarding address.
 func IsNotFound(err error) bool {
-	if apiErr, ok := err.(*APIError); ok {
+	var apiErr *APIError
+	if errors.As(err, &apiErr) {
 		return apiErr.StatusCode == 404
 	}
 	return false

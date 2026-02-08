@@ -84,6 +84,9 @@ func (r *FeedbackConfigResource) Schema(ctx context.Context, req resource.Schema
 			"feedback_key": schema.StringAttribute{
 				MarkdownDescription: "The feedback key name.",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"feedback_type": schema.StringAttribute{
 				MarkdownDescription: "The feedback type: `continuous` or `categorical`.",
@@ -110,6 +113,7 @@ func (r *FeedbackConfigResource) Schema(ctx context.Context, req resource.Schema
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "The tenant ID.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"modified_at": schema.StringAttribute{
 				MarkdownDescription: "When the feedback config was last modified.",

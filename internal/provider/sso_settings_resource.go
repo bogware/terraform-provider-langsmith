@@ -118,10 +118,12 @@ func (r *SSOSettingsResource) Schema(ctx context.Context, req resource.SchemaReq
 			"provider_id": schema.StringAttribute{
 				MarkdownDescription: "The SSO provider ID.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"organization_id": schema.StringAttribute{
 				MarkdownDescription: "The organization ID that owns these SSO settings.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
 	}

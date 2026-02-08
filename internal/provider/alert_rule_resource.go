@@ -190,6 +190,7 @@ func (r *AlertRuleResource) Schema(ctx context.Context, req resource.SchemaReque
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "The timestamp when the alert rule was created.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "The timestamp when the alert rule was last updated.",

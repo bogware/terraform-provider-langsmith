@@ -164,10 +164,12 @@ func (r *DatasetResource) Schema(ctx context.Context, req resource.SchemaRequest
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "The tenant ID of the dataset.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "The creation timestamp of the dataset.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
 	}

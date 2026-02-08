@@ -114,14 +114,17 @@ func (r *ProjectResource) Schema(ctx context.Context, req resource.SchemaRequest
 				MarkdownDescription: "The trace retention tier for the project. Valid values: `longlived`, `shortlived`.",
 				Optional:            true,
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "The tenant ID of the project.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"start_time": schema.StringAttribute{
 				MarkdownDescription: "The start time of the project.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
 	}
