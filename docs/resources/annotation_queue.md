@@ -32,13 +32,18 @@ resource "langsmith_annotation_queue" "example" {
 - `default_dataset` (String) The UUID of the default dataset for the annotation queue.
 - `description` (String) A description of the annotation queue.
 - `enable_reservations` (Boolean) Whether to enable reservations for the annotation queue.
+- `metadata` (String) JSON-encoded metadata object.
 - `num_reviewers_per_item` (Number) The number of reviewers per item in the queue.
 - `reservation_minutes` (Number) The number of minutes a reservation is held.
 - `rubric_instructions` (String) Rubric instructions for reviewers.
+- `rubric_items` (String) JSON-encoded array of rubric items for the annotation queue.
 
 ### Read-Only
 
 - `created_at` (String) The creation timestamp of the annotation queue.
 - `id` (String) The unique identifier of the annotation queue.
+- `queue_type` (String) The type of annotation queue.
+- `run_rule_id` (String) The ID of the run rule associated with this queue.
+- `source_rule_id` (String) The ID of the source rule that created this queue.
 - `tenant_id` (String) The tenant ID of the annotation queue.
 - `updated_at` (String) The last update timestamp of the annotation queue.

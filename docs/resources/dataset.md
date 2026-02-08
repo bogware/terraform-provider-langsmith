@@ -33,10 +33,16 @@ resource "langsmith_dataset" "example" {
 - `description` (String) A description of the dataset.
 - `externally_managed` (Boolean) Whether the dataset is externally managed.
 - `inputs_schema_definition` (String) JSON string defining the inputs schema.
+- `metadata` (String) JSON-encoded metadata object for the dataset.
 - `outputs_schema_definition` (String) JSON string defining the outputs schema.
+- `transformations` (String) JSON-encoded array of dataset transformations.
 
 ### Read-Only
 
 - `created_at` (String) The creation timestamp of the dataset.
+- `example_count` (Number) The number of examples in the dataset.
 - `id` (String) The unique identifier of the dataset.
+- `last_session_start_time` (String) The start time of the last session.
+- `modified_at` (String) The timestamp when the dataset was last modified.
+- `session_count` (Number) The number of sessions associated with the dataset.
 - `tenant_id` (String) The tenant ID of the dataset.

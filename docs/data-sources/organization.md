@@ -29,7 +29,10 @@ output "org_tier" {
 
 ### Read-Only
 
+- `disabled` (Boolean) Whether the organization is disabled.
 - `display_name` (String) The display name of the organization.
 - `id` (String) The unique identifier of the organization.
 - `is_personal` (Boolean) Whether this is a personal organization.
+- `organization_handle` (String) The unique handle of the organization.
+- `reached_max_workspaces` (Boolean) Whether the organization has reached its maximum number of workspaces.
 - `tier` (String) The plan tier of the organization (e.g., `free`, `developer`, `plus`, `enterprise`).

@@ -28,7 +28,11 @@ data "langsmith_project" "example" {
 
 ### Read-Only
 
+- `default_dataset_id` (String) The UUID of the default dataset for this project.
 - `description` (String) A description of the project.
+- `extra` (String) JSON string containing extra metadata for the project.
+- `reference_dataset_id` (String) The UUID of the reference dataset for this project.
 - `run_count` (Number) The number of runs in the project.
 - `start_time` (String) The start time of the project.
 - `tenant_id` (String) The tenant ID of the project.
+- `trace_tier` (String) The trace retention tier (`longlived` or `shortlived`).

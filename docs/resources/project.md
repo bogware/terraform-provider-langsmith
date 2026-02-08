@@ -32,6 +32,7 @@ resource "langsmith_project" "example" {
 - `description` (String) A description of the project.
 - `extra` (String) JSON string containing extra metadata for the project.
 - `reference_dataset_id` (String) The UUID of the reference dataset for this project.
+- `trace_tier` (String) The trace retention tier for the project. Valid values: `longlived`, `shortlived`.
 
 ### Read-Only
 
