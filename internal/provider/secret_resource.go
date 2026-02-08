@@ -43,18 +43,17 @@ type SecretResourceModel struct {
 	Value types.String `tfsdk:"value"`
 }
 
-// secretUpsertRequest is the order form for stashing or updating a secret.
-// The API treats every POST as an upsert -- same as Doc Adams treating
-// every patient the same whether they're new in town or a regular.
-type secretUpsertRequest struct {
+// secretUpsertItem is a single entry in the upsert array. The API expects
+// a list of secrets -- even if you are only moving one head of cattle.
+type secretUpsertItem struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
 }
 
-// secretDeleteRequest is the request to clear a secret off the books.
+// secretDeleteItem is the request to clear a secret off the books.
 // Setting Value to nil marshals as JSON null, which tells the API
 // this secret has ridden off into the sunset.
-type secretDeleteRequest struct {
+type secretDeleteItem struct {
 	Key   string  `json:"key"`
 	Value *string `json:"value"`
 }
@@ -120,10 +119,10 @@ func (r *SecretResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	body := secretUpsertRequest{
+	body := []secretUpsertItem{{
 		Key:   data.Key.ValueString(),
 		Value: data.Value.ValueString(),
-	}
+	}}
 
 	// The API is upsert-based and returns no body worth reading --
 	// like sending a telegram to Dodge City and getting silence back.
@@ -189,10 +188,10 @@ func (r *SecretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	body := secretUpsertRequest{
+	body := []secretUpsertItem{{
 		Key:   data.Key.ValueString(),
 		Value: data.Value.ValueString(),
-	}
+	}}
 
 	// Same upsert trail as Create -- the API doesn't care whether
 	// you're a newcomer or an old hand, it treats you the same.
@@ -217,10 +216,10 @@ func (r *SecretResource) Delete(ctx context.Context, req resource.DeleteRequest,
 
 	// To delete a secret, we POST with value=null. It's the frontier
 	// way of saying "this one's been buried at Boot Hill."
-	body := secretDeleteRequest{
+	body := []secretDeleteItem{{
 		Key:   data.Key.ValueString(),
 		Value: nil,
-	}
+	}}
 
 	err := r.client.Post(ctx, "/api/v1/workspaces/current/secrets", body, nil)
 	if err != nil {

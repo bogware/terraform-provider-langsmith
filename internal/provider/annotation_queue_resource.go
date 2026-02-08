@@ -154,26 +154,32 @@ func (r *AnnotationQueueResource) Schema(ctx context.Context, req resource.Schem
 			"source_rule_id": schema.StringAttribute{
 				MarkdownDescription: "The ID of the source rule that created this queue.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"run_rule_id": schema.StringAttribute{
 				MarkdownDescription: "The ID of the run rule associated with this queue.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"queue_type": schema.StringAttribute{
 				MarkdownDescription: "The type of annotation queue.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "The tenant ID of the annotation queue.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "The creation timestamp of the annotation queue.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "The last update timestamp of the annotation queue.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
 	}
@@ -405,12 +411,12 @@ func mapAnnotationQueueResponseToState(data *AnnotationQueueResourceModel, resul
 
 	// Rubric items and metadata come back as raw JSON -- round 'em up carefully
 	// so Terraform don't report phantom drift on empty corrals.
-	if len(result.RubricItems) > 0 && string(result.RubricItems) != "null" {
+	if len(result.RubricItems) > 0 && string(result.RubricItems) != "null" && string(result.RubricItems) != "[]" {
 		data.RubricItems = types.StringValue(string(result.RubricItems))
 	} else {
 		data.RubricItems = types.StringNull()
 	}
-	if len(result.Metadata) > 0 && string(result.Metadata) != "null" {
+	if len(result.Metadata) > 0 && string(result.Metadata) != "null" && string(result.Metadata) != "{}" {
 		data.Metadata = types.StringValue(string(result.Metadata))
 	} else {
 		data.Metadata = types.StringNull()

@@ -238,7 +238,11 @@ func (r *AlertRuleResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
+	// The create response returns session_id as null, so we preserve the
+	// value from the plan. The GET endpoint returns it properly.
+	sessionID := data.SessionID.ValueString()
 	mapAlertRuleResponseToState(&data, &result)
+	data.SessionID = types.StringValue(sessionID)
 	tflog.Trace(ctx, "created alert rule resource", map[string]interface{}{"id": result.Rule.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -392,7 +396,11 @@ func buildAlertRuleRequest(data *AlertRuleResourceModel) (*alertRuleRequest, dia
 // null -- no sense reporting ghost cattle to the marshal.
 func mapAlertRuleResponseToState(data *AlertRuleResourceModel, result *alertRuleResponse) {
 	data.ID = types.StringValue(result.Rule.ID)
-	data.SessionID = types.StringValue(result.Rule.SessionID)
+	// Only update session_id if the API actually returned one; the create
+	// response notoriously returns null here, like a witness who clams up.
+	if result.Rule.SessionID != "" {
+		data.SessionID = types.StringValue(result.Rule.SessionID)
+	}
 	data.Name = types.StringValue(result.Rule.Name)
 	data.Description = types.StringValue(result.Rule.Description)
 	data.Type = types.StringValue(result.Rule.Type)

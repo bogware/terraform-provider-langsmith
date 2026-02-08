@@ -39,16 +39,18 @@ type WorkspaceMemberResource struct {
 // WorkspaceMemberResourceModel describes the Terraform state for a workspace member.
 type WorkspaceMemberResourceModel struct {
 	ID        types.String `tfsdk:"id"`
-	Email     types.String `tfsdk:"email"`
+	UserID    types.String `tfsdk:"user_id"`
 	RoleID    types.String `tfsdk:"role_id"`
+	Email     types.String `tfsdk:"email"`
 	FullName  types.String `tfsdk:"full_name"`
 	CreatedAt types.String `tfsdk:"created_at"`
 }
 
 // workspaceMemberCreateRequest is the summons to bring a new member into the
-// workspace fold.
+// workspace fold. The API needs a user_id -- you can't just holler a name
+// across the prairie and expect somebody to show up.
 type workspaceMemberCreateRequest struct {
-	Email  string `json:"email"`
+	UserID string `json:"user_id"`
 	RoleID string `json:"role_id"`
 }
 
@@ -59,23 +61,26 @@ type workspaceMemberUpdateRequest struct {
 }
 
 // workspaceMemberCreateResponse is what the API sends back after a new member
-// signs the register -- the identity_id is the brand we track 'em by.
+// signs the register -- the id is the brand we track 'em by.
 type workspaceMemberCreateResponse struct {
-	IdentityID string `json:"identity_id"`
+	ID string `json:"id"`
 }
 
 // workspaceMemberAPIResponse is the full accounting of a workspace member,
 // as recorded in the territory's ledger.
 type workspaceMemberAPIResponse struct {
-	ID        string `json:"identity_id"`
-	Email     string `json:"email"`
-	FullName  string `json:"full_name"`
-	RoleID    string `json:"role_id"`
-	CreatedAt string `json:"created_at"`
+	ID        string  `json:"id"`
+	UserID    string  `json:"user_id"`
+	Email     string  `json:"email"`
+	FullName  *string `json:"full_name"`
+	RoleID    string  `json:"role_id"`
+	CreatedAt string  `json:"created_at"`
 }
 
-// workspaceMemberListAPIResponse is the whole bunkhouse roster.
-type workspaceMemberListAPIResponse []workspaceMemberAPIResponse
+// workspaceMemberListAPIResponse wraps the bunkhouse roster.
+type workspaceMemberListAPIResponse struct {
+	Members []workspaceMemberAPIResponse `json:"members"`
+}
 
 func (r *WorkspaceMemberResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_workspace_member"
@@ -92,8 +97,8 @@ func (r *WorkspaceMemberResource) Schema(ctx context.Context, req resource.Schem
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"email": schema.StringAttribute{
-				MarkdownDescription: "The email address of the member to add.",
+			"user_id": schema.StringAttribute{
+				MarkdownDescription: "The user ID of the member to add to the workspace.",
 				Required:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -102,6 +107,10 @@ func (r *WorkspaceMemberResource) Schema(ctx context.Context, req resource.Schem
 			"role_id": schema.StringAttribute{
 				MarkdownDescription: "The role ID to assign to the member.",
 				Required:            true,
+			},
+			"email": schema.StringAttribute{
+				MarkdownDescription: "The email address of the member.",
+				Computed:            true,
 			},
 			"full_name": schema.StringAttribute{
 				MarkdownDescription: "The member's full name.",
@@ -140,7 +149,7 @@ func (r *WorkspaceMemberResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	body := workspaceMemberCreateRequest{
-		Email:  data.Email.ValueString(),
+		UserID: data.UserID.ValueString(),
 		RoleID: data.RoleID.ValueString(),
 	}
 
@@ -151,9 +160,9 @@ func (r *WorkspaceMemberResource) Create(ctx context.Context, req resource.Creat
 		return
 	}
 
-	// The create response hands us the identity_id -- our brand for tracking
+	// The create response hands us the member id -- our brand for tracking
 	// this cowhand. Now we ride back to the roster for the full picture.
-	data.ID = types.StringValue(createResult.IdentityID)
+	data.ID = types.StringValue(createResult.ID)
 
 	var listResult workspaceMemberListAPIResponse
 	err = r.client.Get(ctx, "/api/v1/workspaces/current/members", nil, &listResult)
@@ -163,9 +172,9 @@ func (r *WorkspaceMemberResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	var found *workspaceMemberAPIResponse
-	for _, member := range listResult {
-		if member.ID == createResult.IdentityID {
-			found = &member
+	for i := range listResult.Members {
+		if listResult.Members[i].ID == createResult.ID {
+			found = &listResult.Members[i]
 			break
 		}
 	}
@@ -173,13 +182,13 @@ func (r *WorkspaceMemberResource) Create(ctx context.Context, req resource.Creat
 	if found == nil {
 		resp.Diagnostics.AddError(
 			"Error reading workspace member after create",
-			fmt.Sprintf("Member with identity_id %s not found in workspace roster after creation -- vanished like a ghost rider.", createResult.IdentityID),
+			fmt.Sprintf("Member with id %s not found in workspace roster after creation -- vanished like a ghost rider.", createResult.ID),
 		)
 		return
 	}
 
 	mapWorkspaceMemberResponseToState(&data, found)
-	tflog.Trace(ctx, "created workspace member resource", map[string]interface{}{"id": createResult.IdentityID})
+	tflog.Trace(ctx, "created workspace member resource", map[string]interface{}{"id": createResult.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -200,9 +209,9 @@ func (r *WorkspaceMemberResource) Read(ctx context.Context, req resource.ReadReq
 	}
 
 	var found *workspaceMemberAPIResponse
-	for _, member := range listResult {
-		if member.ID == data.ID.ValueString() {
-			found = &member
+	for i := range listResult.Members {
+		if listResult.Members[i].ID == data.ID.ValueString() {
+			found = &listResult.Members[i]
 			break
 		}
 	}
@@ -267,11 +276,17 @@ func (r *WorkspaceMemberResource) ImportState(ctx context.Context, req resource.
 // from anyone working Front Street.
 func mapWorkspaceMemberResponseToState(data *WorkspaceMemberResourceModel, result *workspaceMemberAPIResponse) {
 	data.ID = types.StringValue(result.ID)
-	data.Email = types.StringValue(result.Email)
+	data.UserID = types.StringValue(result.UserID)
 	data.RoleID = types.StringValue(result.RoleID)
 
-	if result.FullName != "" {
-		data.FullName = types.StringValue(result.FullName)
+	if result.Email != "" {
+		data.Email = types.StringValue(result.Email)
+	} else {
+		data.Email = types.StringNull()
+	}
+
+	if result.FullName != nil {
+		data.FullName = types.StringValue(*result.FullName)
 	} else {
 		data.FullName = types.StringNull()
 	}
