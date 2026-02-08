@@ -117,6 +117,13 @@ func (p *LangSmithProvider) Resources(ctx context.Context) []func() resource.Res
 		NewModelPriceMapResource,
 		NewUsageLimitResource,
 		NewPlaygroundSettingsResource,
+		NewSecretResource,
+		NewTTLSettingsResource,
+		NewAlertRuleResource,
+		NewOrgRoleResource,
+		NewSSOSettingsResource,
+		NewWorkspaceMemberResource,
+		NewPromptTagResource,
 	}
 }
 
@@ -127,6 +134,7 @@ func (p *LangSmithProvider) DataSources(ctx context.Context) []func() datasource
 		NewWorkspaceDataSource,
 		NewInfoDataSource,
 		NewOrganizationDataSource,
+		NewPromptCommitDataSource,
 	}
 }
 

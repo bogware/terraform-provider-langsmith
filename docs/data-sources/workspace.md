@@ -29,4 +29,6 @@ data "langsmith_workspace" "example" {
 ### Read-Only
 
 - `created_at` (String) The creation timestamp of the workspace.
+- `is_personal` (Boolean) Whether this is a personal workspace.
+- `organization_id` (String) The organization ID that owns this workspace.
 - `tenant_handle` (String) The tenant handle of the workspace.

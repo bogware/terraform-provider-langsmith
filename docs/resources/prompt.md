@@ -31,13 +31,22 @@ resource "langsmith_prompt" "example" {
 ### Optional
 
 - `description` (String) A description of the prompt.
+- `is_archived` (Boolean) Whether the prompt has been archived -- put out to pasture, so to speak.
+- `manifest` (String) JSON string of the prompt manifest (LangChain serialization format). This is the actual prompt content — the template, messages, and variables. Setting this creates a new commit in the prompt repo.
 - `readme` (String) README content for the prompt.
 - `tags` (List of String) Tags for the prompt.
 
 ### Read-Only
 
+- `commit_hash` (String) The hash of the current commit — the latest brand on the cattle.
 - `created_at` (String) When the prompt was created.
 - `full_name` (String) The full name of the prompt (owner/repo_handle).
 - `id` (String) The unique identifier of the prompt repo.
+- `last_commit_hash` (String) The hash of the last commit -- the latest brand on the cattle.
+- `num_commits` (Number) The number of commits in the prompt repo.
+- `num_downloads` (Number) The number of downloads of the prompt.
+- `num_likes` (Number) The number of likes on the prompt.
+- `num_views` (Number) The number of views on the prompt.
 - `owner` (String) The owner of the prompt repo.
+- `tenant_id` (String) The tenant ID that owns this prompt.
 - `updated_at` (String) When the prompt was last updated.

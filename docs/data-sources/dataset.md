@@ -32,4 +32,12 @@ data "langsmith_dataset" "example" {
 - `data_type` (String) The data type of the dataset (e.g., `kv`, `llm`, or `chat`).
 - `description` (String) A description of the dataset.
 - `example_count` (Number) The number of examples in the dataset.
+- `externally_managed` (Boolean) Whether the dataset is externally managed.
+- `inputs_schema_definition` (String) JSON string of the inputs JSON schema definition.
+- `last_session_start_time` (String) The start time of the last session associated with the dataset.
+- `metadata` (String) JSON string of the dataset metadata.
+- `modified_at` (String) The last modification timestamp of the dataset.
+- `outputs_schema_definition` (String) JSON string of the outputs JSON schema definition.
+- `session_count` (Number) The number of sessions associated with the dataset.
 - `tenant_id` (String) The tenant ID of the dataset.
+- `transformations` (String) JSON string of the dataset transformations.

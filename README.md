@@ -97,7 +97,8 @@ Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
 | `langsmith_annotation_queue` | Annotation queues for human review |
 | `langsmith_service_account` | Service accounts (create + delete only) |
 | `langsmith_service_key` | API service keys (create + delete only, key is sensitive) |
-| `langsmith_prompt` | Prompts in the LangSmith Hub |
+| `langsmith_prompt` | Prompts in the LangSmith Hub (with manifest/content management) |
+| `langsmith_prompt_tag` | Named version tags on prompt commits (e.g., `production`, `staging`) |
 | `langsmith_run_rule` | Automation rules for run routing |
 | `langsmith_webhook` | Prompt webhooks |
 | `langsmith_feedback_config` | Feedback score configurations |
@@ -109,6 +110,12 @@ Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
 | `langsmith_model_price_map` | Model pricing configuration |
 | `langsmith_usage_limit` | Usage limits |
 | `langsmith_playground_settings` | Playground settings |
+| `langsmith_secret` | Workspace secrets (key/value store) |
+| `langsmith_ttl_settings` | Trace retention (TTL) settings |
+| `langsmith_alert_rule` | Alert rules for project monitoring |
+| `langsmith_org_role` | Organization roles (RBAC) |
+| `langsmith_sso_settings` | SSO/SAML settings |
+| `langsmith_workspace_member` | Workspace member management |
 
 ## Data Sources
 
@@ -119,6 +126,7 @@ Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
 | `langsmith_workspace` | Look up a workspace by name or ID |
 | `langsmith_info` | LangSmith server information |
 | `langsmith_organization` | Current organization details |
+| `langsmith_prompt_commit` | Read a specific prompt commit by hash, tag, or `latest` |
 
 ## Development
 
@@ -172,72 +180,6 @@ git add docs/
 ```
 
 CI will fail if generated docs are stale.
-
-## Publishing & Releases
-
-### Prerequisites
-
-1. **GPG signing key** for release artifact signing:
-   ```bash
-   gpg --full-generate-key         # RSA, 4096 bits recommended
-   gpg --armor --export "<email>"  # Public key for the registry
-   ```
-
-2. **GitHub repository secrets** (Settings > Secrets > Actions):
-
-   | Secret | Value |
-   |--------|-------|
-   | `GPG_PRIVATE_KEY` | `gpg --armor --export-secret-keys "<key-id>"` |
-   | `PASSPHRASE` | GPG key passphrase |
-   | `LANGSMITH_API_KEY` | API key for CI acceptance tests |
-   | `LANGSMITH_TENANT_ID` | Workspace ID for CI acceptance tests |
-
-3. **Terraform Registry account** at [registry.terraform.io](https://registry.terraform.io/) (sign in with GitHub).
-
-### Creating a Release
-
-```bash
-# 1. Ensure everything is clean
-make generate
-git diff --exit-code       # No uncommitted changes
-make test && make testacc  # All tests pass
-
-# 2. Tag and push
-git tag v0.5.0
-git push origin v0.5.0
-```
-
-The [Release workflow](.github/workflows/release.yml) automatically:
-- Builds multi-platform binaries (Linux, macOS, Windows / amd64, arm64, 386, arm)
-- Signs SHA256SUMS with your GPG key
-- Creates a GitHub release with all artifacts
-
-### Submitting to the Registry
-
-1. Go to [registry.terraform.io/publish/provider](https://registry.terraform.io/publish/provider)
-2. Select `bogware/terraform-provider-langsmith`
-3. Add your GPG **public key**
-4. Future releases are detected and published automatically
-
-### Release Checklist
-
-- [ ] All acceptance tests pass (`make testacc`)
-- [ ] Generated docs are up to date (`make generate && git diff --exit-code`)
-- [ ] `CHANGELOG.md` updated with new version
-- [ ] Tag follows semver (`v0.5.0`)
-- [ ] GitHub release created by CI with: zip archives, SHA256SUMS, SHA256SUMS.sig, manifest.json
-- [ ] GPG public key registered at [registry.terraform.io](https://registry.terraform.io)
-
-## Registry Files
-
-These required files are already included:
-
-| File | Purpose |
-|------|---------|
-| `terraform-registry-manifest.json` | Declares protocol version (v6) |
-| `.goreleaser.yml` | Multi-platform build + GPG signing config |
-| `docs/` | Auto-generated documentation |
-| `examples/` | Example Terraform configs |
 
 ## License
 

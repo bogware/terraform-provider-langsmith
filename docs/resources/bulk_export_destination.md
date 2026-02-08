@@ -44,6 +44,7 @@ resource "langsmith_bulk_export_destination" "example" {
 ### Read-Only
 
 - `created_at` (String) The creation timestamp.
+- `credentials_keys` (List of String) The keys of configured credentials.
 - `id` (String) The unique identifier of the bulk export destination.
 - `tenant_id` (String) The tenant ID.
 - `updated_at` (String) The last update timestamp.

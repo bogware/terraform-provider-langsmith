@@ -24,8 +24,11 @@ resource "langsmith_service_key" "example" {
 
 ### Optional
 
+- `default_workspace_id` (String) The default workspace ID for the service key.
 - `description` (String) A description for the service key.
+- `expires_at` (String) ISO 8601 timestamp when the service key expires.
 - `read_only` (Boolean) Whether the service key is read-only.
+- `role_id` (String) The role ID to assign to the service key.
 
 ### Read-Only
 

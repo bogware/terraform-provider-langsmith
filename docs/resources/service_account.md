@@ -25,6 +25,10 @@ resource "langsmith_service_account" "example" {
 
 - `name` (String) The name of the service account.
 
+### Optional
+
+- `workspaces` (String) JSON-encoded array of workspace assignments, e.g. `[{"workspace_id": "uuid", "role_id": "uuid"}]`.
+
 ### Read-Only
 
 - `created_at` (String) The creation timestamp of the service account.

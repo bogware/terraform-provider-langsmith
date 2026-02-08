@@ -40,29 +40,45 @@ type PlaygroundSettingsResource struct {
 // The "settings" field is a JSON string -- flexible enough to carry whatever
 // configuration the playground needs without a rigid schema.
 type PlaygroundSettingsResourceModel struct {
-	ID          types.String `tfsdk:"id"`
-	Name        types.String `tfsdk:"name"`
-	Description types.String `tfsdk:"description"`
-	Settings    types.String `tfsdk:"settings"`
-	CreatedAt   types.String `tfsdk:"created_at"`
-	UpdatedAt   types.String `tfsdk:"updated_at"`
+	ID           types.String `tfsdk:"id"`
+	Name         types.String `tfsdk:"name"`
+	Description  types.String `tfsdk:"description"`
+	Settings     types.String `tfsdk:"settings"`
+	CreatedAt    types.String `tfsdk:"created_at"`
+	UpdatedAt    types.String `tfsdk:"updated_at"`
+	Options      types.String `tfsdk:"options"`
+	SettingsType types.String `tfsdk:"settings_type"`
 }
 
-// playgroundSettingsAPIRequest is the request body for creating/updating playground settings.
-type playgroundSettingsAPIRequest struct {
+// playgroundSettingsAPICreateRequest is the request body for creating playground settings.
+// Every new saloon in Dodge City needs a proper blueprint before the first nail goes in.
+type playgroundSettingsAPICreateRequest struct {
+	Name         *string         `json:"name,omitempty"`
+	Description  *string         `json:"description,omitempty"`
+	Settings     json.RawMessage `json:"settings"`
+	Options      json.RawMessage `json:"options,omitempty"`
+	SettingsType *string         `json:"settings_type,omitempty"`
+}
+
+// playgroundSettingsAPIUpdateRequest is the request body for updating playground settings.
+// Even Marshal Dillon had to make adjustments to the law now and then.
+type playgroundSettingsAPIUpdateRequest struct {
 	Name        *string         `json:"name,omitempty"`
 	Description *string         `json:"description,omitempty"`
 	Settings    json.RawMessage `json:"settings"`
+	Options     json.RawMessage `json:"options,omitempty"`
 }
 
 // playgroundSettingsAPIResponse is the API response for playground settings.
 type playgroundSettingsAPIResponse struct {
-	ID          string          `json:"id"`
-	Name        *string         `json:"name"`
-	Description *string         `json:"description"`
-	Settings    json.RawMessage `json:"settings"`
-	CreatedAt   string          `json:"created_at"`
-	UpdatedAt   string          `json:"updated_at"`
+	ID           string          `json:"id"`
+	Name         *string         `json:"name"`
+	Description  *string         `json:"description"`
+	Settings     json.RawMessage `json:"settings"`
+	Options      json.RawMessage `json:"options"`
+	SettingsType string          `json:"settings_type"`
+	CreatedAt    string          `json:"created_at"`
+	UpdatedAt    string          `json:"updated_at"`
 }
 
 func (r *PlaygroundSettingsResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -100,6 +116,15 @@ func (r *PlaygroundSettingsResource) Schema(ctx context.Context, req resource.Sc
 				MarkdownDescription: "The last update timestamp.",
 				Computed:            true,
 			},
+			"options": schema.StringAttribute{
+				MarkdownDescription: "JSON-encoded options object.",
+				Optional:            true,
+			},
+			"settings_type": schema.StringAttribute{
+				MarkdownDescription: "The settings type. Valid values: `complex`, `simple`. Defaults to `complex`.",
+				Optional:            true,
+				Computed:            true,
+			},
 		},
 	}
 }
@@ -128,7 +153,7 @@ func (r *PlaygroundSettingsResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
-	body := playgroundSettingsAPIRequest{
+	body := playgroundSettingsAPICreateRequest{
 		Settings: json.RawMessage(data.Settings.ValueString()),
 	}
 
@@ -139,6 +164,15 @@ func (r *PlaygroundSettingsResource) Create(ctx context.Context, req resource.Cr
 	if !data.Description.IsNull() && !data.Description.IsUnknown() {
 		v := data.Description.ValueString()
 		body.Description = &v
+	}
+	// Saddle up the options if somebody packed them for the ride.
+	if !data.Options.IsNull() && !data.Options.IsUnknown() {
+		body.Options = json.RawMessage(data.Options.ValueString())
+	}
+	// Pin on the settings type badge if the deputy brought one along.
+	if !data.SettingsType.IsNull() && !data.SettingsType.IsUnknown() {
+		v := data.SettingsType.ValueString()
+		body.SettingsType = &v
 	}
 
 	var result playgroundSettingsAPIResponse
@@ -197,7 +231,7 @@ func (r *PlaygroundSettingsResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 
-	body := playgroundSettingsAPIRequest{
+	body := playgroundSettingsAPIUpdateRequest{
 		Settings: json.RawMessage(data.Settings.ValueString()),
 	}
 
@@ -208,6 +242,10 @@ func (r *PlaygroundSettingsResource) Update(ctx context.Context, req resource.Up
 	if !data.Description.IsNull() && !data.Description.IsUnknown() {
 		v := data.Description.ValueString()
 		body.Description = &v
+	}
+	// Pack the options for the trail if the cowhand brought any.
+	if !data.Options.IsNull() && !data.Options.IsUnknown() {
+		body.Options = json.RawMessage(data.Options.ValueString())
 	}
 
 	var result playgroundSettingsAPIResponse
@@ -268,4 +306,14 @@ func mapPlaygroundSettingsResponseToState(data *PlaygroundSettingsResourceModel,
 
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
+
+	// Stash the options in state -- like Miss Kitty's lockbox, it holds
+	// whatever JSON valuables the API sent back from the Long Branch.
+	if len(result.Options) > 0 && string(result.Options) != "null" {
+		data.Options = types.StringValue(string(result.Options))
+	} else {
+		data.Options = types.StringNull()
+	}
+
+	data.SettingsType = types.StringValue(result.SettingsType)
 }

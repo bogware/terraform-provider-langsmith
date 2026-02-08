@@ -45,6 +45,7 @@ type ProjectResourceModel struct {
 	DefaultDatasetID   types.String `tfsdk:"default_dataset_id"`
 	ReferenceDatasetID types.String `tfsdk:"reference_dataset_id"`
 	Extra              types.String `tfsdk:"extra"`
+	TraceTier          types.String `tfsdk:"trace_tier"`
 	TenantID           types.String `tfsdk:"tenant_id"`
 	StartTime          types.String `tfsdk:"start_time"`
 }
@@ -57,6 +58,7 @@ type projectAPIRequest struct {
 	DefaultDatasetID   *string         `json:"default_dataset_id,omitempty"`
 	ReferenceDatasetID *string         `json:"reference_dataset_id,omitempty"`
 	Extra              json.RawMessage `json:"extra,omitempty"`
+	TraceTier          *string         `json:"trace_tier,omitempty"`
 }
 
 // projectAPIResponse is what the LangSmith API sends back when a project is
@@ -68,6 +70,7 @@ type projectAPIResponse struct {
 	DefaultDatasetID   *string         `json:"default_dataset_id"`
 	ReferenceDatasetID *string         `json:"reference_dataset_id"`
 	Extra              json.RawMessage `json:"extra"`
+	TraceTier          *string         `json:"trace_tier"`
 	TenantID           string          `json:"tenant_id"`
 	StartTime          string          `json:"start_time"`
 }
@@ -106,6 +109,11 @@ func (r *ProjectResource) Schema(ctx context.Context, req resource.SchemaRequest
 			"extra": schema.StringAttribute{
 				MarkdownDescription: "JSON string containing extra metadata for the project.",
 				Optional:            true,
+			},
+			"trace_tier": schema.StringAttribute{
+				MarkdownDescription: "The trace retention tier for the project. Valid values: `longlived`, `shortlived`.",
+				Optional:            true,
+				Computed:            true,
 			},
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "The tenant ID of the project.",
@@ -161,6 +169,11 @@ func (r *ProjectResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 	if !data.Extra.IsNull() && !data.Extra.IsUnknown() {
 		body.Extra = json.RawMessage(data.Extra.ValueString())
+	}
+	// A trace's tier determines how long it stays on the prairie before fading away.
+	if !data.TraceTier.IsNull() && !data.TraceTier.IsUnknown() {
+		v := data.TraceTier.ValueString()
+		body.TraceTier = &v
 	}
 
 	var result projectAPIResponse
@@ -225,6 +238,11 @@ func (r *ProjectResource) Update(ctx context.Context, req resource.UpdateRequest
 	if !data.Extra.IsNull() && !data.Extra.IsUnknown() {
 		body.Extra = json.RawMessage(data.Extra.ValueString())
 	}
+	// Even Marshal Dillon knows you can't outrun a retention policy.
+	if !data.TraceTier.IsNull() && !data.TraceTier.IsUnknown() {
+		v := data.TraceTier.ValueString()
+		body.TraceTier = &v
+	}
 
 	var result projectAPIResponse
 	err := r.client.Patch(ctx, "/api/v1/sessions/"+data.ID.ValueString(), body, &result)
@@ -287,6 +305,12 @@ func mapProjectResponseToState(data *ProjectResourceModel, result *projectAPIRes
 		data.Extra = types.StringValue(string(result.Extra))
 	} else {
 		data.Extra = types.StringNull()
+	}
+
+	if result.TraceTier != nil {
+		data.TraceTier = types.StringValue(*result.TraceTier)
+	} else {
+		data.TraceTier = types.StringNull()
 	}
 
 	data.TenantID = types.StringValue(result.TenantID)

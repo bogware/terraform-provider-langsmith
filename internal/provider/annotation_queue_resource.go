@@ -5,6 +5,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 
@@ -50,6 +51,11 @@ type AnnotationQueueResourceModel struct {
 	ReservationMinutes  types.Int64  `tfsdk:"reservation_minutes"`
 	DefaultDataset      types.String `tfsdk:"default_dataset"`
 	RubricInstructions  types.String `tfsdk:"rubric_instructions"`
+	RubricItems         types.String `tfsdk:"rubric_items"`
+	Metadata            types.String `tfsdk:"metadata"`
+	SourceRuleID        types.String `tfsdk:"source_rule_id"`
+	RunRuleID           types.String `tfsdk:"run_rule_id"`
+	QueueType           types.String `tfsdk:"queue_type"`
 	TenantID            types.String `tfsdk:"tenant_id"`
 	CreatedAt           types.String `tfsdk:"created_at"`
 	UpdatedAt           types.String `tfsdk:"updated_at"`
@@ -57,28 +63,35 @@ type AnnotationQueueResourceModel struct {
 
 // annotationQueueAPIRequest is the request body for creating/updating an annotation queue.
 type annotationQueueAPIRequest struct {
-	Name                string  `json:"name"`
-	Description         *string `json:"description,omitempty"`
-	EnableReservations  *bool   `json:"enable_reservations,omitempty"`
-	NumReviewersPerItem *int64  `json:"num_reviewers_per_item,omitempty"`
-	ReservationMinutes  *int64  `json:"reservation_minutes,omitempty"`
-	DefaultDataset      *string `json:"default_dataset,omitempty"`
-	RubricInstructions  *string `json:"rubric_instructions,omitempty"`
+	Name                string          `json:"name"`
+	Description         *string         `json:"description,omitempty"`
+	EnableReservations  *bool           `json:"enable_reservations,omitempty"`
+	NumReviewersPerItem *int64          `json:"num_reviewers_per_item,omitempty"`
+	ReservationMinutes  *int64          `json:"reservation_minutes,omitempty"`
+	DefaultDataset      *string         `json:"default_dataset,omitempty"`
+	RubricInstructions  *string         `json:"rubric_instructions,omitempty"`
+	RubricItems         json.RawMessage `json:"rubric_items,omitempty"`
+	Metadata            json.RawMessage `json:"metadata,omitempty"`
 }
 
 // annotationQueueAPIResponse is the API response for an annotation queue.
 type annotationQueueAPIResponse struct {
-	ID                  string  `json:"id"`
-	Name                string  `json:"name"`
-	Description         *string `json:"description"`
-	EnableReservations  *bool   `json:"enable_reservations"`
-	NumReviewersPerItem *int64  `json:"num_reviewers_per_item"`
-	ReservationMinutes  *int64  `json:"reservation_minutes"`
-	DefaultDataset      *string `json:"default_dataset"`
-	RubricInstructions  *string `json:"rubric_instructions"`
-	TenantID            string  `json:"tenant_id"`
-	CreatedAt           string  `json:"created_at"`
-	UpdatedAt           string  `json:"updated_at"`
+	ID                  string          `json:"id"`
+	Name                string          `json:"name"`
+	Description         *string         `json:"description"`
+	EnableReservations  *bool           `json:"enable_reservations"`
+	NumReviewersPerItem *int64          `json:"num_reviewers_per_item"`
+	ReservationMinutes  *int64          `json:"reservation_minutes"`
+	DefaultDataset      *string         `json:"default_dataset"`
+	RubricInstructions  *string         `json:"rubric_instructions"`
+	RubricItems         json.RawMessage `json:"rubric_items"`
+	Metadata            json.RawMessage `json:"metadata"`
+	SourceRuleID        *string         `json:"source_rule_id"`
+	RunRuleID           *string         `json:"run_rule_id"`
+	QueueType           string          `json:"queue_type"`
+	TenantID            string          `json:"tenant_id"`
+	CreatedAt           string          `json:"created_at"`
+	UpdatedAt           string          `json:"updated_at"`
 }
 
 func (r *AnnotationQueueResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -130,17 +143,43 @@ func (r *AnnotationQueueResource) Schema(ctx context.Context, req resource.Schem
 				MarkdownDescription: "Rubric instructions for reviewers.",
 				Optional:            true,
 			},
+			"rubric_items": schema.StringAttribute{
+				MarkdownDescription: "JSON-encoded array of rubric items for the annotation queue.",
+				Optional:            true,
+			},
+			"metadata": schema.StringAttribute{
+				MarkdownDescription: "JSON-encoded metadata object.",
+				Optional:            true,
+			},
+			"source_rule_id": schema.StringAttribute{
+				MarkdownDescription: "The ID of the source rule that created this queue.",
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"run_rule_id": schema.StringAttribute{
+				MarkdownDescription: "The ID of the run rule associated with this queue.",
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"queue_type": schema.StringAttribute{
+				MarkdownDescription: "The type of annotation queue.",
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "The tenant ID of the annotation queue.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "The creation timestamp of the annotation queue.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "The last update timestamp of the annotation queue.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
 	}
@@ -197,6 +236,13 @@ func (r *AnnotationQueueResource) Create(ctx context.Context, req resource.Creat
 	if !data.RubricInstructions.IsNull() && !data.RubricInstructions.IsUnknown() {
 		v := data.RubricInstructions.ValueString()
 		body.RubricInstructions = &v
+	}
+	// Rubric items and metadata ride along as raw JSON -- no need to break 'em in.
+	if !data.RubricItems.IsNull() && !data.RubricItems.IsUnknown() {
+		body.RubricItems = json.RawMessage(data.RubricItems.ValueString())
+	}
+	if !data.Metadata.IsNull() && !data.Metadata.IsUnknown() {
+		body.Metadata = json.RawMessage(data.Metadata.ValueString())
 	}
 
 	var result annotationQueueAPIResponse
@@ -269,6 +315,13 @@ func (r *AnnotationQueueResource) Update(ctx context.Context, req resource.Updat
 	if !data.RubricInstructions.IsNull() && !data.RubricInstructions.IsUnknown() {
 		v := data.RubricInstructions.ValueString()
 		body.RubricInstructions = &v
+	}
+	// Same as Create -- hitch up the raw JSON fields for the ride to the API.
+	if !data.RubricItems.IsNull() && !data.RubricItems.IsUnknown() {
+		body.RubricItems = json.RawMessage(data.RubricItems.ValueString())
+	}
+	if !data.Metadata.IsNull() && !data.Metadata.IsUnknown() {
+		body.Metadata = json.RawMessage(data.Metadata.ValueString())
 	}
 
 	err := r.client.Patch(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), body, nil)
@@ -356,6 +409,31 @@ func mapAnnotationQueueResponseToState(data *AnnotationQueueResourceModel, resul
 		data.RubricInstructions = types.StringNull()
 	}
 
+	// Rubric items and metadata come back as raw JSON -- round 'em up carefully
+	// so Terraform don't report phantom drift on empty corrals.
+	if len(result.RubricItems) > 0 && string(result.RubricItems) != "null" && string(result.RubricItems) != "[]" {
+		data.RubricItems = types.StringValue(string(result.RubricItems))
+	} else {
+		data.RubricItems = types.StringNull()
+	}
+	if len(result.Metadata) > 0 && string(result.Metadata) != "null" && string(result.Metadata) != "{}" {
+		data.Metadata = types.StringValue(string(result.Metadata))
+	} else {
+		data.Metadata = types.StringNull()
+	}
+
+	if result.SourceRuleID != nil {
+		data.SourceRuleID = types.StringValue(*result.SourceRuleID)
+	} else {
+		data.SourceRuleID = types.StringNull()
+	}
+	if result.RunRuleID != nil {
+		data.RunRuleID = types.StringValue(*result.RunRuleID)
+	} else {
+		data.RunRuleID = types.StringNull()
+	}
+
+	data.QueueType = types.StringValue(result.QueueType)
 	data.TenantID = types.StringValue(result.TenantID)
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)

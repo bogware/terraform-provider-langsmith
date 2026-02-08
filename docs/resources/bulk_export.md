@@ -33,13 +33,16 @@ resource "langsmith_bulk_export" "example" {
 
 - `compression` (String) The compression type. Defaults to `gzip`.
 - `end_time` (String) The end time for the export in RFC3339 format.
+- `export_fields` (List of String) List of fields to export.
 - `filter` (String) A filter expression for the export.
 - `format` (String) The export format. Defaults to `Parquet`.
+- `format_version` (String) The format version. Valid values: `v1`, `v2_beta`.
 - `interval_hours` (Number) The interval in hours for recurring exports.
 
 ### Read-Only
 
 - `created_at` (String) The creation timestamp.
+- `finished_at` (String) The timestamp when the export finished.
 - `id` (String) The unique identifier of the bulk export.
 - `status` (String) The status of the bulk export.
 - `tenant_id` (String) The tenant ID.

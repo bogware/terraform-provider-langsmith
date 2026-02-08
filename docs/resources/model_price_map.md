@@ -34,8 +34,10 @@ resource "langsmith_model_price_map" "example" {
 
 ### Optional
 
+- `completion_cost_details` (String) JSON-encoded cost details object for completion tokens — every last cent accounted for.
 - `match_path` (List of String) Paths to match for model identification. Defaults to `["model", "model_name", "model_id", "model_path", "endpoint_name"]`.
 - `model_provider` (String) The model provider name (e.g., `openai`, `anthropic`).
+- `prompt_cost_details` (String) JSON-encoded cost details object for prompt tokens — the fine print on what you owe.
 - `start_time` (String) The effective start time for this price map entry.
 
 ### Read-Only

@@ -34,16 +34,32 @@ resource "langsmith_run_rule" "example" {
 - `add_to_annotation_queue_id` (String) UUID of the annotation queue to add matching runs to.
 - `add_to_dataset_id` (String) UUID of the dataset to add matching runs to.
 - `add_to_dataset_prefer_correction` (Boolean) Whether to prefer correction when adding to dataset.
+- `alerts` (String) JSON-encoded array of alert configurations.
+- `backfill_from` (String) ISO timestamp to backfill rules from.
+- `code_evaluators` (String) JSON-encoded array of code evaluator configurations.
+- `dataset_id` (String) The ID of the associated dataset.
+- `evaluators` (String) JSON-encoded array of evaluator configurations.
+- `extend_only` (Boolean) Whether the rule only extends existing annotations.
 - `filter` (String) Run filter expression.
+- `group_by` (String) Field to group runs by.
+- `include_extended_stats` (Boolean) Whether to include extended statistics.
 - `is_enabled` (Boolean) Whether the rule is enabled.
 - `num_few_shot_examples` (Number) Number of few-shot examples.
 - `session_id` (String) The project/session UUID to scope this rule to.
 - `trace_filter` (String) Trace filter expression.
+- `transient` (Boolean) Whether the rule is transient.
 - `tree_filter` (String) Tree filter expression.
+- `use_corrections_dataset` (Boolean) Whether to use a corrections dataset.
+- `webhooks` (String) JSON-encoded array of webhook configurations.
 
 ### Read-Only
 
+- `alignment_annotation_queue_id` (String) The ID of the alignment annotation queue.
+- `corrections_dataset_id` (String) The ID of the corrections dataset.
 - `created_at` (String) When the rule was created.
+- `dataset_name` (String) The name of the associated dataset.
+- `evaluator_id` (String) The ID of the evaluator.
 - `id` (String) The unique identifier of the run rule.
+- `session_name` (String) The name of the associated session/project.
 - `tenant_id` (String) The tenant ID.
 - `updated_at` (String) When the rule was last updated.

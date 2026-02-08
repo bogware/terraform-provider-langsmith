@@ -5,6 +5,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 
@@ -33,24 +34,40 @@ type DatasetDataSource struct {
 // DatasetDataSourceModel holds the read-only attributes for a dataset lookup:
 // name, description, data type, and the tally of examples it contains.
 type DatasetDataSourceModel struct {
-	ID           types.String `tfsdk:"id"`
-	Name         types.String `tfsdk:"name"`
-	Description  types.String `tfsdk:"description"`
-	DataType     types.String `tfsdk:"data_type"`
-	TenantID     types.String `tfsdk:"tenant_id"`
-	CreatedAt    types.String `tfsdk:"created_at"`
-	ExampleCount types.Int64  `tfsdk:"example_count"`
+	ID                      types.String `tfsdk:"id"`
+	Name                    types.String `tfsdk:"name"`
+	Description             types.String `tfsdk:"description"`
+	DataType                types.String `tfsdk:"data_type"`
+	InputsSchemaDefinition  types.String `tfsdk:"inputs_schema_definition"`
+	OutputsSchemaDefinition types.String `tfsdk:"outputs_schema_definition"`
+	ExternallyManaged       types.Bool   `tfsdk:"externally_managed"`
+	Transformations         types.String `tfsdk:"transformations"`
+	Metadata                types.String `tfsdk:"metadata"`
+	TenantID                types.String `tfsdk:"tenant_id"`
+	CreatedAt               types.String `tfsdk:"created_at"`
+	ModifiedAt              types.String `tfsdk:"modified_at"`
+	ExampleCount            types.Int64  `tfsdk:"example_count"`
+	SessionCount            types.Int64  `tfsdk:"session_count"`
+	LastSessionStartTime    types.String `tfsdk:"last_session_start_time"`
 }
 
 // datasetDataSourceAPIResponse is the API response for a dataset lookup.
 type datasetDataSourceAPIResponse struct {
-	ID           string  `json:"id"`
-	Name         string  `json:"name"`
-	Description  *string `json:"description"`
-	DataType     string  `json:"data_type"`
-	TenantID     string  `json:"tenant_id"`
-	CreatedAt    string  `json:"created_at"`
-	ExampleCount int64   `json:"example_count"`
+	ID                      string          `json:"id"`
+	Name                    string          `json:"name"`
+	Description             *string         `json:"description"`
+	DataType                string          `json:"data_type"`
+	InputsSchemaDefinition  json.RawMessage `json:"inputs_schema_definition"`
+	OutputsSchemaDefinition json.RawMessage `json:"outputs_schema_definition"`
+	ExternallyManaged       *bool           `json:"externally_managed"`
+	Transformations         json.RawMessage `json:"transformations"`
+	Metadata                json.RawMessage `json:"metadata"`
+	TenantID                string          `json:"tenant_id"`
+	CreatedAt               string          `json:"created_at"`
+	ModifiedAt              string          `json:"modified_at"`
+	ExampleCount            int64           `json:"example_count"`
+	SessionCount            *int64          `json:"session_count"`
+	LastSessionStartTime    *string         `json:"last_session_start_time"`
 }
 
 func (d *DatasetDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -79,6 +96,26 @@ func (d *DatasetDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 				MarkdownDescription: "The data type of the dataset (e.g., `kv`, `llm`, or `chat`).",
 				Computed:            true,
 			},
+			"inputs_schema_definition": schema.StringAttribute{
+				MarkdownDescription: "JSON string of the inputs JSON schema definition.",
+				Computed:            true,
+			},
+			"outputs_schema_definition": schema.StringAttribute{
+				MarkdownDescription: "JSON string of the outputs JSON schema definition.",
+				Computed:            true,
+			},
+			"externally_managed": schema.BoolAttribute{
+				MarkdownDescription: "Whether the dataset is externally managed.",
+				Computed:            true,
+			},
+			"transformations": schema.StringAttribute{
+				MarkdownDescription: "JSON string of the dataset transformations.",
+				Computed:            true,
+			},
+			"metadata": schema.StringAttribute{
+				MarkdownDescription: "JSON string of the dataset metadata.",
+				Computed:            true,
+			},
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "The tenant ID of the dataset.",
 				Computed:            true,
@@ -87,8 +124,20 @@ func (d *DatasetDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 				MarkdownDescription: "The creation timestamp of the dataset.",
 				Computed:            true,
 			},
+			"modified_at": schema.StringAttribute{
+				MarkdownDescription: "The last modification timestamp of the dataset.",
+				Computed:            true,
+			},
 			"example_count": schema.Int64Attribute{
 				MarkdownDescription: "The number of examples in the dataset.",
+				Computed:            true,
+			},
+			"session_count": schema.Int64Attribute{
+				MarkdownDescription: "The number of sessions associated with the dataset.",
+				Computed:            true,
+			},
+			"last_session_start_time": schema.StringAttribute{
+				MarkdownDescription: "The start time of the last session associated with the dataset.",
 				Computed:            true,
 			},
 		},
@@ -170,9 +219,53 @@ func (d *DatasetDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	}
 
 	data.DataType = types.StringValue(result.DataType)
+
+	if len(result.InputsSchemaDefinition) > 0 && string(result.InputsSchemaDefinition) != "null" {
+		data.InputsSchemaDefinition = types.StringValue(string(result.InputsSchemaDefinition))
+	} else {
+		data.InputsSchemaDefinition = types.StringNull()
+	}
+
+	if len(result.OutputsSchemaDefinition) > 0 && string(result.OutputsSchemaDefinition) != "null" {
+		data.OutputsSchemaDefinition = types.StringValue(string(result.OutputsSchemaDefinition))
+	} else {
+		data.OutputsSchemaDefinition = types.StringNull()
+	}
+
+	if result.ExternallyManaged != nil {
+		data.ExternallyManaged = types.BoolValue(*result.ExternallyManaged)
+	} else {
+		data.ExternallyManaged = types.BoolNull()
+	}
+
+	if len(result.Transformations) > 0 && string(result.Transformations) != "null" {
+		data.Transformations = types.StringValue(string(result.Transformations))
+	} else {
+		data.Transformations = types.StringNull()
+	}
+
+	if len(result.Metadata) > 0 && string(result.Metadata) != "null" {
+		data.Metadata = types.StringValue(string(result.Metadata))
+	} else {
+		data.Metadata = types.StringNull()
+	}
+
 	data.TenantID = types.StringValue(result.TenantID)
 	data.CreatedAt = types.StringValue(result.CreatedAt)
+	data.ModifiedAt = types.StringValue(result.ModifiedAt)
 	data.ExampleCount = types.Int64Value(result.ExampleCount)
+
+	if result.SessionCount != nil {
+		data.SessionCount = types.Int64Value(*result.SessionCount)
+	} else {
+		data.SessionCount = types.Int64Null()
+	}
+
+	if result.LastSessionStartTime != nil {
+		data.LastSessionStartTime = types.StringValue(*result.LastSessionStartTime)
+	} else {
+		data.LastSessionStartTime = types.StringNull()
+	}
 
 	tflog.Trace(ctx, "read dataset data source", map[string]interface{}{"id": result.ID})
 
