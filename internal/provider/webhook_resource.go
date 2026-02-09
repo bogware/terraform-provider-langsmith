@@ -110,10 +110,16 @@ func (r *WebhookResource) Schema(ctx context.Context, req resource.SchemaRequest
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "The tenant ID.",
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "When the webhook was created.",
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "When the webhook was last updated.",

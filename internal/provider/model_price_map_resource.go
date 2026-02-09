@@ -70,14 +70,16 @@ type modelPriceMapAPIRequest struct {
 
 // modelPriceMapAPIResponse is the API response for a model price map.
 type modelPriceMapAPIResponse struct {
-	ID             string   `json:"id"`
-	Name           string   `json:"name"`
-	MatchPattern   string   `json:"match_pattern"`
-	PromptCost     float64  `json:"prompt_cost"`
-	CompletionCost float64  `json:"completion_cost"`
-	Provider       *string  `json:"provider"`
-	StartTime      *string  `json:"start_time"`
-	MatchPath      []string `json:"match_path"`
+	ID                    string          `json:"id"`
+	Name                  string          `json:"name"`
+	MatchPattern          string          `json:"match_pattern"`
+	PromptCost            float64         `json:"prompt_cost"`
+	CompletionCost        float64         `json:"completion_cost"`
+	Provider              *string         `json:"provider"`
+	StartTime             *string         `json:"start_time"`
+	MatchPath             []string        `json:"match_path"`
+	PromptCostDetails     json.RawMessage `json:"prompt_cost_details"`
+	CompletionCostDetails json.RawMessage `json:"completion_cost_details"`
 }
 
 func (r *ModelPriceMapResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -338,5 +340,17 @@ func mapModelPriceMapResponseToState(ctx context.Context, data *ModelPriceMapRes
 		data.MatchPath = matchPathList
 	} else {
 		data.MatchPath = types.ListNull(types.StringType)
+	}
+
+	if len(result.PromptCostDetails) > 0 && string(result.PromptCostDetails) != "null" {
+		data.PromptCostDetails = types.StringValue(string(result.PromptCostDetails))
+	} else {
+		data.PromptCostDetails = types.StringNull()
+	}
+
+	if len(result.CompletionCostDetails) > 0 && string(result.CompletionCostDetails) != "null" {
+		data.CompletionCostDetails = types.StringValue(string(result.CompletionCostDetails))
+	} else {
+		data.CompletionCostDetails = types.StringNull()
 	}
 }

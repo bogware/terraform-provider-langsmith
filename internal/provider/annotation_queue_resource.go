@@ -179,7 +179,6 @@ func (r *AnnotationQueueResource) Schema(ctx context.Context, req resource.Schem
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "The last update timestamp of the annotation queue.",
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
 	}

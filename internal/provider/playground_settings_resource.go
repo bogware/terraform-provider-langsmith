@@ -111,6 +111,7 @@ func (r *PlaygroundSettingsResource) Schema(ctx context.Context, req resource.Sc
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "The creation timestamp.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "The last update timestamp.",
@@ -121,9 +122,13 @@ func (r *PlaygroundSettingsResource) Schema(ctx context.Context, req resource.Sc
 				Optional:            true,
 			},
 			"settings_type": schema.StringAttribute{
-				MarkdownDescription: "The settings type. Valid values: `complex`, `simple`. Defaults to `complex`.",
+				MarkdownDescription: "The settings type. Valid values: `complex`, `simple`. Defaults to `complex`. Cannot be changed after creation.",
 				Optional:            true,
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}
