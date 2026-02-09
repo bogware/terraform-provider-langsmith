@@ -11,7 +11,7 @@ import (
 
 // TestAccTTLSettingsResource_basic checks that time-to-live settings stick
 // like a brand on a longhorn. Even in Dodge City, nothing lasts forever —
-// but these traces ought to hold for at least 400 days.
+// but these traces ought to hold for a good while.
 func TestAccTTLSettingsResource_basic(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -19,12 +19,12 @@ func TestAccTTLSettingsResource_basic(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: `resource "langsmith_ttl_settings" "test" {
-  longlived_ttl_days = 400
+  default_trace_tier = "longlived"
 }`,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("langsmith_ttl_settings.test", "longlived_ttl_days", "400"),
+					resource.TestCheckResourceAttr("langsmith_ttl_settings.test", "default_trace_tier", "longlived"),
 					resource.TestCheckResourceAttrSet("langsmith_ttl_settings.test", "id"),
-					resource.TestCheckResourceAttrSet("langsmith_ttl_settings.test", "tenant_id"),
+					resource.TestCheckResourceAttrSet("langsmith_ttl_settings.test", "organization_id"),
 				),
 			},
 		},
