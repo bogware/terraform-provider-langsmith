@@ -185,6 +185,7 @@ func (r *PromptResource) Schema(ctx context.Context, req resource.SchemaRequest,
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "The tenant ID that owns this prompt.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"num_commits": schema.Int64Attribute{
 				MarkdownDescription: "The number of commits in the prompt repo.",
@@ -209,6 +210,7 @@ func (r *PromptResource) Schema(ctx context.Context, req resource.SchemaRequest,
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "When the prompt was created.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "When the prompt was last updated.",

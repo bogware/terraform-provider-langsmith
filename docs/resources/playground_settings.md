@@ -31,7 +31,7 @@ resource "langsmith_playground_settings" "example" {
 - `description` (String) A description of the playground settings.
 - `name` (String) The name of the playground settings.
 - `options` (String) JSON-encoded options object.
-- `settings_type` (String) The settings type. Valid values: `complex`, `simple`. Defaults to `complex`.
+- `settings_type` (String) The settings type. Valid values: `complex`, `simple`. Defaults to `complex`. Cannot be changed after creation.
 
 ### Read-Only
 

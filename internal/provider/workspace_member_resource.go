@@ -111,14 +111,23 @@ func (r *WorkspaceMemberResource) Schema(ctx context.Context, req resource.Schem
 			"email": schema.StringAttribute{
 				MarkdownDescription: "The email address of the member.",
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"full_name": schema.StringAttribute{
 				MarkdownDescription: "The member's full name.",
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "The timestamp when the member was added.",
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}
@@ -259,7 +268,7 @@ func (r *WorkspaceMemberResource) Delete(ctx context.Context, req resource.Delet
 	}
 
 	err := r.client.Delete(ctx, "/api/v1/workspaces/current/members/"+data.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting workspace member", err.Error())
 		return
 	}

@@ -125,6 +125,9 @@ func (r *ServiceKeyResource) Schema(ctx context.Context, req resource.SchemaRequ
 			"short_key": schema.StringAttribute{
 				MarkdownDescription: "The shortened version of the API key for display purposes.",
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"key": schema.StringAttribute{
 				MarkdownDescription: "The full API key. Only available at creation time; will be empty after import.",
@@ -137,6 +140,9 @@ func (r *ServiceKeyResource) Schema(ctx context.Context, req resource.SchemaRequ
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "The creation timestamp of the service key.",
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"expires_at": schema.StringAttribute{
 				MarkdownDescription: "ISO 8601 timestamp when the service key expires.",

@@ -106,14 +106,17 @@ func (r *OrgRoleResource) Schema(ctx context.Context, req resource.SchemaRequest
 			"name": schema.StringAttribute{
 				MarkdownDescription: "The internal name of the role.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"organization_id": schema.StringAttribute{
 				MarkdownDescription: "The organization ID that owns this role.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"access_scope": schema.StringAttribute{
 				MarkdownDescription: "The access scope of the role.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
 	}

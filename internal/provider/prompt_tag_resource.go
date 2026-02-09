@@ -113,6 +113,7 @@ func (r *PromptTagResource) Schema(ctx context.Context, req resource.SchemaReque
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "When the tag was created.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "When the tag was last updated.",

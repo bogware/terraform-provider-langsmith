@@ -34,4 +34,4 @@ resource "langsmith_workspace" "example" {
 - `created_at` (String) The timestamp when the workspace was created.
 - `id` (String) The unique identifier of the workspace.
 - `is_personal` (Boolean) Whether this workspace belongs to a single soul or the whole outfit.
-- `organization_id` (String) The organization that owns this workspace — the ranch brand on the deed.
+- `organization_id` (String) The organization that owns this workspace.

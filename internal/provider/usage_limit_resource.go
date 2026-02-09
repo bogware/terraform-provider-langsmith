@@ -92,10 +92,16 @@ func (r *UsageLimitResource) Schema(ctx context.Context, req resource.SchemaRequ
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "The tenant ID.",
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "The creation timestamp.",
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "The last update timestamp.",
@@ -216,7 +222,7 @@ func (r *UsageLimitResource) Delete(ctx context.Context, req resource.DeleteRequ
 	}
 
 	err := r.client.Delete(ctx, "/api/v1/usage-limits/"+data.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting usage limit", err.Error())
 		return
 	}
