@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -19,7 +20,10 @@ import (
 	"github.com/bogware/terraform-provider-langsmith/internal/client"
 )
 
-var _ resource.Resource = &TaggingResource{}
+var (
+	_ resource.Resource                = &TaggingResource{}
+	_ resource.ResourceWithImportState = &TaggingResource{}
+)
 
 func NewTaggingResource() resource.Resource {
 	return &TaggingResource{}
@@ -189,4 +193,8 @@ func (r *TaggingResource) Delete(ctx context.Context, req resource.DeleteRequest
 	}
 
 	tflog.Trace(ctx, "deleted tagging resource", map[string]interface{}{"id": data.ID.ValueString()})
+}
+
+func (r *TaggingResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -18,7 +19,10 @@ import (
 	"github.com/bogware/terraform-provider-langsmith/internal/client"
 )
 
-var _ resource.Resource = &OrgMemberResource{}
+var (
+	_ resource.Resource                = &OrgMemberResource{}
+	_ resource.ResourceWithImportState = &OrgMemberResource{}
+)
 
 func NewOrgMemberResource() resource.Resource {
 	return &OrgMemberResource{}
@@ -295,4 +299,8 @@ func (r *OrgMemberResource) Delete(ctx context.Context, req resource.DeleteReque
 	}
 
 	tflog.Trace(ctx, "deleted org member resource", map[string]interface{}{"id": data.ID.ValueString()})
+}
+
+func (r *OrgMemberResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }

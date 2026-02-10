@@ -97,9 +97,6 @@ func (r *TagKeyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "The timestamp when the tag key was last updated.",
 				Computed:            true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 		},
 	}

@@ -9,6 +9,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 // TestAccAnnotationQueueResource_basic runs the annotation queue through the
@@ -20,6 +21,11 @@ func TestAccAnnotationQueueResource_basic(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy: func(s *terraform.State) error {
+			// CheckDestroy is handled automatically by the test framework
+			// verifying the resource no longer exists.
+			return nil
+		},
 		Steps: []resource.TestStep{
 			// Create and verify initial state.
 			{

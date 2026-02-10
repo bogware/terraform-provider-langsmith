@@ -112,7 +112,6 @@ func (r *ServiceAccountResource) Schema(ctx context.Context, req resource.Schema
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "The last update timestamp of the service account.",
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"workspaces": schema.StringAttribute{
 				MarkdownDescription: "JSON-encoded array of workspace assignments, e.g. `[{\"workspace_id\": \"uuid\", \"role_id\": \"uuid\"}]`.",

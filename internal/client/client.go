@@ -11,11 +11,18 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
 )
+
+// maxResponseBodySize is the maximum response body we'll read (10 MB).
+const maxResponseBodySize = 10 * 1024 * 1024
+
+// maxRetryAfterSecs is the maximum Retry-After we'll honor (60 seconds).
+const maxRetryAfterSecs = 60
 
 // Client is the LangSmith API client.
 type Client struct {
@@ -57,8 +64,9 @@ func (c *Client) doRequest(ctx context.Context, method, path string, query url.V
 	}
 
 	var lastErr error
+	skipBackoff := false
 	for attempt := 0; attempt <= c.MaxRetries; attempt++ {
-		if attempt > 0 {
+		if attempt > 0 && !skipBackoff {
 			wait := retryDelay(attempt)
 			select {
 			case <-ctx.Done():
@@ -66,6 +74,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, query url.V
 			case <-time.After(wait):
 			}
 		}
+		skipBackoff = false
 
 		var bodyReader io.Reader
 		if jsonBody != nil {
@@ -84,7 +93,9 @@ func (c *Client) doRequest(ctx context.Context, method, path string, query url.V
 		if c.UserAgent != "" {
 			req.Header.Set("User-Agent", c.UserAgent)
 		}
-		req.Header.Set("Content-Type", "application/json")
+		if jsonBody != nil {
+			req.Header.Set("Content-Type", "application/json")
+		}
 		req.Header.Set("Accept", "application/json")
 
 		resp, err := c.HTTPClient.Do(req)
@@ -93,7 +104,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, query url.V
 			continue
 		}
 
-		respBody, err := io.ReadAll(resp.Body)
+		respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodySize))
 		resp.Body.Close()
 		if err != nil {
 			lastErr = fmt.Errorf("reading response body: %w", err)
@@ -105,15 +116,20 @@ func (c *Client) doRequest(ctx context.Context, method, path string, query url.V
 				StatusCode: resp.StatusCode,
 				Body:       string(respBody),
 			}
-			// Honor Retry-After header if present on 429.
+			// Honor Retry-After header on 429, then skip exponential backoff
+			// for the next iteration to avoid double-waiting.
 			if resp.StatusCode == 429 {
 				if ra := resp.Header.Get("Retry-After"); ra != "" {
 					if secs, parseErr := strconv.Atoi(ra); parseErr == nil {
+						if secs > maxRetryAfterSecs {
+							secs = maxRetryAfterSecs
+						}
 						select {
 						case <-ctx.Done():
 							return ctx.Err()
 						case <-time.After(time.Duration(secs) * time.Second):
 						}
+						skipBackoff = true
 					}
 				}
 			}
@@ -139,9 +155,11 @@ func (c *Client) doRequest(ctx context.Context, method, path string, query url.V
 	return fmt.Errorf("request failed after %d retries: %w", c.MaxRetries+1, lastErr)
 }
 
-// retryDelay calculates exponential backoff: 1s, 2s, 4s, ...
+// retryDelay calculates exponential backoff with jitter: base * 2^(attempt-1) +/- 20%.
 func retryDelay(attempt int) time.Duration {
-	return time.Duration(math.Pow(2, float64(attempt-1))) * time.Second
+	base := math.Pow(2, float64(attempt-1)) * float64(time.Second)
+	jitter := base * 0.2 * (2*rand.Float64() - 1) // +/- 20%
+	return time.Duration(base + jitter)
 }
 
 // Get sends an HTTP GET request.

@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -65,9 +66,9 @@ func (p *LangSmithProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	apiKey := os.Getenv("LANGSMITH_API_KEY")
+	apiKey := strings.TrimSpace(os.Getenv("LANGSMITH_API_KEY"))
 	if !data.APIKey.IsNull() {
-		apiKey = data.APIKey.ValueString()
+		apiKey = strings.TrimSpace(data.APIKey.ValueString())
 	}
 
 	if apiKey == "" {
@@ -144,6 +145,8 @@ func (p *LangSmithProvider) Resources(ctx context.Context) []func() resource.Res
 		NewFeedbackFormulaResource,
 		NewChartSectionResource,
 		NewChartResource,
+		NewAccessPolicyResource,
+		NewSCIMTokenResource,
 	}
 }
 
