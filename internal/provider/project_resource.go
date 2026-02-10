@@ -117,6 +117,7 @@ func (r *ProjectResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				Validators:          []validator.String{stringvalidator.OneOf("longlived", "shortlived")},
 			},
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "The tenant ID of the project.",
