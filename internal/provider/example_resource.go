@@ -277,7 +277,7 @@ func (r *ExampleResource) Delete(ctx context.Context, req resource.DeleteRequest
 	}
 
 	err := r.client.Delete(ctx, "/api/v1/examples/"+data.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting example", err.Error())
 		return
 	}
@@ -295,23 +295,9 @@ func mapExampleResponseToState(data *ExampleResourceModel, result *exampleAPIRes
 	data.ID = types.StringValue(result.ID)
 	data.DatasetID = types.StringValue(result.DatasetID)
 
-	if len(result.Inputs) > 0 && string(result.Inputs) != "null" {
-		data.Inputs = types.StringValue(string(result.Inputs))
-	} else {
-		data.Inputs = types.StringNull()
-	}
-
-	if len(result.Outputs) > 0 && string(result.Outputs) != "null" {
-		data.Outputs = types.StringValue(string(result.Outputs))
-	} else {
-		data.Outputs = types.StringNull()
-	}
-
-	if len(result.Metadata) > 0 && string(result.Metadata) != "null" {
-		data.Metadata = types.StringValue(string(result.Metadata))
-	} else {
-		data.Metadata = types.StringNull()
-	}
+	data.Inputs = jsonStringValue(result.Inputs)
+	data.Outputs = jsonStringValue(result.Outputs)
+	data.Metadata = jsonStringValue(result.Metadata)
 
 	if result.Split != nil {
 		data.Split = types.StringValue(*result.Split)

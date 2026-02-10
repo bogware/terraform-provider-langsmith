@@ -10,41 +10,52 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
+	"math/rand"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 )
 
-// Client is the LangSmith API client — the trusty horse that carries every
-// request across the wire to the LangSmith frontier.
+// maxResponseBodySize is the maximum response body we'll read (10 MB).
+const maxResponseBodySize = 10 * 1024 * 1024
+
+// maxRetryAfterSecs is the maximum Retry-After we'll honor (60 seconds).
+const maxRetryAfterSecs = 60
+
+// Client is the LangSmith API client.
 type Client struct {
 	BaseURL    string
 	APIKey     string
 	TenantID   string
+	UserAgent  string
 	HTTPClient *http.Client
+	MaxRetries int
 }
 
-// NewClient saddles up a fresh LangSmith API client with the given base URL,
-// API key, and optional tenant ID.
-func NewClient(baseURL, apiKey, tenantID string) *Client {
+// NewClient creates a new LangSmith API client.
+func NewClient(baseURL, apiKey, tenantID, userAgent string) *Client {
 	return &Client{
 		BaseURL:  baseURL,
 		APIKey:   apiKey,
 		TenantID: tenantID,
+		UserAgent: userAgent,
 		HTTPClient: &http.Client{
 			Timeout: 120 * time.Second,
 		},
+		MaxRetries: 3,
 	}
 }
 
 func (c *Client) doRequest(ctx context.Context, method, path string, query url.Values, body interface{}, result interface{}) error {
-	var bodyReader io.Reader
+	var jsonBody []byte
 	if body != nil {
-		jsonBody, err := json.Marshal(body)
+		var err error
+		jsonBody, err = json.Marshal(body)
 		if err != nil {
 			return fmt.Errorf("marshaling request body: %w", err)
 		}
-		bodyReader = bytes.NewReader(jsonBody)
 	}
 
 	reqURL := c.BaseURL + path
@@ -52,88 +63,146 @@ func (c *Client) doRequest(ctx context.Context, method, path string, query url.V
 		reqURL += "?" + query.Encode()
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, reqURL, bodyReader)
-	if err != nil {
-		return fmt.Errorf("creating request: %w", err)
-	}
-
-	req.Header.Set("X-API-Key", c.APIKey)
-	if c.TenantID != "" {
-		req.Header.Set("X-Tenant-Id", c.TenantID)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("executing request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("reading response body: %w", err)
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return &APIError{
-			StatusCode: resp.StatusCode,
-			Body:       string(respBody),
+	var lastErr error
+	skipBackoff := false
+	for attempt := 0; attempt <= c.MaxRetries; attempt++ {
+		if attempt > 0 && !skipBackoff {
+			wait := retryDelay(attempt)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(wait):
+			}
 		}
-	}
+		skipBackoff = false
 
-	if result != nil && len(respBody) > 0 {
-		if err := json.Unmarshal(respBody, result); err != nil {
-			return fmt.Errorf("unmarshaling response: %w", err)
+		var bodyReader io.Reader
+		if jsonBody != nil {
+			bodyReader = bytes.NewReader(jsonBody)
 		}
+
+		req, err := http.NewRequestWithContext(ctx, method, reqURL, bodyReader)
+		if err != nil {
+			return fmt.Errorf("creating request: %w", err)
+		}
+
+		req.Header.Set("X-API-Key", c.APIKey)
+		if c.TenantID != "" {
+			req.Header.Set("X-Tenant-Id", c.TenantID)
+		}
+		if c.UserAgent != "" {
+			req.Header.Set("User-Agent", c.UserAgent)
+		}
+		if jsonBody != nil {
+			req.Header.Set("Content-Type", "application/json")
+		}
+		req.Header.Set("Accept", "application/json")
+
+		resp, err := c.HTTPClient.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("executing request: %w", err)
+			continue
+		}
+
+		respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodySize))
+		resp.Body.Close()
+		if err != nil {
+			lastErr = fmt.Errorf("reading response body: %w", err)
+			continue
+		}
+
+		if resp.StatusCode == 429 || resp.StatusCode >= 500 {
+			lastErr = &APIError{
+				StatusCode: resp.StatusCode,
+				Body:       string(respBody),
+			}
+			// Honor Retry-After header on 429, then skip exponential backoff
+			// for the next iteration to avoid double-waiting.
+			if resp.StatusCode == 429 {
+				if ra := resp.Header.Get("Retry-After"); ra != "" {
+					if secs, parseErr := strconv.Atoi(ra); parseErr == nil {
+						if secs > maxRetryAfterSecs {
+							secs = maxRetryAfterSecs
+						}
+						select {
+						case <-ctx.Done():
+							return ctx.Err()
+						case <-time.After(time.Duration(secs) * time.Second):
+						}
+						skipBackoff = true
+					}
+				}
+			}
+			continue
+		}
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return &APIError{
+				StatusCode: resp.StatusCode,
+				Body:       string(respBody),
+			}
+		}
+
+		if result != nil && len(respBody) > 0 {
+			if err := json.Unmarshal(respBody, result); err != nil {
+				return fmt.Errorf("unmarshaling response: %w", err)
+			}
+		}
+
+		return nil
 	}
 
-	return nil
+	return fmt.Errorf("request failed after %d retries: %w", c.MaxRetries+1, lastErr)
 }
 
-// Get rides out with an HTTP GET request and brings back whatever the API has to say.
+// retryDelay calculates exponential backoff with jitter: base * 2^(attempt-1) +/- 20%.
+func retryDelay(attempt int) time.Duration {
+	base := math.Pow(2, float64(attempt-1)) * float64(time.Second)
+	jitter := base * 0.2 * (2*rand.Float64() - 1) // +/- 20%
+	return time.Duration(base + jitter)
+}
+
+// Get sends an HTTP GET request.
 func (c *Client) Get(ctx context.Context, path string, query url.Values, result interface{}) error {
 	return c.doRequest(ctx, http.MethodGet, path, query, nil, result)
 }
 
-// Post sends an HTTP POST request — staking a new claim on the LangSmith API.
+// Post sends an HTTP POST request.
 func (c *Client) Post(ctx context.Context, path string, body interface{}, result interface{}) error {
 	return c.doRequest(ctx, http.MethodPost, path, nil, body, result)
 }
 
-// PostWithQuery sends an HTTP POST with query parameters riding shotgun.
+// PostWithQuery sends an HTTP POST with query parameters.
 func (c *Client) PostWithQuery(ctx context.Context, path string, query url.Values, body interface{}, result interface{}) error {
 	return c.doRequest(ctx, http.MethodPost, path, query, body, result)
 }
 
-// Patch sends an HTTP PATCH request to mend what needs mending.
+// Patch sends an HTTP PATCH request.
 func (c *Client) Patch(ctx context.Context, path string, body interface{}, result interface{}) error {
 	return c.doRequest(ctx, http.MethodPatch, path, nil, body, result)
 }
 
-// Put sends an HTTP PUT request, replacing the whole lot in one go.
+// Put sends an HTTP PUT request.
 func (c *Client) Put(ctx context.Context, path string, body interface{}, result interface{}) error {
 	return c.doRequest(ctx, http.MethodPut, path, nil, body, result)
 }
 
-// Delete sends an HTTP DELETE request. No trial, no appeal.
+// Delete sends an HTTP DELETE request.
 func (c *Client) Delete(ctx context.Context, path string) error {
 	return c.doRequest(ctx, http.MethodDelete, path, nil, nil, nil)
 }
 
-// DeleteWithQuery sends an HTTP DELETE with query parameters to help identify the outlaw.
+// DeleteWithQuery sends an HTTP DELETE with query parameters.
 func (c *Client) DeleteWithQuery(ctx context.Context, path string, query url.Values) error {
 	return c.doRequest(ctx, http.MethodDelete, path, query, nil, nil)
 }
 
-// DeleteWithBody sends an HTTP DELETE with a request body, for when you need
-// to spell out exactly what you're putting down.
+// DeleteWithBody sends an HTTP DELETE with a request body.
 func (c *Client) DeleteWithBody(ctx context.Context, path string, body interface{}) error {
 	return c.doRequest(ctx, http.MethodDelete, path, nil, body, nil)
 }
 
-// APIError represents trouble from the LangSmith API — the kind Doc Adams
-// would shake his head at. Carries the HTTP status code and raw response body.
+// APIError represents an error response from the LangSmith API.
 type APIError struct {
 	StatusCode int
 	Body       string
@@ -143,8 +212,7 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("LangSmith API error (status %d): %s", e.StatusCode, e.Body)
 }
 
-// IsNotFound checks whether the error is a 404 — the resource has skipped town
-// and left no forwarding address.
+// IsNotFound checks whether the error is a 404.
 func IsNotFound(err error) bool {
 	var apiErr *APIError
 	if errors.As(err, &apiErr) {

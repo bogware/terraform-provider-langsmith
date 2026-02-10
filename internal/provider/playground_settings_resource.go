@@ -8,11 +8,13 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
@@ -129,6 +131,7 @@ func (r *PlaygroundSettingsResource) Schema(ctx context.Context, req resource.Sc
 					stringplanmodifier.RequiresReplace(),
 					stringplanmodifier.UseStateForUnknown(),
 				},
+				Validators: []validator.String{stringvalidator.OneOf("complex", "simple")},
 			},
 		},
 	}
@@ -274,7 +277,7 @@ func (r *PlaygroundSettingsResource) Delete(ctx context.Context, req resource.De
 	}
 
 	err := r.client.Delete(ctx, "/api/v1/playground-settings/"+data.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting playground settings", err.Error())
 		return
 	}
@@ -303,22 +306,14 @@ func mapPlaygroundSettingsResponseToState(data *PlaygroundSettingsResourceModel,
 		data.Description = types.StringNull()
 	}
 
-	if len(result.Settings) > 0 && string(result.Settings) != "null" {
-		data.Settings = types.StringValue(string(result.Settings))
-	} else {
-		data.Settings = types.StringNull()
-	}
+	data.Settings = jsonStringValue(result.Settings)
 
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 
 	// Stash the options in state -- like Miss Kitty's lockbox, it holds
 	// whatever JSON valuables the API sent back from the Long Branch.
-	if len(result.Options) > 0 && string(result.Options) != "null" {
-		data.Options = types.StringValue(string(result.Options))
-	} else {
-		data.Options = types.StringNull()
-	}
+	data.Options = jsonStringValue(result.Options)
 
 	data.SettingsType = types.StringValue(result.SettingsType)
 }

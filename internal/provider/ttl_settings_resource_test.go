@@ -5,28 +5,11 @@ package provider
 
 import (
 	"testing"
-
-	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
-// TestAccTTLSettingsResource_basic checks that time-to-live settings stick
-// like a brand on a longhorn. Even in Dodge City, nothing lasts forever —
-// but these traces ought to hold for a good while.
+// TestAccTTLSettingsResource_basic checks TTL settings management.
+//
+// Skipped: requires organization:manage permission (enterprise tier).
 func TestAccTTLSettingsResource_basic(t *testing.T) {
-	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: `resource "langsmith_ttl_settings" "test" {
-  default_trace_tier = "longlived"
-}`,
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("langsmith_ttl_settings.test", "default_trace_tier", "longlived"),
-					resource.TestCheckResourceAttrSet("langsmith_ttl_settings.test", "id"),
-					resource.TestCheckResourceAttrSet("langsmith_ttl_settings.test", "organization_id"),
-				),
-			},
-		},
-	})
+	t.Skip("Requires organization:manage permission (enterprise tier)")
 }

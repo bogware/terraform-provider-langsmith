@@ -27,7 +27,7 @@ resource "langsmith_ttl_settings" "example" {
 
 ### Optional
 
-- `apply_to_all_projects` (Boolean) Whether to apply TTL settings to all projects. Defaults to `false`.
+- `apply_to_all_projects` (Boolean) Whether to apply TTL settings to all projects.
 - `tenant_id` (String) The tenant (workspace) ID to scope the TTL settings to. If omitted, applies at the org level.
 
 ### Read-Only

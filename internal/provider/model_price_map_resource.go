@@ -301,7 +301,7 @@ func (r *ModelPriceMapResource) Delete(ctx context.Context, req resource.DeleteR
 	}
 
 	err := r.client.Delete(ctx, "/api/v1/model-price-map/"+data.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting model price map", err.Error())
 		return
 	}

@@ -112,7 +112,6 @@ func (r *ServiceAccountResource) Schema(ctx context.Context, req resource.Schema
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "The last update timestamp of the service account.",
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"workspaces": schema.StringAttribute{
 				MarkdownDescription: "JSON-encoded array of workspace assignments, e.g. `[{\"workspace_id\": \"uuid\", \"role_id\": \"uuid\"}]`.",
@@ -218,7 +217,7 @@ func (r *ServiceAccountResource) Delete(ctx context.Context, req resource.Delete
 	}
 
 	err := r.client.Delete(ctx, "/api/v1/service-accounts/"+data.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting service account", err.Error())
 		return
 	}

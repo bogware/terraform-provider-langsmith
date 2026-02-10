@@ -5,7 +5,9 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -18,14 +20,12 @@ import (
 
 var _ provider.Provider = &LangSmithProvider{}
 
-// LangSmithProvider defines the provider implementation. This is the marshal's
-// office — where all resources and data sources report for duty.
+// LangSmithProvider defines the provider implementation.
 type LangSmithProvider struct {
 	version string
 }
 
-// LangSmithProviderModel describes the provider configuration: API key, base
-// URL, and tenant ID. The credentials every lawman carries on the frontier.
+// LangSmithProviderModel describes the provider configuration.
 type LangSmithProviderModel struct {
 	APIKey   types.String `tfsdk:"api_key"`
 	APIURL   types.String `tfsdk:"api_url"`
@@ -66,9 +66,9 @@ func (p *LangSmithProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	apiKey := os.Getenv("LANGSMITH_API_KEY")
+	apiKey := strings.TrimSpace(os.Getenv("LANGSMITH_API_KEY"))
 	if !data.APIKey.IsNull() {
-		apiKey = data.APIKey.ValueString()
+		apiKey = strings.TrimSpace(data.APIKey.ValueString())
 	}
 
 	if apiKey == "" {
@@ -92,7 +92,22 @@ func (p *LangSmithProvider) Configure(ctx context.Context, req provider.Configur
 		tenantID = data.TenantID.ValueString()
 	}
 
-	c := client.NewClient(apiURL, apiKey, tenantID)
+	userAgent := fmt.Sprintf("terraform-provider-langsmith/%s", p.version)
+
+	c := client.NewClient(apiURL, apiKey, tenantID, userAgent)
+
+	// Validate the API key by making a lightweight request.
+	var info struct {
+		Version string `json:"version"`
+	}
+	if err := c.Get(ctx, "/api/v1/info", nil, &info); err != nil {
+		resp.Diagnostics.AddError(
+			"Unable to connect to LangSmith API",
+			fmt.Sprintf("Could not validate API credentials against %s: %s", apiURL, err),
+		)
+		return
+	}
+
 	resp.DataSourceData = c
 	resp.ResourceData = c
 }
@@ -124,6 +139,14 @@ func (p *LangSmithProvider) Resources(ctx context.Context) []func() resource.Res
 		NewSSOSettingsResource,
 		NewWorkspaceMemberResource,
 		NewPromptTagResource,
+		NewOrgMemberResource,
+		NewFilterViewResource,
+		NewTaggingResource,
+		NewFeedbackFormulaResource,
+		NewChartSectionResource,
+		NewChartResource,
+		NewAccessPolicyResource,
+		NewSCIMTokenResource,
 	}
 }
 
@@ -135,11 +158,16 @@ func (p *LangSmithProvider) DataSources(ctx context.Context) []func() datasource
 		NewInfoDataSource,
 		NewOrganizationDataSource,
 		NewPromptCommitDataSource,
+		NewPromptDataSource,
+		NewAnnotationQueueDataSource,
+		NewOrgRoleDataSource,
+		NewRunRuleDataSource,
+		NewTagKeyDataSource,
+		NewServiceAccountDataSource,
 	}
 }
 
-// New returns a provider factory function, ready to pin on the badge and start
-// serving Terraform requests.
+// New returns a provider factory function.
 func New(version string) func() provider.Provider {
 	return func() provider.Provider {
 		return &LangSmithProvider{

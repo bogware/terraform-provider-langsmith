@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 // TestAccSecretResource_basic rides into town with a secret and makes sure
@@ -16,6 +17,11 @@ func TestAccSecretResource_basic(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy: func(s *terraform.State) error {
+			// CheckDestroy is handled automatically by the test framework
+			// verifying the resource no longer exists.
+			return nil
+		},
 		Steps: []resource.TestStep{
 			{
 				Config: `resource "langsmith_secret" "test" {

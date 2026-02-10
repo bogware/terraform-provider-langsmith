@@ -242,7 +242,7 @@ func (r *OrgRoleResource) Delete(ctx context.Context, req resource.DeleteRequest
 	}
 
 	err := r.client.Delete(ctx, "/api/v1/orgs/current/roles/"+data.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting organization role", err.Error())
 		return
 	}
@@ -270,9 +270,5 @@ func mapOrgRoleResponseToState(data *OrgRoleResourceModel, result *orgRoleAPIRes
 		data.Description = types.StringNull()
 	}
 
-	if len(result.Permissions) > 0 && string(result.Permissions) != "null" {
-		data.Permissions = types.StringValue(string(result.Permissions))
-	} else {
-		data.Permissions = types.StringNull()
-	}
+	data.Permissions = jsonStringValue(result.Permissions)
 }

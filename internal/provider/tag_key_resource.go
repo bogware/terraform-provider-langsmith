@@ -97,9 +97,6 @@ func (r *TagKeyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "The timestamp when the tag key was last updated.",
 				Computed:            true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 		},
 	}
@@ -211,7 +208,7 @@ func (r *TagKeyResource) Delete(ctx context.Context, req resource.DeleteRequest,
 	}
 
 	err := r.client.Delete(ctx, "/api/v1/workspaces/current/tag-keys/"+data.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting tag key", err.Error())
 		return
 	}

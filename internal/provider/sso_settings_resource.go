@@ -272,7 +272,7 @@ func (r *SSOSettingsResource) Delete(ctx context.Context, req resource.DeleteReq
 	}
 
 	err := r.client.Delete(ctx, "/api/v1/orgs/current/sso-settings/"+data.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting SSO settings", err.Error())
 		return
 	}
@@ -298,11 +298,7 @@ func mapSSOSettingsResponseToState(data *SSOSettingsResourceModel, result *ssoSe
 		data.DefaultWorkspaceRoleID = types.StringNull()
 	}
 
-	if len(result.DefaultWorkspaceIDs) > 0 && string(result.DefaultWorkspaceIDs) != "null" {
-		data.DefaultWorkspaceIDs = types.StringValue(string(result.DefaultWorkspaceIDs))
-	} else {
-		data.DefaultWorkspaceIDs = types.StringNull()
-	}
+	data.DefaultWorkspaceIDs = jsonStringValue(result.DefaultWorkspaceIDs)
 
 	if result.MetadataURL != "" {
 		data.MetadataURL = types.StringValue(result.MetadataURL)
