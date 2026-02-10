@@ -1,4 +1,4 @@
 data "langsmith_prompt_commit" "example" {
-  repo     = "my-prompt"
-  ref      = "latest"
+  repo_handle = "my-prompt"
+  ref         = "latest"
 }

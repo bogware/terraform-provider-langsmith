@@ -13,6 +13,7 @@ import (
 )
 
 func TestAccChartResource_basic(t *testing.T) {
+	projectName := fmt.Sprintf("tf-proj-%s", acctest.RandStringFromCharSet(8, acctest.CharSetAlphaNum))
 	sectionTitle := fmt.Sprintf("tf-section-%s", acctest.RandStringFromCharSet(8, acctest.CharSetAlphaNum))
 	chartTitle := fmt.Sprintf("tf-chart-%s", acctest.RandStringFromCharSet(8, acctest.CharSetAlphaNum))
 
@@ -26,7 +27,7 @@ func TestAccChartResource_basic(t *testing.T) {
 		},
 		Steps: []resource.TestStep{
 			{
-				Config: testAccChartResourceConfig(sectionTitle, chartTitle),
+				Config: testAccChartResourceConfig(projectName, sectionTitle, chartTitle),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("langsmith_chart.test", "id"),
 					resource.TestCheckResourceAttr("langsmith_chart.test", "title", chartTitle),
@@ -34,30 +35,38 @@ func TestAccChartResource_basic(t *testing.T) {
 				),
 			},
 			{
-				ResourceName:      "langsmith_chart.test",
-				ImportState:       true,
-				ImportStateVerify: true,
+				ResourceName:            "langsmith_chart.test",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"series"},
 			},
 		},
 	})
 }
 
-func testAccChartResourceConfig(sectionTitle, chartTitle string) string {
+func testAccChartResourceConfig(projectName, sectionTitle, chartTitle string) string {
 	return fmt.Sprintf(`
+resource "langsmith_project" "test" {
+  name = %[1]q
+}
+
 resource "langsmith_chart_section" "test" {
-  title = %[1]q
+  title = %[2]q
 }
 
 resource "langsmith_chart" "test" {
-  title      = %[2]q
+  title      = %[3]q
   chart_type = "line"
   section_id = langsmith_chart_section.test.id
   series     = jsonencode([
     {
       name   = "Run Count"
       metric = "run_count"
+      filters = {
+        session = [langsmith_project.test.id]
+      }
     }
   ])
 }
-`, sectionTitle, chartTitle)
+`, projectName, sectionTitle, chartTitle)
 }

@@ -4,13 +4,17 @@
 package provider
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 func TestAccFeedbackFormulaResource_basic(t *testing.T) {
+	projectName := fmt.Sprintf("tf-proj-%s", acctest.RandStringFromCharSet(8, acctest.CharSetAlphaNum))
+
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -21,7 +25,7 @@ func TestAccFeedbackFormulaResource_basic(t *testing.T) {
 		},
 		Steps: []resource.TestStep{
 			{
-				Config: testAccFeedbackFormulaResourceConfig(),
+				Config: testAccFeedbackFormulaResourceConfig(projectName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("langsmith_feedback_formula.test", "id"),
 					resource.TestCheckResourceAttr("langsmith_feedback_formula.test", "feedback_key", "composite"),
@@ -37,11 +41,16 @@ func TestAccFeedbackFormulaResource_basic(t *testing.T) {
 	})
 }
 
-func testAccFeedbackFormulaResourceConfig() string {
-	return `
+func testAccFeedbackFormulaResourceConfig(projectName string) string {
+	return fmt.Sprintf(`
+resource "langsmith_project" "test" {
+  name = %[1]q
+}
+
 resource "langsmith_feedback_formula" "test" {
   feedback_key     = "composite"
   aggregation_type = "avg"
+  session_id       = langsmith_project.test.id
   formula_parts    = jsonencode([
     {
       part_type = "weighted_key"
@@ -50,5 +59,5 @@ resource "langsmith_feedback_formula" "test" {
     }
   ])
 }
-`
+`, projectName)
 }

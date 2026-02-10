@@ -6,6 +6,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/url"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -53,6 +54,32 @@ type taggingAPIResponse struct {
 	ResourceType string `json:"resource_type"`
 	ResourceID   string `json:"resource_id"`
 	CreatedAt    string `json:"created_at"`
+}
+
+// taggingListResponse is the nested response format from the list endpoint.
+type taggingListResponse struct {
+	TagKey     string                 `json:"tag_key"`
+	TagKeyID   string                 `json:"tag_key_id"`
+	TagValue   string                 `json:"tag_value"`
+	TagValueID string                 `json:"tag_value_id"`
+	Resources  taggingResourcesByType `json:"resources"`
+}
+
+type taggingResourcesByType struct {
+	Alerts      []taggingResourceItem `json:"alerts"`
+	Dashboards  []taggingResourceItem `json:"dashboards"`
+	Datasets    []taggingResourceItem `json:"datasets"`
+	Deployments []taggingResourceItem `json:"deployments"`
+	Experiments []taggingResourceItem `json:"experiments"`
+	Projects    []taggingResourceItem `json:"projects"`
+	Prompts     []taggingResourceItem `json:"prompts"`
+	Queues      []taggingResourceItem `json:"queues"`
+}
+
+type taggingResourceItem struct {
+	TaggingID    string `json:"tagging_id"`
+	ResourceName string `json:"resource_name"`
+	ResourceID   string `json:"resource_id"`
 }
 
 func (r *TaggingResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -142,33 +169,50 @@ func (r *TaggingResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	// The tagging API returns a list; we search for our specific tagging by ID.
-	var results []taggingAPIResponse
-	err := r.client.Get(ctx, "/api/v1/workspaces/current/taggings", nil, &results)
+	// The tagging list API returns a nested response grouped by tag value and
+	// resource type. Filter by tag_value_id for efficiency.
+	query := url.Values{}
+	query.Set("tag_value_id", data.TagValueID.ValueString())
+
+	var results []taggingListResponse
+	err := r.client.Get(ctx, "/api/v1/workspaces/current/taggings", query, &results)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading taggings", err.Error())
 		return
 	}
 
-	var found *taggingAPIResponse
-	for i := range results {
-		if results[i].ID == data.ID.ValueString() {
-			found = &results[i]
+	// Search through the nested response for our tagging ID.
+	found := false
+	for _, group := range results {
+		allItems := [][]taggingResourceItem{
+			group.Resources.Alerts, group.Resources.Dashboards,
+			group.Resources.Datasets, group.Resources.Deployments,
+			group.Resources.Experiments, group.Resources.Projects,
+			group.Resources.Prompts, group.Resources.Queues,
+		}
+		for _, items := range allItems {
+			for _, item := range items {
+				if item.TaggingID == data.ID.ValueString() {
+					found = true
+					break
+				}
+			}
+			if found {
+				break
+			}
+		}
+		if found {
 			break
 		}
 	}
 
-	if found == nil {
+	if !found {
 		resp.State.RemoveResource(ctx)
 		return
 	}
 
-	data.ID = types.StringValue(found.ID)
-	data.TagValueID = types.StringValue(found.TagValueID)
-	data.ResourceType = types.StringValue(found.ResourceType)
-	data.ResourceID = types.StringValue(found.ResourceID)
-	data.CreatedAt = types.StringValue(found.CreatedAt)
-
+	// State is already populated from the prior apply; the list endpoint
+	// doesn't return created_at, so we keep it from state.
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

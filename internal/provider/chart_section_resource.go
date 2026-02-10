@@ -149,9 +149,16 @@ func (r *ChartSectionResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	// Chart section read uses POST.
+	// Save timestamps from state; the read endpoint doesn't return them.
+	savedCreatedAt := data.CreatedAt
+	savedUpdatedAt := data.UpdatedAt
+
+	// Chart section read uses POST with a body (omit chart data).
+	body := struct {
+		OmitData bool `json:"omit_data"`
+	}{OmitData: true}
 	var result chartSectionAPIResponse
-	err := r.client.Post(ctx, "/api/v1/charts/section/"+data.ID.ValueString(), nil, &result)
+	err := r.client.Post(ctx, "/api/v1/charts/section/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -162,6 +169,9 @@ func (r *ChartSectionResource) Read(ctx context.Context, req resource.ReadReques
 	}
 
 	mapChartSectionResponseToState(&data, &result)
+	// Restore timestamps since the read endpoint doesn't return them.
+	data.CreatedAt = savedCreatedAt
+	data.UpdatedAt = savedUpdatedAt
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

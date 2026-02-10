@@ -204,9 +204,16 @@ func (r *ChartResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		return
 	}
 
-	// Chart read uses POST.
+	// Save timestamps from state; the read endpoint doesn't return them.
+	savedCreatedAt := data.CreatedAt
+	savedUpdatedAt := data.UpdatedAt
+
+	// Chart read uses POST with a body (omit timeseries data).
+	body := struct {
+		OmitData bool `json:"omit_data"`
+	}{OmitData: true}
 	var result chartAPIResponse
-	err := r.client.Post(ctx, "/api/v1/charts/"+data.ID.ValueString(), nil, &result)
+	err := r.client.Post(ctx, "/api/v1/charts/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -217,6 +224,9 @@ func (r *ChartResource) Read(ctx context.Context, req resource.ReadRequest, resp
 	}
 
 	mapChartResponseToState(&data, &result)
+	// Restore timestamps since the read endpoint doesn't return them.
+	data.CreatedAt = savedCreatedAt
+	data.UpdatedAt = savedUpdatedAt
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
