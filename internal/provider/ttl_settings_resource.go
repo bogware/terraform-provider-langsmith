@@ -254,7 +254,7 @@ func (r *TTLSettingsResource) readTTLSettings(ctx context.Context, data *TTLSett
 	}
 
 	if len(results) == 0 {
-		data.ID = types.StringNull()
+		diags.AddError("Error reading TTL settings", "No TTL settings found")
 		return
 	}
 

@@ -131,7 +131,6 @@ func (r *PlaygroundSettingsResource) Schema(ctx context.Context, req resource.Sc
 					stringplanmodifier.RequiresReplace(),
 					stringplanmodifier.UseStateForUnknown(),
 				},
-				Validators: []validator.String{stringvalidator.OneOf("complex", "simple")},
 			},
 		},
 	}

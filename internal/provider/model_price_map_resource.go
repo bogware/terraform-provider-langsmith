@@ -342,6 +342,15 @@ func mapModelPriceMapResponseToState(ctx context.Context, data *ModelPriceMapRes
 		data.MatchPath = types.ListNull(types.StringType)
 	}
 
-	data.PromptCostDetails = jsonStringValue(result.PromptCostDetails)
-	data.CompletionCostDetails = jsonStringValue(result.CompletionCostDetails)
+	if len(result.PromptCostDetails) > 0 && string(result.PromptCostDetails) != "null" {
+		data.PromptCostDetails = types.StringValue(string(result.PromptCostDetails))
+	} else {
+		data.PromptCostDetails = types.StringNull()
+	}
+
+	if len(result.CompletionCostDetails) > 0 && string(result.CompletionCostDetails) != "null" {
+		data.CompletionCostDetails = types.StringValue(string(result.CompletionCostDetails))
+	} else {
+		data.CompletionCostDetails = types.StringNull()
+	}
 }
