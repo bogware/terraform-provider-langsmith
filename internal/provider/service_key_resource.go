@@ -284,7 +284,7 @@ func (r *ServiceKeyResource) Delete(ctx context.Context, req resource.DeleteRequ
 	}
 
 	err := r.client.Delete(ctx, "/api/v1/orgs/current/service-keys/"+data.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting service key", err.Error())
 		return
 	}

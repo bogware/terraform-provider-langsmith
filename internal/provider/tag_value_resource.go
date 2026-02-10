@@ -106,9 +106,6 @@ func (r *TagValueResource) Schema(ctx context.Context, req resource.SchemaReques
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "The timestamp when the tag value was last updated.",
 				Computed:            true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 		},
 	}
@@ -231,7 +228,7 @@ func (r *TagValueResource) Delete(ctx context.Context, req resource.DeleteReques
 		data.TagKeyID.ValueString(), data.ID.ValueString())
 
 	err := r.client.Delete(ctx, apiPath)
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting tag value", err.Error())
 		return
 	}

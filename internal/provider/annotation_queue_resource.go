@@ -354,7 +354,7 @@ func (r *AnnotationQueueResource) Delete(ctx context.Context, req resource.Delet
 	q := url.Values{}
 	q.Set("queue_ids", data.ID.ValueString())
 	err := r.client.DeleteWithQuery(ctx, "/api/v1/annotation-queues", q)
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting annotation queue", err.Error())
 		return
 	}
@@ -410,16 +410,8 @@ func mapAnnotationQueueResponseToState(data *AnnotationQueueResourceModel, resul
 
 	// Rubric items and metadata come back as raw JSON -- round 'em up carefully
 	// so Terraform don't report phantom drift on empty corrals.
-	if len(result.RubricItems) > 0 && string(result.RubricItems) != "null" && string(result.RubricItems) != "[]" {
-		data.RubricItems = types.StringValue(string(result.RubricItems))
-	} else {
-		data.RubricItems = types.StringNull()
-	}
-	if len(result.Metadata) > 0 && string(result.Metadata) != "null" && string(result.Metadata) != "{}" {
-		data.Metadata = types.StringValue(string(result.Metadata))
-	} else {
-		data.Metadata = types.StringNull()
-	}
+	data.RubricItems = jsonEmptyArrayIsNull(result.RubricItems)
+	data.Metadata = jsonStringValue(result.Metadata)
 
 	if result.SourceRuleID != nil {
 		data.SourceRuleID = types.StringValue(*result.SourceRuleID)

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -15,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
@@ -119,6 +121,7 @@ func (r *DatasetResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Optional:            true,
 				Computed:            true,
 				Default:             stringdefault.StaticString("kv"),
+				Validators:          []validator.String{stringvalidator.OneOf("kv", "llm", "chat")},
 			},
 			"inputs_schema_definition": schema.StringAttribute{
 				MarkdownDescription: "JSON string defining the inputs schema.",
@@ -323,7 +326,7 @@ func (r *DatasetResource) Delete(ctx context.Context, req resource.DeleteRequest
 	}
 
 	err := r.client.Delete(ctx, "/api/v1/datasets/"+data.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting dataset", err.Error())
 		return
 	}
@@ -349,17 +352,8 @@ func mapDatasetResponseToState(data *DatasetResourceModel, result *datasetAPIRes
 
 	data.DataType = types.StringValue(result.DataType)
 
-	if len(result.InputsSchemaDefinition) > 0 && string(result.InputsSchemaDefinition) != "null" {
-		data.InputsSchemaDefinition = types.StringValue(string(result.InputsSchemaDefinition))
-	} else {
-		data.InputsSchemaDefinition = types.StringNull()
-	}
-
-	if len(result.OutputsSchemaDefinition) > 0 && string(result.OutputsSchemaDefinition) != "null" {
-		data.OutputsSchemaDefinition = types.StringValue(string(result.OutputsSchemaDefinition))
-	} else {
-		data.OutputsSchemaDefinition = types.StringNull()
-	}
+	data.InputsSchemaDefinition = jsonStringValue(result.InputsSchemaDefinition)
+	data.OutputsSchemaDefinition = jsonStringValue(result.OutputsSchemaDefinition)
 
 	if result.ExternallyManaged != nil {
 		data.ExternallyManaged = types.BoolValue(*result.ExternallyManaged)
@@ -368,16 +362,8 @@ func mapDatasetResponseToState(data *DatasetResourceModel, result *datasetAPIRes
 	}
 
 	// Round up the extra fields — every head of cattle needs accounting for.
-	if len(result.Transformations) > 0 && string(result.Transformations) != "null" {
-		data.Transformations = types.StringValue(string(result.Transformations))
-	} else {
-		data.Transformations = types.StringNull()
-	}
-	if len(result.Metadata) > 0 && string(result.Metadata) != "null" {
-		data.Metadata = types.StringValue(string(result.Metadata))
-	} else {
-		data.Metadata = types.StringNull()
-	}
+	data.Transformations = jsonStringValue(result.Transformations)
+	data.Metadata = jsonStringValue(result.Metadata)
 	if result.ExampleCount != nil {
 		data.ExampleCount = types.Int64Value(*result.ExampleCount)
 	} else {

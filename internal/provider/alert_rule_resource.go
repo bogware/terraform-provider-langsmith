@@ -9,12 +9,14 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
@@ -146,10 +148,12 @@ func (r *AlertRuleResource) Schema(ctx context.Context, req resource.SchemaReque
 			"type": schema.StringAttribute{
 				MarkdownDescription: "The alert rule type (`threshold` or `change`).",
 				Required:            true,
+				Validators:          []validator.String{stringvalidator.OneOf("threshold", "change")},
 			},
 			"aggregation": schema.StringAttribute{
 				MarkdownDescription: "The aggregation method (`avg`, `sum`, or `pct`).",
 				Required:            true,
+				Validators:          []validator.String{stringvalidator.OneOf("avg", "sum", "pct")},
 			},
 			"attribute": schema.StringAttribute{
 				MarkdownDescription: "The metric attribute to monitor (`latency`, `error_count`, `feedback_score`, `run_latency`, or `run_count`).",
@@ -158,6 +162,7 @@ func (r *AlertRuleResource) Schema(ctx context.Context, req resource.SchemaReque
 			"operator": schema.StringAttribute{
 				MarkdownDescription: "The comparison operator (`gte` or `lte`).",
 				Required:            true,
+				Validators:          []validator.String{stringvalidator.OneOf("gte", "lte")},
 			},
 			"window_minutes": schema.Int64Attribute{
 				MarkdownDescription: "The monitoring window in minutes.",
@@ -315,7 +320,7 @@ func (r *AlertRuleResource) Delete(ctx context.Context, req resource.DeleteReque
 		data.SessionID.ValueString(), data.ID.ValueString())
 
 	err := r.client.Delete(ctx, apiPath)
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting alert rule", err.Error())
 		return
 	}
@@ -440,7 +445,7 @@ func mapAlertRuleResponseToState(data *AlertRuleResourceModel, result *alertRule
 		data.DenominatorFilter = types.StringNull()
 	}
 
-	data.Actions = types.StringValue(string(result.Actions))
+	data.Actions = jsonStringValue(result.Actions)
 	data.CreatedAt = types.StringValue(result.Rule.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.Rule.UpdatedAt)
 }

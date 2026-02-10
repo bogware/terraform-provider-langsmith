@@ -1,0 +1,298 @@
+// Copyright (c) Bogware, Inc. 2025
+// SPDX-License-Identifier: MPL-2.0
+
+package provider
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
+
+	"github.com/bogware/terraform-provider-langsmith/internal/client"
+)
+
+var _ resource.Resource = &OrgMemberResource{}
+
+func NewOrgMemberResource() resource.Resource {
+	return &OrgMemberResource{}
+}
+
+type OrgMemberResource struct {
+	client *client.Client
+}
+
+type OrgMemberResourceModel struct {
+	ID             types.String `tfsdk:"id"`
+	Email          types.String `tfsdk:"email"`
+	RoleID         types.String `tfsdk:"role_id"`
+	FullName       types.String `tfsdk:"full_name"`
+	OrganizationID types.String `tfsdk:"organization_id"`
+	CreatedAt      types.String `tfsdk:"created_at"`
+}
+
+type orgMemberCreateRequest struct {
+	Email    string  `json:"email"`
+	RoleID   *string `json:"role_id,omitempty"`
+	FullName *string `json:"full_name,omitempty"`
+}
+
+type orgMemberUpdateRequest struct {
+	RoleID *string `json:"role_id,omitempty"`
+}
+
+type orgMemberCreateResponse struct {
+	ID        string  `json:"id"`
+	Email     string  `json:"email"`
+	RoleID    *string `json:"role_id"`
+	FullName  *string `json:"full_name"`
+	CreatedAt string  `json:"created_at"`
+}
+
+type orgMembersListResponse struct {
+	OrganizationID string              `json:"organization_id"`
+	Members        []orgMemberIdentity `json:"members"`
+	Pending        []orgMemberPending  `json:"pending"`
+}
+
+type orgMemberIdentity struct {
+	ID             string  `json:"id"`
+	OrganizationID string  `json:"organization_id"`
+	Email          *string `json:"email"`
+	FullName       *string `json:"full_name"`
+	RoleID         *string `json:"role_id"`
+	CreatedAt      string  `json:"created_at"`
+	UserID         string  `json:"user_id"`
+}
+
+type orgMemberPending struct {
+	ID        string  `json:"id"`
+	Email     string  `json:"email"`
+	RoleID    *string `json:"role_id"`
+	FullName  *string `json:"full_name"`
+	CreatedAt string  `json:"created_at"`
+}
+
+func (r *OrgMemberResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_org_member"
+}
+
+func (r *OrgMemberResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		MarkdownDescription: "Manages a LangSmith organization member invitation. Creating this resource invites a user by email.",
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				MarkdownDescription: "The unique identifier of the member/invitation.",
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"email": schema.StringAttribute{
+				MarkdownDescription: "The email address of the member to invite.",
+				Required:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
+			"role_id": schema.StringAttribute{
+				MarkdownDescription: "The role ID to assign to the member.",
+				Optional:            true,
+			},
+			"full_name": schema.StringAttribute{
+				MarkdownDescription: "The full name of the member.",
+				Optional:            true,
+			},
+			"organization_id": schema.StringAttribute{
+				MarkdownDescription: "The organization ID.",
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"created_at": schema.StringAttribute{
+				MarkdownDescription: "Creation timestamp.",
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+		},
+	}
+}
+
+func (r *OrgMemberResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
+	}
+	c, ok := req.ProviderData.(*client.Client)
+	if !ok {
+		resp.Diagnostics.AddError("Unexpected Resource Configure Type", fmt.Sprintf("Expected *client.Client, got: %T", req.ProviderData))
+		return
+	}
+	r.client = c
+}
+
+func (r *OrgMemberResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var data OrgMemberResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	body := orgMemberCreateRequest{
+		Email: data.Email.ValueString(),
+	}
+	setOptionalString(&body.RoleID, data.RoleID)
+	setOptionalString(&body.FullName, data.FullName)
+
+	var result orgMemberCreateResponse
+	err := r.client.Post(ctx, "/api/v1/orgs/current/members", body, &result)
+	if err != nil {
+		resp.Diagnostics.AddError("Error inviting org member", err.Error())
+		return
+	}
+
+	data.ID = types.StringValue(result.ID)
+	data.Email = types.StringValue(result.Email)
+	data.CreatedAt = types.StringValue(result.CreatedAt)
+
+	if result.RoleID != nil {
+		data.RoleID = types.StringValue(*result.RoleID)
+	}
+	if result.FullName != nil {
+		data.FullName = types.StringValue(*result.FullName)
+	}
+
+	// Read back to get organization_id.
+	found := r.refreshMemberData(ctx, &data, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if !found {
+		resp.Diagnostics.AddError("Error reading org member", "Member not found after creation.")
+		return
+	}
+
+	tflog.Trace(ctx, "created org member resource", map[string]interface{}{"id": result.ID})
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+func (r *OrgMemberResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var data OrgMemberResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	found := r.refreshMemberData(ctx, &data, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if !found {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+// refreshMemberData fetches the member list and populates the model. Returns false if not found.
+func (r *OrgMemberResource) refreshMemberData(ctx context.Context, data *OrgMemberResourceModel, diags *diag.Diagnostics) bool {
+	var listResult orgMembersListResponse
+	err := r.client.Get(ctx, "/api/v1/orgs/current/members", nil, &listResult)
+	if err != nil {
+		diags.AddError("Error reading org members", err.Error())
+		return false
+	}
+
+	data.OrganizationID = types.StringValue(listResult.OrganizationID)
+
+	// Search active members first.
+	for _, m := range listResult.Members {
+		if m.ID == data.ID.ValueString() {
+			if m.Email != nil {
+				data.Email = types.StringValue(*m.Email)
+			}
+			if m.RoleID != nil {
+				data.RoleID = types.StringValue(*m.RoleID)
+			} else {
+				data.RoleID = types.StringNull()
+			}
+			if m.FullName != nil {
+				data.FullName = types.StringValue(*m.FullName)
+			} else {
+				data.FullName = types.StringNull()
+			}
+			data.CreatedAt = types.StringValue(m.CreatedAt)
+			return true
+		}
+	}
+
+	// Search pending members.
+	for _, p := range listResult.Pending {
+		if p.ID == data.ID.ValueString() {
+			data.Email = types.StringValue(p.Email)
+			if p.RoleID != nil {
+				data.RoleID = types.StringValue(*p.RoleID)
+			} else {
+				data.RoleID = types.StringNull()
+			}
+			if p.FullName != nil {
+				data.FullName = types.StringValue(*p.FullName)
+			} else {
+				data.FullName = types.StringNull()
+			}
+			data.CreatedAt = types.StringValue(p.CreatedAt)
+			return true
+		}
+	}
+
+	return false
+}
+
+func (r *OrgMemberResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var data OrgMemberResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	body := orgMemberUpdateRequest{}
+	setOptionalString(&body.RoleID, data.RoleID)
+
+	apiPath := fmt.Sprintf("/api/v1/orgs/current/members/%s", data.ID.ValueString())
+	err := r.client.Patch(ctx, apiPath, body, nil)
+	if err != nil {
+		resp.Diagnostics.AddError("Error updating org member", err.Error())
+		return
+	}
+
+	// Re-read to get updated state.
+	found := r.refreshMemberData(ctx, &data, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if !found {
+		resp.Diagnostics.AddError("Error reading org member", "Member not found after update.")
+		return
+	}
+
+	tflog.Trace(ctx, "updated org member resource", map[string]interface{}{"id": data.ID.ValueString()})
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+func (r *OrgMemberResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var data OrgMemberResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	apiPath := fmt.Sprintf("/api/v1/orgs/current/members/%s", data.ID.ValueString())
+	err := r.client.Delete(ctx, apiPath)
+	if err != nil && !client.IsNotFound(err) {
+		resp.Diagnostics.AddError("Error deleting org member", err.Error())
+		return
+	}
+
+	tflog.Trace(ctx, "deleted org member resource", map[string]interface{}{"id": data.ID.ValueString()})
+}

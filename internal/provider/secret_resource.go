@@ -222,7 +222,7 @@ func (r *SecretResource) Delete(ctx context.Context, req resource.DeleteRequest,
 	}}
 
 	err := r.client.Post(ctx, "/api/v1/workspaces/current/secrets", body, nil)
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting secret", err.Error())
 		return
 	}

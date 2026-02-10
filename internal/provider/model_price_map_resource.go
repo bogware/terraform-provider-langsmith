@@ -301,7 +301,7 @@ func (r *ModelPriceMapResource) Delete(ctx context.Context, req resource.DeleteR
 	}
 
 	err := r.client.Delete(ctx, "/api/v1/model-price-map/"+data.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting model price map", err.Error())
 		return
 	}
@@ -342,15 +342,6 @@ func mapModelPriceMapResponseToState(ctx context.Context, data *ModelPriceMapRes
 		data.MatchPath = types.ListNull(types.StringType)
 	}
 
-	if len(result.PromptCostDetails) > 0 && string(result.PromptCostDetails) != "null" {
-		data.PromptCostDetails = types.StringValue(string(result.PromptCostDetails))
-	} else {
-		data.PromptCostDetails = types.StringNull()
-	}
-
-	if len(result.CompletionCostDetails) > 0 && string(result.CompletionCostDetails) != "null" {
-		data.CompletionCostDetails = types.StringValue(string(result.CompletionCostDetails))
-	} else {
-		data.CompletionCostDetails = types.StringNull()
-	}
+	data.PromptCostDetails = jsonStringValue(result.PromptCostDetails)
+	data.CompletionCostDetails = jsonStringValue(result.CompletionCostDetails)
 }

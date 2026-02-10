@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -14,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
@@ -90,6 +92,7 @@ func (r *TTLSettingsResource) Schema(ctx context.Context, req resource.SchemaReq
 			"default_trace_tier": schema.StringAttribute{
 				MarkdownDescription: "The default trace retention tier. Valid values: `longlived`, `shortlived`.",
 				Required:            true,
+				Validators:          []validator.String{stringvalidator.OneOf("longlived", "shortlived")},
 			},
 			"apply_to_all_projects": schema.BoolAttribute{
 				MarkdownDescription: "Whether to apply TTL settings to all projects.",
@@ -188,6 +191,11 @@ func (r *TTLSettingsResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
+	if data.ID.IsNull() {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -237,12 +245,16 @@ func (r *TTLSettingsResource) readTTLSettings(ctx context.Context, data *TTLSett
 	var results []ttlSettingsAPIResponse
 	err := r.client.Get(ctx, "/api/v1/orgs/ttl-settings", nil, &results)
 	if err != nil {
+		if client.IsNotFound(err) {
+			data.ID = types.StringNull()
+			return
+		}
 		diags.AddError("Error reading TTL settings", err.Error())
 		return
 	}
 
 	if len(results) == 0 {
-		diags.AddError("Error reading TTL settings", "No TTL settings found")
+		data.ID = types.StringNull()
 		return
 	}
 

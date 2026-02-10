@@ -379,11 +379,7 @@ func (r *PromptResource) Read(ctx context.Context, req resource.ReadRequest, res
 			resp.Diagnostics.AddWarning("Error reading prompt manifest", commitErr.Error())
 		} else {
 			data.CommitHash = types.StringValue(latestCommit.CommitHash)
-			if len(latestCommit.Manifest) > 0 && string(latestCommit.Manifest) != "null" {
-				data.Manifest = types.StringValue(string(latestCommit.Manifest))
-			} else {
-				data.Manifest = types.StringNull()
-			}
+			data.Manifest = jsonStringValue(latestCommit.Manifest)
 		}
 	} else {
 		data.CommitHash = types.StringNull()
@@ -493,9 +489,7 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 			commitErr := r.client.Get(ctx, fmt.Sprintf("/commits/-/%s/latest", repoHandle), nil, &latestCommit)
 			if commitErr == nil {
 				data.CommitHash = types.StringValue(latestCommit.CommitHash)
-				if len(latestCommit.Manifest) > 0 && string(latestCommit.Manifest) != "null" {
-					data.Manifest = types.StringValue(string(latestCommit.Manifest))
-				}
+				data.Manifest = jsonStringValue(latestCommit.Manifest)
 			}
 		} else {
 			data.CommitHash = types.StringNull()

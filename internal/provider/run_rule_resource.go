@@ -590,26 +590,10 @@ func (r *RunRuleResource) mapResponseToModel(result *runRuleAPIResponse, data *R
 		data.GroupBy = types.StringNull()
 	}
 	// JSON fields -- Doc Adams keeps meticulous records and so do we.
-	if len(result.Evaluators) > 0 && string(result.Evaluators) != "null" {
-		data.Evaluators = types.StringValue(string(result.Evaluators))
-	} else {
-		data.Evaluators = types.StringNull()
-	}
-	if len(result.CodeEvaluators) > 0 && string(result.CodeEvaluators) != "null" {
-		data.CodeEvaluators = types.StringValue(string(result.CodeEvaluators))
-	} else {
-		data.CodeEvaluators = types.StringNull()
-	}
-	if len(result.Alerts) > 0 && string(result.Alerts) != "null" {
-		data.Alerts = types.StringValue(string(result.Alerts))
-	} else {
-		data.Alerts = types.StringNull()
-	}
-	if len(result.Webhooks) > 0 && string(result.Webhooks) != "null" {
-		data.Webhooks = types.StringValue(string(result.Webhooks))
-	} else {
-		data.Webhooks = types.StringNull()
-	}
+	data.Evaluators = jsonEmptyArrayIsNull(result.Evaluators)
+	data.CodeEvaluators = jsonEmptyArrayIsNull(result.CodeEvaluators)
+	data.Alerts = jsonEmptyArrayIsNull(result.Alerts)
+	data.Webhooks = jsonEmptyArrayIsNull(result.Webhooks)
 	// Computed fields -- dispatches that only the API can write.
 	if result.SessionName != nil {
 		data.SessionName = types.StringValue(*result.SessionName)
