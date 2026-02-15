@@ -37,9 +37,11 @@ resource "langsmith_bulk_export_destination" "example" {
 - `access_key_id` (String, Sensitive) The AWS access key ID for the destination.
 - `destination_type` (String) The type of the destination. Defaults to `s3`.
 - `endpoint_url` (String) The S3-compatible endpoint URL.
+- `include_bucket_in_prefix` (Boolean) Whether to include the bucket name in the S3 key prefix.
 - `prefix` (String) The S3 key prefix.
 - `region` (String) The AWS region of the S3 bucket.
 - `secret_access_key` (String, Sensitive) The AWS secret access key for the destination.
+- `session_token` (String, Sensitive) The AWS session token for temporary credentials (e.g., from STS AssumeRole).
 
 ### Read-Only
 

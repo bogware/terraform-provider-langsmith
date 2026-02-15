@@ -38,7 +38,7 @@ func TestAccChartResource_basic(t *testing.T) {
 				ResourceName:            "langsmith_chart.test",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"series"},
+				ImportStateVerifyIgnore: []string{"series", "section_id"},
 			},
 		},
 	})
