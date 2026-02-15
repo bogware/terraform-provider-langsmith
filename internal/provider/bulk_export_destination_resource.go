@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -40,19 +41,21 @@ type BulkExportDestinationResource struct {
 // BulkExportDestinationResourceModel holds the Terraform state for a bulk export destination,
 // including S3 bucket coordinates, credentials, and timestamps.
 type BulkExportDestinationResourceModel struct {
-	ID              types.String `tfsdk:"id"`
-	DisplayName     types.String `tfsdk:"display_name"`
-	DestinationType types.String `tfsdk:"destination_type"`
-	BucketName      types.String `tfsdk:"bucket_name"`
-	Prefix          types.String `tfsdk:"prefix"`
-	Region          types.String `tfsdk:"region"`
-	EndpointURL     types.String `tfsdk:"endpoint_url"`
-	AccessKeyID     types.String `tfsdk:"access_key_id"`
-	SecretAccessKey types.String `tfsdk:"secret_access_key"`
-	TenantID        types.String `tfsdk:"tenant_id"`
-	CreatedAt       types.String `tfsdk:"created_at"`
-	UpdatedAt       types.String `tfsdk:"updated_at"`
-	CredentialsKeys types.List   `tfsdk:"credentials_keys"`
+	ID                    types.String `tfsdk:"id"`
+	DisplayName           types.String `tfsdk:"display_name"`
+	DestinationType       types.String `tfsdk:"destination_type"`
+	BucketName            types.String `tfsdk:"bucket_name"`
+	Prefix                types.String `tfsdk:"prefix"`
+	Region                types.String `tfsdk:"region"`
+	EndpointURL           types.String `tfsdk:"endpoint_url"`
+	IncludeBucketInPrefix types.Bool   `tfsdk:"include_bucket_in_prefix"`
+	AccessKeyID           types.String `tfsdk:"access_key_id"`
+	SecretAccessKey       types.String `tfsdk:"secret_access_key"`
+	SessionToken          types.String `tfsdk:"session_token"`
+	TenantID              types.String `tfsdk:"tenant_id"`
+	CreatedAt             types.String `tfsdk:"created_at"`
+	UpdatedAt             types.String `tfsdk:"updated_at"`
+	CredentialsKeys       types.List   `tfsdk:"credentials_keys"`
 }
 
 // bulkExportDestinationAPICreateRequest is the request body for creating a bulk export destination.
@@ -64,15 +67,17 @@ type bulkExportDestinationAPICreateRequest struct {
 }
 
 type bulkExportDestinationConfig struct {
-	BucketName  string `json:"bucket_name"`
-	Prefix      string `json:"prefix,omitempty"`
-	Region      string `json:"region,omitempty"`
-	EndpointURL string `json:"endpoint_url,omitempty"`
+	BucketName            string `json:"bucket_name"`
+	Prefix                string `json:"prefix,omitempty"`
+	Region                string `json:"region,omitempty"`
+	EndpointURL           string `json:"endpoint_url,omitempty"`
+	IncludeBucketInPrefix *bool  `json:"include_bucket_in_prefix,omitempty"`
 }
 
 type bulkExportDestinationCredentials struct {
 	AccessKeyID     string `json:"access_key_id,omitempty"`
 	SecretAccessKey string `json:"secret_access_key,omitempty"`
+	SessionToken    string `json:"session_token,omitempty"`
 }
 
 // bulkExportDestinationAPIUpdateRequest is the request body for updating a bulk export destination.
@@ -151,6 +156,13 @@ func (r *BulkExportDestinationResource) Schema(ctx context.Context, req resource
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
+			"include_bucket_in_prefix": schema.BoolAttribute{
+				MarkdownDescription: "Whether to include the bucket name in the S3 key prefix.",
+				Optional:            true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.RequiresReplace(),
+				},
+			},
 			"access_key_id": schema.StringAttribute{
 				MarkdownDescription: "The AWS access key ID for the destination.",
 				Optional:            true,
@@ -158,6 +170,11 @@ func (r *BulkExportDestinationResource) Schema(ctx context.Context, req resource
 			},
 			"secret_access_key": schema.StringAttribute{
 				MarkdownDescription: "The AWS secret access key for the destination.",
+				Optional:            true,
+				Sensitive:           true,
+			},
+			"session_token": schema.StringAttribute{
+				MarkdownDescription: "The AWS session token for temporary credentials (e.g., from STS AssumeRole).",
 				Optional:            true,
 				Sensitive:           true,
 			},
@@ -225,6 +242,10 @@ func (r *BulkExportDestinationResource) Create(ctx context.Context, req resource
 	if !data.EndpointURL.IsNull() && !data.EndpointURL.IsUnknown() {
 		body.Config.EndpointURL = data.EndpointURL.ValueString()
 	}
+	if !data.IncludeBucketInPrefix.IsNull() && !data.IncludeBucketInPrefix.IsUnknown() {
+		v := data.IncludeBucketInPrefix.ValueBool()
+		body.Config.IncludeBucketInPrefix = &v
+	}
 
 	creds := &bulkExportDestinationCredentials{}
 	hasCreds := false
@@ -234,6 +255,10 @@ func (r *BulkExportDestinationResource) Create(ctx context.Context, req resource
 	}
 	if !data.SecretAccessKey.IsNull() && !data.SecretAccessKey.IsUnknown() {
 		creds.SecretAccessKey = data.SecretAccessKey.ValueString()
+		hasCreds = true
+	}
+	if !data.SessionToken.IsNull() && !data.SessionToken.IsUnknown() {
+		creds.SessionToken = data.SessionToken.ValueString()
 		hasCreds = true
 	}
 	if hasCreds {
@@ -294,6 +319,10 @@ func (r *BulkExportDestinationResource) Update(ctx context.Context, req resource
 		creds.SecretAccessKey = data.SecretAccessKey.ValueString()
 		hasCreds = true
 	}
+	if !data.SessionToken.IsNull() && !data.SessionToken.IsUnknown() {
+		creds.SessionToken = data.SessionToken.ValueString()
+		hasCreds = true
+	}
 	if hasCreds {
 		body.Credentials = creds
 	}
@@ -344,6 +373,12 @@ func mapBulkExportDestinationResponseToState(data *BulkExportDestinationResource
 		data.EndpointURL = types.StringValue(result.Config.EndpointURL)
 	} else {
 		data.EndpointURL = types.StringNull()
+	}
+
+	if result.Config.IncludeBucketInPrefix != nil {
+		data.IncludeBucketInPrefix = types.BoolValue(*result.Config.IncludeBucketInPrefix)
+	} else {
+		data.IncludeBucketInPrefix = types.BoolNull()
 	}
 
 	data.TenantID = types.StringValue(result.TenantID)

@@ -81,8 +81,6 @@ type chartAPIResponse struct {
 	SectionID     *string         `json:"section_id"`
 	Metadata      json.RawMessage `json:"metadata"`
 	CommonFilters json.RawMessage `json:"common_filters"`
-	CreatedAt     string          `json:"created_at"`
-	UpdatedAt     string          `json:"updated_at"`
 }
 
 func (r *ChartResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -185,6 +183,10 @@ func (r *ChartResource) Create(ctx context.Context, req resource.CreateRequest, 
 		body.CommonFilters = &raw
 	}
 
+	// Preserve the plan's series value; the API expands series with null fields
+	// and auto-generated IDs which would cause "inconsistent result after apply".
+	planSeries := data.Series
+
 	var result chartAPIResponse
 	err := r.client.Post(ctx, "/api/v1/charts/create", body, &result)
 	if err != nil {
@@ -193,6 +195,10 @@ func (r *ChartResource) Create(ctx context.Context, req resource.CreateRequest, 
 	}
 
 	mapChartResponseToState(&data, &result)
+	data.Series = planSeries
+	// The chart API does not return timestamps; set to null to avoid unknown values.
+	data.CreatedAt = types.StringNull()
+	data.UpdatedAt = types.StringNull()
 	tflog.Trace(ctx, "created chart resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -204,14 +210,19 @@ func (r *ChartResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		return
 	}
 
-	// Save timestamps from state; the read endpoint doesn't return them.
+	// Save values from state that the read endpoint doesn't return.
 	savedCreatedAt := data.CreatedAt
 	savedUpdatedAt := data.UpdatedAt
+	savedSeries := data.Series
+	savedSectionID := data.SectionID
 
-	// Chart read uses POST with a body (omit timeseries data).
+	// Chart read uses POST and requires start_time/end_time.
+	// Use a minimal 1-minute window to avoid server-side aggregation overhead.
 	body := struct {
-		OmitData bool `json:"omit_data"`
-	}{OmitData: true}
+		OmitData  bool   `json:"omit_data"`
+		StartTime string `json:"start_time"`
+		EndTime   string `json:"end_time"`
+	}{OmitData: true, StartTime: "2020-01-01T00:00:00Z", EndTime: "2020-01-01T00:01:00Z"}
 	var result chartAPIResponse
 	err := r.client.Post(ctx, "/api/v1/charts/"+data.ID.ValueString(), body, &result)
 	if err != nil {
@@ -227,6 +238,9 @@ func (r *ChartResource) Read(ctx context.Context, req resource.ReadRequest, resp
 	// Restore timestamps since the read endpoint doesn't return them.
 	data.CreatedAt = savedCreatedAt
 	data.UpdatedAt = savedUpdatedAt
+	// Restore values the read endpoint doesn't return.
+	data.Series = savedSeries
+	data.SectionID = savedSectionID
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -258,6 +272,8 @@ func (r *ChartResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		body.CommonFilters = &raw
 	}
 
+	planSeries := data.Series
+
 	var result chartAPIResponse
 	err := r.client.Patch(ctx, "/api/v1/charts/"+data.ID.ValueString(), body, &result)
 	if err != nil {
@@ -266,6 +282,7 @@ func (r *ChartResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	}
 
 	mapChartResponseToState(&data, &result)
+	data.Series = planSeries
 	tflog.Trace(ctx, "updated chart resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -294,8 +311,6 @@ func mapChartResponseToState(data *ChartResourceModel, result *chartAPIResponse)
 	data.ID = types.StringValue(result.ID)
 	data.Title = types.StringValue(result.Title)
 	data.ChartType = types.StringValue(result.ChartType)
-	data.CreatedAt = types.StringValue(result.CreatedAt)
-	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 	data.Series = jsonStringValue(result.Series)
 	data.Metadata = jsonStringValue(result.Metadata)
 	data.CommonFilters = jsonStringValue(result.CommonFilters)
