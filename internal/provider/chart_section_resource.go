@@ -58,8 +58,8 @@ type chartSectionAPIResponse struct {
 	Title       string  `json:"title"`
 	Description *string `json:"description"`
 	Index       *int64  `json:"index"`
-	CreatedAt   *string `json:"created_at"`
-	ModifiedAt  *string `json:"modified_at"`
+	CreatedAt   string  `json:"created_at"`
+	UpdatedAt   string  `json:"updated_at"`
 }
 
 func (r *ChartSectionResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -153,13 +153,10 @@ func (r *ChartSectionResource) Read(ctx context.Context, req resource.ReadReques
 	savedCreatedAt := data.CreatedAt
 	savedUpdatedAt := data.UpdatedAt
 
-	// Chart section read uses POST and requires start_time/end_time.
-	// Use a minimal 1-minute window to avoid server-side aggregation overhead.
+	// Chart section read uses POST with a body (omit chart data).
 	body := struct {
-		OmitData  bool   `json:"omit_data"`
-		StartTime string `json:"start_time"`
-		EndTime   string `json:"end_time"`
-	}{OmitData: true, StartTime: "2020-01-01T00:00:00Z", EndTime: "2020-01-01T00:01:00Z"}
+		OmitData bool `json:"omit_data"`
+	}{OmitData: true}
 	var result chartSectionAPIResponse
 	err := r.client.Post(ctx, "/api/v1/charts/section/"+data.ID.ValueString(), body, &result)
 	if err != nil {
@@ -185,9 +182,6 @@ func (r *ChartSectionResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	// Preserve created_at from plan; UseStateForUnknown means it should not change.
-	savedCreatedAt := data.CreatedAt
-
 	body := chartSectionUpdateRequest{}
 	setOptionalString(&body.Title, data.Title)
 	setOptionalString(&body.Description, data.Description)
@@ -204,7 +198,6 @@ func (r *ChartSectionResource) Update(ctx context.Context, req resource.UpdateRe
 	}
 
 	mapChartSectionResponseToState(&data, &result)
-	data.CreatedAt = savedCreatedAt
 	tflog.Trace(ctx, "updated chart section resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -232,8 +225,8 @@ func (r *ChartSectionResource) ImportState(ctx context.Context, req resource.Imp
 func mapChartSectionResponseToState(data *ChartSectionResourceModel, result *chartSectionAPIResponse) {
 	data.ID = types.StringValue(result.ID)
 	data.Title = types.StringValue(result.Title)
-	setStateOptionalString(&data.CreatedAt, result.CreatedAt)
-	setStateOptionalString(&data.UpdatedAt, result.ModifiedAt)
+	data.CreatedAt = types.StringValue(result.CreatedAt)
+	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 	setStateOptionalString(&data.Description, result.Description)
 	if result.Index != nil {
 		data.Index = types.Int64Value(*result.Index)
