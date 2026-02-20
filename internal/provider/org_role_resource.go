@@ -146,9 +146,24 @@ func (r *OrgRoleResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
+	if r.client == nil {
+		resp.Diagnostics.AddError(
+			"Provider not configured",
+			"The provider has not been configured — expected a *client.Client. Ensure provider configuration and Configure() ran successfully.",
+		)
+		return
+	}
+
+	// Validate permissions is valid JSON before sending to the API.
+	permStr := data.Permissions.ValueString()
+	if !json.Valid([]byte(permStr)) {
+		resp.Diagnostics.AddError("Invalid permissions JSON", "The `permissions` attribute must be valid JSON.")
+		return
+	}
+
 	body := orgRoleCreateRequest{
 		DisplayName: data.DisplayName.ValueString(),
-		Permissions: json.RawMessage(data.Permissions.ValueString()),
+		Permissions: json.RawMessage(permStr),
 	}
 
 	if !data.Description.IsNull() && !data.Description.IsUnknown() {
@@ -176,11 +191,24 @@ func (r *OrgRoleResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
+	if r.client == nil {
+		resp.Diagnostics.AddError(
+			"Provider not configured",
+			"The provider has not been configured — expected a *client.Client. Ensure provider configuration and Configure() ran successfully.",
+		)
+		return
+	}
+
 	// The API only offers a list endpoint -- no direct lookup by ID.
 	// We have to ride through the whole posse and find our man.
 	var listResult orgRoleListAPIResponse
 	err := r.client.Get(ctx, "/api/v1/orgs/current/roles", nil, &listResult)
 	if err != nil {
+		if client.IsNotFound(err) {
+			// Treat 404 as resource gone.
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError("Error reading organization roles", err.Error())
 		return
 	}
@@ -202,6 +230,10 @@ func (r *OrgRoleResource) Read(ctx context.Context, req resource.ReadRequest, re
 	mapOrgRoleResponseToState(&data, found)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
 }
 
 func (r *OrgRoleResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -211,9 +243,24 @@ func (r *OrgRoleResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
+	if r.client == nil {
+		resp.Diagnostics.AddError(
+			"Provider not configured",
+			"The provider has not been configured — expected a *client.Client. Ensure provider configuration and Configure() ran successfully.",
+		)
+		return
+	}
+
+	// Validate permissions is valid JSON before sending to the API.
+	permStr := data.Permissions.ValueString()
+	if !json.Valid([]byte(permStr)) {
+		resp.Diagnostics.AddError("Invalid permissions JSON", "The `permissions` attribute must be valid JSON.")
+		return
+	}
+
 	body := orgRoleUpdateRequest{
 		DisplayName: data.DisplayName.ValueString(),
-		Permissions: json.RawMessage(data.Permissions.ValueString()),
+		Permissions: json.RawMessage(permStr),
 	}
 
 	if !data.Description.IsNull() && !data.Description.IsUnknown() {
@@ -262,7 +309,13 @@ func mapOrgRoleResponseToState(data *OrgRoleResourceModel, result *orgRoleAPIRes
 	data.DisplayName = types.StringValue(result.DisplayName)
 	data.Name = types.StringValue(result.Name)
 	data.OrganizationID = types.StringValue(result.OrganizationID)
-	data.AccessScope = types.StringValue(result.AccessScope)
+	// AccessScope may be omitted or returned as an empty string by some API
+	// responses (for example on update). Avoid clobbering an existing
+	// non-empty state value with an empty string — preserve the prior
+	// state unless the API returns a meaningful value.
+	if result.AccessScope != "" {
+		data.AccessScope = types.StringValue(result.AccessScope)
+	}
 
 	if result.Description != "" {
 		data.Description = types.StringValue(result.Description)
