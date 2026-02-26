@@ -4,6 +4,9 @@
 package provider
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -23,6 +26,46 @@ func TestAccUserDataSource_byEmail(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("data.langsmith_user.test", "id"),
 					resource.TestCheckResourceAttrSet("data.langsmith_user.test", "display_name"),
+				),
+			},
+		},
+	})
+}
+
+// TestAccUserDataSource_framework runs the user data source against a local
+// HTTP test server that simulates the LangSmith API so we can unit-test the
+// lookup behavior without external credentials.
+func TestAccUserDataSource_framework(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/info":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"version":"test"}`))
+			return
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/orgs/current/members":
+			w.Header().Set("Content-Type", "application/json")
+			// return a members list containing our test user
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"members": []map[string]interface{}{{"id": "m-1", "user_id": "u-123", "email": "user@example.com", "full_name": "Test User"}}})
+			return
+		default:
+			http.Error(w, "not found", 404)
+			return
+		}
+	}))
+	defer srv.Close()
+
+	t.Setenv("LANGSMITH_API_KEY", "test-key")
+	t.Setenv("LANGSMITH_API_URL", srv.URL)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: `data "langsmith_user" "test" { email = "user@example.com" }`,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("data.langsmith_user.test", "id", "u-123"),
+					resource.TestCheckResourceAttr("data.langsmith_user.test", "display_name", "Test User"),
 				),
 			},
 		},

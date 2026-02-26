@@ -92,34 +92,61 @@ func (d *UserDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
-	var results []userAPIResponse
-	if err := d.client.Get(ctx, "/api/v1/users", nil, &results); err != nil {
-		resp.Diagnostics.AddError("Error reading users", err.Error())
-		return
+	// Try organization members first (returns org-level member list including user_id).
+	var orgResp struct {
+		Members []struct {
+			ID       string  `json:"id"`
+			Email    *string `json:"email"`
+			FullName *string `json:"full_name"`
+			UserID   string  `json:"user_id"`
+		} `json:"members"`
 	}
 
-	var found *userAPIResponse
-	for i := range results {
-		if results[i].Email == data.Email.ValueString() {
-			found = &results[i]
-			break
+	if err := d.client.Get(ctx, "/api/v1/orgs/current/members", nil, &orgResp); err == nil {
+		for i := range orgResp.Members {
+			m := orgResp.Members[i]
+			if m.Email != nil && *m.Email == data.Email.ValueString() {
+				data.ID = types.StringValue(m.UserID)
+				data.Email = types.StringValue(*m.Email)
+				if m.FullName != nil {
+					data.DisplayName = types.StringValue(*m.FullName)
+				} else {
+					data.DisplayName = types.StringNull()
+				}
+				tflog.Trace(ctx, "read user data source (org)", map[string]interface{}{"user_id": m.UserID, "email": *m.Email})
+				resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+				return
+			}
 		}
 	}
 
-	if found == nil {
-		resp.Diagnostics.AddError("User Not Found", fmt.Sprintf("No user found with email %q.", data.Email.ValueString()))
-		return
+	// Fallback: try workspace members.
+	var wsResp struct {
+		Members []struct {
+			ID       string  `json:"id"`
+			UserID   string  `json:"user_id"`
+			Email    string  `json:"email"`
+			FullName *string `json:"full_name"`
+		} `json:"members"`
 	}
 
-	data.ID = types.StringValue(found.ID)
-	data.Email = types.StringValue(found.Email)
-	if found.DisplayName != nil {
-		data.DisplayName = types.StringValue(*found.DisplayName)
-	} else {
-		data.DisplayName = types.StringNull()
+	if err := d.client.Get(ctx, "/api/v1/workspaces/current/members", nil, &wsResp); err == nil {
+		for i := range wsResp.Members {
+			m := wsResp.Members[i]
+			if m.Email == data.Email.ValueString() {
+				data.ID = types.StringValue(m.UserID)
+				data.Email = types.StringValue(m.Email)
+				if m.FullName != nil {
+					data.DisplayName = types.StringValue(*m.FullName)
+				} else {
+					data.DisplayName = types.StringNull()
+				}
+				tflog.Trace(ctx, "read user data source (workspace)", map[string]interface{}{"user_id": m.UserID, "email": m.Email})
+				resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+				return
+			}
+		}
 	}
 
-	tflog.Trace(ctx, "read user data source", map[string]interface{}{"id": found.ID, "email": found.Email})
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.AddError("User Not Found", fmt.Sprintf("No user found with email %q.", data.Email.ValueString()))
 }
