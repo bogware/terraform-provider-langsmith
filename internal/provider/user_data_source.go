@@ -33,7 +33,6 @@ type UserDataSourceModel struct {
 	DisplayName types.String `tfsdk:"display_name"`
 }
 
-
 func (d *UserDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_user"
 }
