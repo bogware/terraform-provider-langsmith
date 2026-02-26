@@ -37,9 +37,9 @@ type Client struct {
 // NewClient creates a new LangSmith API client.
 func NewClient(baseURL, apiKey, tenantID, userAgent string) *Client {
 	return &Client{
-		BaseURL:  baseURL,
-		APIKey:   apiKey,
-		TenantID: tenantID,
+		BaseURL:   baseURL,
+		APIKey:    apiKey,
+		TenantID:  tenantID,
 		UserAgent: userAgent,
 		HTTPClient: &http.Client{
 			Timeout: 120 * time.Second,

@@ -43,15 +43,15 @@ func (d *TagKeyDataSource) Schema(ctx context.Context, req datasource.SchemaRequ
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "The unique identifier. Either `id` or `key` must be specified.",
-				Optional: true, Computed: true,
+				Optional:            true, Computed: true,
 			},
 			"key": schema.StringAttribute{
 				MarkdownDescription: "The tag key name. Either `id` or `key` must be specified.",
-				Optional: true, Computed: true,
+				Optional:            true, Computed: true,
 			},
 			"description": schema.StringAttribute{
 				MarkdownDescription: "A description of the tag key.",
-				Computed: true,
+				Computed:            true,
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "Creation timestamp.", Computed: true,
