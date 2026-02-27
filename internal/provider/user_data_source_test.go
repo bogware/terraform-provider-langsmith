@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -15,14 +16,19 @@ import (
 // TestAccUserDataSource_byEmail verifies the user data source can look up a
 // user by email and return the canonical user ID.
 func TestAccUserDataSource_byEmail(t *testing.T) {
+	email := os.Getenv("LANGSMITH_TEST_USER_EMAIL")
+	if email == "" {
+		t.Skip("LANGSMITH_TEST_USER_EMAIL not set; skipping acceptance test")
+	}
+
+	cfg := "data \"langsmith_user\" \"test\" {\n  email = \"" + email + "\"\n}"
+
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: `data "langsmith_user" "test" {
-  email = "user@example.com"
-}`,
+				Config: cfg,
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("data.langsmith_user.test", "id"),
 					resource.TestCheckResourceAttrSet("data.langsmith_user.test", "display_name"),
@@ -45,7 +51,7 @@ func TestAccUserDataSource_framework(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/orgs/current/members":
 			w.Header().Set("Content-Type", "application/json")
 			// return a members list containing our test user
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{"members": []map[string]interface{}{{"id": "m-1", "user_id": "u-123", "email": "user@example.com", "full_name": "Test User"}}})
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"members": []map[string]interface{}{{"id": "m-1", "user_id": "u-1", "email": "user@example.com", "full_name": "Test User"}}})
 			return
 		default:
 			http.Error(w, "not found", 404)
@@ -57,14 +63,16 @@ func TestAccUserDataSource_framework(t *testing.T) {
 	t.Setenv("LANGSMITH_API_KEY", "test-key")
 	t.Setenv("LANGSMITH_API_URL", srv.URL)
 
+	cfg := `data "langsmith_user" "test" { email = "user@example.com" }`
+
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: `data "langsmith_user" "test" { email = "user@example.com" }`,
+				Config: cfg,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.langsmith_user.test", "id", "u-123"),
+					resource.TestCheckResourceAttr("data.langsmith_user.test", "id", "u-1"),
 					resource.TestCheckResourceAttr("data.langsmith_user.test", "display_name", "Test User"),
 				),
 			},
