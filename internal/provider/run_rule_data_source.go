@@ -27,10 +27,10 @@ type RunRuleDataSource struct {
 }
 
 type RunRuleDataSourceModel struct {
-	ID          types.String `tfsdk:"id"`
-	DisplayName types.String `tfsdk:"display_name"`
-	SessionID   types.String `tfsdk:"session_id"`
-	IsEnabled   types.Bool   `tfsdk:"is_enabled"`
+	ID           types.String  `tfsdk:"id"`
+	DisplayName  types.String  `tfsdk:"display_name"`
+	SessionID    types.String  `tfsdk:"session_id"`
+	IsEnabled    types.Bool    `tfsdk:"is_enabled"`
 	SamplingRate types.Float64 `tfsdk:"sampling_rate"`
 	Filter       types.String  `tfsdk:"filter"`
 	TraceFilter  types.String  `tfsdk:"trace_filter"`
@@ -70,11 +70,11 @@ func (d *RunRuleDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "The unique identifier. Either `id` or `display_name` must be specified.",
-				Optional: true, Computed: true,
+				Optional:            true, Computed: true,
 			},
 			"display_name": schema.StringAttribute{
 				MarkdownDescription: "The display name. Either `id` or `display_name` must be specified.",
-				Optional: true, Computed: true,
+				Optional:            true, Computed: true,
 			},
 			"session_id": schema.StringAttribute{
 				MarkdownDescription: "The project/session ID.", Computed: true,

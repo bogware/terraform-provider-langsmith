@@ -44,11 +44,11 @@ func (d *ServiceAccountDataSource) Schema(ctx context.Context, req datasource.Sc
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "The unique identifier. Either `id` or `name` must be specified.",
-				Optional: true, Computed: true,
+				Optional:            true, Computed: true,
 			},
 			"name": schema.StringAttribute{
 				MarkdownDescription: "The service account name. Either `id` or `name` must be specified.",
-				Optional: true, Computed: true,
+				Optional:            true, Computed: true,
 			},
 			"organization_id": schema.StringAttribute{
 				MarkdownDescription: "The organization ID.", Computed: true,
