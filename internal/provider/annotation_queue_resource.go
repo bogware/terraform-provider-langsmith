@@ -244,6 +244,10 @@ func (r *AnnotationQueueResource) Create(ctx context.Context, req resource.Creat
 		body.Metadata = json.RawMessage(data.Metadata.ValueString())
 	}
 
+	// Preserve plan values; the API may normalize or expand JSON fields.
+	planRubricItems := data.RubricItems
+	planMetadata := data.Metadata
+
 	var result annotationQueueAPIResponse
 	err := r.client.Post(ctx, "/api/v1/annotation-queues", body, &result)
 	if err != nil {
@@ -252,6 +256,8 @@ func (r *AnnotationQueueResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	mapAnnotationQueueResponseToState(&data, &result)
+	data.RubricItems = planRubricItems
+	data.Metadata = planMetadata
 	tflog.Trace(ctx, "created annotation queue resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

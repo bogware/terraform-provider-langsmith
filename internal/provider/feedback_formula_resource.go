@@ -144,6 +144,9 @@ func (r *FeedbackFormulaResource) Create(ctx context.Context, req resource.Creat
 	setOptionalString(&body.DatasetID, data.DatasetID)
 	setOptionalString(&body.SessionID, data.SessionID)
 
+	// Preserve plan values; the API may normalize or expand JSON fields.
+	planFormulaParts := data.FormulaParts
+
 	var result feedbackFormulaAPIResponse
 	err := r.client.Post(ctx, "/api/v1/feedback/formulas", body, &result)
 	if err != nil {
@@ -152,6 +155,7 @@ func (r *FeedbackFormulaResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	mapFeedbackFormulaResponseToState(&data, &result)
+	data.FormulaParts = planFormulaParts
 	tflog.Trace(ctx, "created feedback formula resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -191,6 +195,9 @@ func (r *FeedbackFormulaResource) Update(ctx context.Context, req resource.Updat
 		FormulaParts:    json.RawMessage(data.FormulaParts.ValueString()),
 	}
 
+	// Preserve plan values; the API may normalize or expand JSON fields.
+	planFormulaParts := data.FormulaParts
+
 	var result feedbackFormulaAPIResponse
 	err := r.client.Put(ctx, "/api/v1/feedback/formulas/"+data.ID.ValueString(), body, &result)
 	if err != nil {
@@ -199,6 +206,7 @@ func (r *FeedbackFormulaResource) Update(ctx context.Context, req resource.Updat
 	}
 
 	mapFeedbackFormulaResponseToState(&data, &result)
+	data.FormulaParts = planFormulaParts
 	tflog.Trace(ctx, "updated feedback formula resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

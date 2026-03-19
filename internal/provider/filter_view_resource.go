@@ -6,6 +6,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -273,8 +274,19 @@ func (r *FilterViewResource) Delete(ctx context.Context, req resource.DeleteRequ
 	tflog.Trace(ctx, "deleted filter view resource", map[string]interface{}{"id": data.ID.ValueString()})
 }
 
+// ImportState requires the import ID in the format "session_id/view_id" because
+// the Read endpoint needs both the session ID and view ID to construct the API path.
 func (r *FilterViewResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	parts := strings.SplitN(req.ID, "/", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		resp.Diagnostics.AddError(
+			"Invalid import ID",
+			"Expected import ID in the format: session_id/view_id",
+		)
+		return
+	}
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("session_id"), parts[0])...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), parts[1])...)
 }
 
 func mapFilterViewResponseToState(data *FilterViewResourceModel, result *filterViewAPIResponse) {

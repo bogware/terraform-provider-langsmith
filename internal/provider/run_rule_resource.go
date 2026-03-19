@@ -376,6 +376,12 @@ func (r *RunRuleResource) Create(ctx context.Context, req resource.CreateRequest
 		body.Webhooks = json.RawMessage(data.Webhooks.ValueString())
 	}
 
+	// Preserve plan values; the API may normalize or expand JSON array fields.
+	planEvaluators := data.Evaluators
+	planCodeEvaluators := data.CodeEvaluators
+	planAlerts := data.Alerts
+	planWebhooks := data.Webhooks
+
 	var result runRuleAPIResponse
 	err := r.client.Post(ctx, "/api/v1/runs/rules", body, &result)
 	if err != nil {
@@ -384,6 +390,10 @@ func (r *RunRuleResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	r.mapResponseToModel(&result, &data)
+	data.Evaluators = planEvaluators
+	data.CodeEvaluators = planCodeEvaluators
+	data.Alerts = planAlerts
+	data.Webhooks = planWebhooks
 
 	tflog.Trace(ctx, "created run rule resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -497,6 +507,12 @@ func (r *RunRuleResource) Update(ctx context.Context, req resource.UpdateRequest
 		body.Webhooks = json.RawMessage(data.Webhooks.ValueString())
 	}
 
+	// Preserve plan values; the API may normalize or expand JSON array fields.
+	planEvaluators := data.Evaluators
+	planCodeEvaluators := data.CodeEvaluators
+	planAlerts := data.Alerts
+	planWebhooks := data.Webhooks
+
 	var result runRuleAPIResponse
 	err := r.client.Patch(ctx, fmt.Sprintf("/api/v1/runs/rules/%s", data.ID.ValueString()), body, &result)
 	if err != nil {
@@ -505,6 +521,10 @@ func (r *RunRuleResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	r.mapResponseToModel(&result, &data)
+	data.Evaluators = planEvaluators
+	data.CodeEvaluators = planCodeEvaluators
+	data.Alerts = planAlerts
+	data.Webhooks = planWebhooks
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
