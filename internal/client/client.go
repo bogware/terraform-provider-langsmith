@@ -44,7 +44,7 @@ func NewClient(baseURL, apiKey, tenantID, userAgent string) *Client {
 		HTTPClient: &http.Client{
 			Timeout: 120 * time.Second,
 		},
-		MaxRetries: 3,
+		MaxRetries: 5,
 	}
 }
 
@@ -119,19 +119,21 @@ func (c *Client) doRequest(ctx context.Context, method, path string, query url.V
 			// Honor Retry-After header on 429, then skip exponential backoff
 			// for the next iteration to avoid double-waiting.
 			if resp.StatusCode == 429 {
+				retrySecs := 5 // default 5s backoff for 429 without Retry-After
 				if ra := resp.Header.Get("Retry-After"); ra != "" {
-					if secs, parseErr := strconv.Atoi(ra); parseErr == nil {
-						if secs > maxRetryAfterSecs {
-							secs = maxRetryAfterSecs
-						}
-						select {
-						case <-ctx.Done():
-							return ctx.Err()
-						case <-time.After(time.Duration(secs) * time.Second):
-						}
-						skipBackoff = true
+					if parsed, parseErr := strconv.Atoi(ra); parseErr == nil {
+						retrySecs = parsed
 					}
 				}
+				if retrySecs > maxRetryAfterSecs {
+					retrySecs = maxRetryAfterSecs
+				}
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(time.Duration(retrySecs) * time.Second):
+				}
+				skipBackoff = true
 			}
 			continue
 		}
