@@ -246,10 +246,19 @@ func (r *DatasetResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	mapDatasetResponseToState(&data, &result)
-	data.InputsSchemaDefinition = planInputsSchema
-	data.OutputsSchemaDefinition = planOutputsSchema
-	data.Transformations = planTransformations
-	data.Metadata = planMetadata
+	// Only preserve plan values that are actually known (not unknown from Computed fields).
+	if !planInputsSchema.IsUnknown() {
+		data.InputsSchemaDefinition = planInputsSchema
+	}
+	if !planOutputsSchema.IsUnknown() {
+		data.OutputsSchemaDefinition = planOutputsSchema
+	}
+	if !planTransformations.IsUnknown() {
+		data.Transformations = planTransformations
+	}
+	if !planMetadata.IsUnknown() {
+		data.Metadata = planMetadata
+	}
 	tflog.Trace(ctx, "created dataset resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -329,10 +338,19 @@ func (r *DatasetResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	mapDatasetResponseToState(&data, &result)
-	data.InputsSchemaDefinition = planInputsSchema
-	data.OutputsSchemaDefinition = planOutputsSchema
-	data.Transformations = planTransformations
-	data.Metadata = planMetadata
+	// Only preserve plan values that are actually known (not unknown from Computed fields).
+	if !planInputsSchema.IsUnknown() {
+		data.InputsSchemaDefinition = planInputsSchema
+	}
+	if !planOutputsSchema.IsUnknown() {
+		data.OutputsSchemaDefinition = planOutputsSchema
+	}
+	if !planTransformations.IsUnknown() {
+		data.Transformations = planTransformations
+	}
+	if !planMetadata.IsUnknown() {
+		data.Metadata = planMetadata
+	}
 	tflog.Trace(ctx, "updated dataset resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
