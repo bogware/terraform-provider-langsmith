@@ -183,6 +183,10 @@ func (r *PlaygroundSettingsResource) Create(ctx context.Context, req resource.Cr
 		body.SettingsType = &v
 	}
 
+	// Preserve plan values; the API may normalize or expand JSON fields.
+	planSettings := data.Settings
+	planOptions := data.Options
+
 	var result playgroundSettingsAPIResponse
 	err := r.client.Post(ctx, "/api/v1/playground-settings", body, &result)
 	if err != nil {
@@ -191,6 +195,10 @@ func (r *PlaygroundSettingsResource) Create(ctx context.Context, req resource.Cr
 	}
 
 	mapPlaygroundSettingsResponseToState(&data, &result)
+	data.Settings = planSettings
+	if !planOptions.IsNull() && !planOptions.IsUnknown() {
+		data.Options = planOptions
+	}
 	tflog.Trace(ctx, "created playground settings resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -256,6 +264,10 @@ func (r *PlaygroundSettingsResource) Update(ctx context.Context, req resource.Up
 		body.Options = json.RawMessage(data.Options.ValueString())
 	}
 
+	// Preserve plan values; the API may normalize or expand JSON fields.
+	planSettings := data.Settings
+	planOptions := data.Options
+
 	var result playgroundSettingsAPIResponse
 	err := r.client.Patch(ctx, "/api/v1/playground-settings/"+data.ID.ValueString(), body, &result)
 	if err != nil {
@@ -264,6 +276,10 @@ func (r *PlaygroundSettingsResource) Update(ctx context.Context, req resource.Up
 	}
 
 	mapPlaygroundSettingsResponseToState(&data, &result)
+	data.Settings = planSettings
+	if !planOptions.IsNull() && !planOptions.IsUnknown() {
+		data.Options = planOptions
+	}
 	tflog.Trace(ctx, "updated playground settings resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

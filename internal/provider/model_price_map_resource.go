@@ -193,6 +193,10 @@ func (r *ModelPriceMapResource) Create(ctx context.Context, req resource.CreateR
 		body.CompletionCostDetails = json.RawMessage(data.CompletionCostDetails.ValueString())
 	}
 
+	// Preserve plan values; the API may normalize or expand JSON fields.
+	planPromptCostDetails := data.PromptCostDetails
+	planCompletionCostDetails := data.CompletionCostDetails
+
 	var result modelPriceMapAPIResponse
 	err := r.client.Post(ctx, "/api/v1/model-price-map", body, &result)
 	if err != nil {
@@ -201,6 +205,8 @@ func (r *ModelPriceMapResource) Create(ctx context.Context, req resource.CreateR
 	}
 
 	mapModelPriceMapResponseToState(ctx, &data, &result, &resp.Diagnostics)
+	data.PromptCostDetails = planPromptCostDetails
+	data.CompletionCostDetails = planCompletionCostDetails
 	tflog.Trace(ctx, "created model price map resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -280,6 +286,10 @@ func (r *ModelPriceMapResource) Update(ctx context.Context, req resource.UpdateR
 		body.CompletionCostDetails = json.RawMessage(data.CompletionCostDetails.ValueString())
 	}
 
+	// Preserve plan values; the API may normalize or expand JSON fields.
+	planPromptCostDetails := data.PromptCostDetails
+	planCompletionCostDetails := data.CompletionCostDetails
+
 	var result modelPriceMapAPIResponse
 	err := r.client.Put(ctx, "/api/v1/model-price-map/"+data.ID.ValueString(), body, &result)
 	if err != nil {
@@ -288,6 +298,8 @@ func (r *ModelPriceMapResource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	mapModelPriceMapResponseToState(ctx, &data, &result, &resp.Diagnostics)
+	data.PromptCostDetails = planPromptCostDetails
+	data.CompletionCostDetails = planCompletionCostDetails
 	tflog.Trace(ctx, "updated model price map resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -342,15 +354,6 @@ func mapModelPriceMapResponseToState(ctx context.Context, data *ModelPriceMapRes
 		data.MatchPath = types.ListNull(types.StringType)
 	}
 
-	if len(result.PromptCostDetails) > 0 && string(result.PromptCostDetails) != "null" {
-		data.PromptCostDetails = types.StringValue(string(result.PromptCostDetails))
-	} else {
-		data.PromptCostDetails = types.StringNull()
-	}
-
-	if len(result.CompletionCostDetails) > 0 && string(result.CompletionCostDetails) != "null" {
-		data.CompletionCostDetails = types.StringValue(string(result.CompletionCostDetails))
-	} else {
-		data.CompletionCostDetails = types.StringNull()
-	}
+	data.PromptCostDetails = jsonStringValue(result.PromptCostDetails)
+	data.CompletionCostDetails = jsonStringValue(result.CompletionCostDetails)
 }

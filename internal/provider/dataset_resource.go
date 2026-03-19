@@ -232,6 +232,12 @@ func (r *DatasetResource) Create(ctx context.Context, req resource.CreateRequest
 		body.Metadata = json.RawMessage(data.Metadata.ValueString())
 	}
 
+	// Preserve plan values; the API may normalize or expand JSON fields.
+	planInputsSchema := data.InputsSchemaDefinition
+	planOutputsSchema := data.OutputsSchemaDefinition
+	planTransformations := data.Transformations
+	planMetadata := data.Metadata
+
 	var result datasetAPIResponse
 	err := r.client.Post(ctx, "/api/v1/datasets", body, &result)
 	if err != nil {
@@ -240,6 +246,10 @@ func (r *DatasetResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	mapDatasetResponseToState(&data, &result)
+	data.InputsSchemaDefinition = planInputsSchema
+	data.OutputsSchemaDefinition = planOutputsSchema
+	data.Transformations = planTransformations
+	data.Metadata = planMetadata
 	tflog.Trace(ctx, "created dataset resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -305,6 +315,12 @@ func (r *DatasetResource) Update(ctx context.Context, req resource.UpdateRequest
 		body.Metadata = json.RawMessage(data.Metadata.ValueString())
 	}
 
+	// Preserve plan values; the API may normalize or expand JSON fields.
+	planInputsSchema := data.InputsSchemaDefinition
+	planOutputsSchema := data.OutputsSchemaDefinition
+	planTransformations := data.Transformations
+	planMetadata := data.Metadata
+
 	var result datasetAPIResponse
 	err := r.client.Patch(ctx, "/api/v1/datasets/"+data.ID.ValueString(), body, &result)
 	if err != nil {
@@ -313,6 +329,10 @@ func (r *DatasetResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	mapDatasetResponseToState(&data, &result)
+	data.InputsSchemaDefinition = planInputsSchema
+	data.OutputsSchemaDefinition = planOutputsSchema
+	data.Transformations = planTransformations
+	data.Metadata = planMetadata
 	tflog.Trace(ctx, "updated dataset resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -367,7 +387,7 @@ func mapDatasetResponseToState(data *DatasetResourceModel, result *datasetAPIRes
 	if result.ExampleCount != nil {
 		data.ExampleCount = types.Int64Value(*result.ExampleCount)
 	} else {
-		data.ExampleCount = types.Int64Value(0)
+		data.ExampleCount = types.Int64Null()
 	}
 	data.SessionCount = types.Int64Value(result.SessionCount)
 	data.ModifiedAt = types.StringValue(result.ModifiedAt)
