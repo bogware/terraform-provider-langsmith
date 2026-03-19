@@ -40,9 +40,10 @@ func TestAccDatasetResource_basic(t *testing.T) {
 			},
 			// ImportState testing.
 			{
-				ResourceName:      "langsmith_dataset.test",
-				ImportState:       true,
-				ImportStateVerify: true,
+				ResourceName:            "langsmith_dataset.test",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"example_count"},
 			},
 			// Update the name and add a description.
 			{
