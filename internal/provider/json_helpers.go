@@ -38,6 +38,30 @@ func jsonStringValue(raw json.RawMessage) types.String {
 	return types.StringValue(normalizeJSON(string(raw)))
 }
 
+// stripJSONKey removes a specific key from a JSON object and returns the
+// result as a types.String. If the raw JSON is nil/null/empty or if stripping
+// the key produces an empty object, falls back to the saved state value.
+// This is used when the API injects keys (like dataset_split) that aren't
+// part of the user's configuration.
+func stripJSONKey(raw json.RawMessage, key string, saved types.String) types.String {
+	if len(raw) == 0 || string(raw) == "null" {
+		return saved
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return saved
+	}
+	delete(m, key)
+	if len(m) == 0 {
+		return saved
+	}
+	out, err := json.Marshal(m)
+	if err != nil {
+		return saved
+	}
+	return types.StringValue(string(out))
+}
+
 // jsonEmptyArrayIsNull returns types.StringNull() if the JSON is an empty
 // array "[]" or empty object "{}", otherwise normalizes and returns.
 func jsonEmptyArrayIsNull(raw json.RawMessage) types.String {

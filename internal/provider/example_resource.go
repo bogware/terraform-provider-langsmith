@@ -190,6 +190,11 @@ func (r *ExampleResource) Create(ctx context.Context, req resource.CreateRequest
 		body.SourceRunID = &v
 	}
 
+	// Preserve plan values; the API does not round-trip split (returns null)
+	// and injects dataset_split into metadata.
+	planSplit := data.Split
+	planMetadata := data.Metadata
+
 	var result exampleAPIResponse
 	err := r.client.Post(ctx, "/api/v1/examples", body, &result)
 	if err != nil {
@@ -198,6 +203,8 @@ func (r *ExampleResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	mapExampleResponseToState(&data, &result)
+	data.Split = planSplit
+	data.Metadata = planMetadata
 	tflog.Trace(ctx, "created example resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -209,6 +216,10 @@ func (r *ExampleResource) Read(ctx context.Context, req resource.ReadRequest, re
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	// Save values from state that the API doesn't round-trip cleanly.
+	savedSplit := data.Split
+	savedMetadata := data.Metadata
 
 	var result exampleAPIResponse
 	err := r.client.Get(ctx, "/api/v1/examples/"+data.ID.ValueString(), nil, &result)
@@ -222,6 +233,11 @@ func (r *ExampleResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 
 	mapExampleResponseToState(&data, &result)
+	// Restore split from state; the API stores it as dataset_split inside metadata
+	// rather than returning it as a standalone field.
+	data.Split = savedSplit
+	// Strip the API-injected dataset_split key from metadata to match user config.
+	data.Metadata = stripJSONKey(result.Metadata, "dataset_split", savedMetadata)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -256,6 +272,11 @@ func (r *ExampleResource) Update(ctx context.Context, req resource.UpdateRequest
 		body.SourceRunID = &v
 	}
 
+	// Preserve plan values; the API does not round-trip split (returns null)
+	// and injects dataset_split into metadata.
+	planSplit := data.Split
+	planMetadata := data.Metadata
+
 	var result exampleAPIResponse
 	err := r.client.Patch(ctx, "/api/v1/examples/"+data.ID.ValueString(), body, &result)
 	if err != nil {
@@ -264,6 +285,8 @@ func (r *ExampleResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	mapExampleResponseToState(&data, &result)
+	data.Split = planSplit
+	data.Metadata = planMetadata
 	tflog.Trace(ctx, "updated example resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
