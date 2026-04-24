@@ -37,11 +37,14 @@ resource "langsmith_run_rule" "example" {
 - `alerts` (String) JSON-encoded array of alert configurations.
 - `backfill_from` (String) ISO timestamp to backfill rules from.
 - `code_evaluators` (String) JSON-encoded array of code evaluator configurations.
+- `create_alignment_queue` (Boolean) If true, instructs the API to create an alignment annotation queue when the rule is created. Write-only; the API does not echo this value back.
 - `dataset_id` (String) The ID of the associated dataset.
+- `evaluator_id` (String) The ID of the evaluator. Optional on input to reference an existing evaluator; populated by the API on response.
+- `evaluator_version` (Number) The version of the associated evaluator. Set to pin a specific version, or leave unset to let the API pick.
 - `evaluators` (String) JSON-encoded array of evaluator configurations.
 - `extend_only` (Boolean) Whether the rule only extends existing annotations.
 - `filter` (String) Run filter expression.
-- `group_by` (String) Field to group runs by.
+- `group_by` (String) Field to group runs by. The only accepted value is `thread_id`. Changing this value forces replacement because the API rejects `group_by` on update.
 - `include_extended_stats` (Boolean) Whether to include extended statistics.
 - `is_enabled` (Boolean) Whether the rule is enabled.
 - `num_few_shot_examples` (Number) Number of few-shot examples.
@@ -54,11 +57,17 @@ resource "langsmith_run_rule" "example" {
 
 ### Read-Only
 
+- `add_to_annotation_queue_name` (String) The display name of the annotation queue referenced by `add_to_annotation_queue_id`.
+- `add_to_dataset_name` (String) The name of the dataset referenced by `add_to_dataset_id`.
 - `alignment_annotation_queue_id` (String) The ID of the alignment annotation queue.
+- `backfill_completed_at` (String) The timestamp when the backfill operation completed.
+- `backfill_error` (String) The error message from a failed backfill operation, if any.
+- `backfill_id` (String) The ID of the backfill operation triggered by `backfill_from`, if any.
+- `backfill_progress` (Number) The progress of the backfill operation, from 0.0 to 1.0.
+- `backfill_status` (String) The status of the backfill operation.
 - `corrections_dataset_id` (String) The ID of the corrections dataset.
 - `created_at` (String) When the rule was created.
 - `dataset_name` (String) The name of the associated dataset.
-- `evaluator_id` (String) The ID of the evaluator.
 - `id` (String) The unique identifier of the run rule.
 - `session_name` (String) The name of the associated session/project.
 - `tenant_id` (String) The tenant ID.
