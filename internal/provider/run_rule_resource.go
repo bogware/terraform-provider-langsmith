@@ -8,13 +8,16 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
@@ -59,15 +62,24 @@ type RunRuleResourceModel struct {
 	Transient                    types.Bool    `tfsdk:"transient"`
 	IncludeExtendedStats         types.Bool    `tfsdk:"include_extended_stats"`
 	GroupBy                      types.String  `tfsdk:"group_by"`
+	CreateAlignmentQueue         types.Bool    `tfsdk:"create_alignment_queue"`
+	EvaluatorID                  types.String  `tfsdk:"evaluator_id"`
+	EvaluatorVersion             types.Int64   `tfsdk:"evaluator_version"`
 	Evaluators                   types.String  `tfsdk:"evaluators"`
 	CodeEvaluators               types.String  `tfsdk:"code_evaluators"`
 	Alerts                       types.String  `tfsdk:"alerts"`
 	Webhooks                     types.String  `tfsdk:"webhooks"`
 	SessionName                  types.String  `tfsdk:"session_name"`
 	DatasetName                  types.String  `tfsdk:"dataset_name"`
+	AddToAnnotationQueueName     types.String  `tfsdk:"add_to_annotation_queue_name"`
+	AddToDatasetName             types.String  `tfsdk:"add_to_dataset_name"`
 	CorrectionsDatasetID         types.String  `tfsdk:"corrections_dataset_id"`
-	EvaluatorID                  types.String  `tfsdk:"evaluator_id"`
 	AlignmentAnnotationQueueID   types.String  `tfsdk:"alignment_annotation_queue_id"`
+	BackfillID                   types.String  `tfsdk:"backfill_id"`
+	BackfillStatus               types.String  `tfsdk:"backfill_status"`
+	BackfillProgress             types.Float64 `tfsdk:"backfill_progress"`
+	BackfillCompletedAt          types.String  `tfsdk:"backfill_completed_at"`
+	BackfillError                types.String  `tfsdk:"backfill_error"`
 	TenantID                     types.String  `tfsdk:"tenant_id"`
 	CreatedAt                    types.String  `tfsdk:"created_at"`
 	UpdatedAt                    types.String  `tfsdk:"updated_at"`
@@ -94,6 +106,9 @@ type runRuleCreateRequest struct {
 	Transient                    *bool           `json:"transient,omitempty"`
 	IncludeExtendedStats         *bool           `json:"include_extended_stats,omitempty"`
 	GroupBy                      *string         `json:"group_by,omitempty"`
+	CreateAlignmentQueue         bool            `json:"create_alignment_queue,omitempty"`
+	EvaluatorID                  *string         `json:"evaluator_id,omitempty"`
+	EvaluatorVersion             *int64          `json:"evaluator_version,omitempty"`
 	Evaluators                   json.RawMessage `json:"evaluators,omitempty"`
 	CodeEvaluators               json.RawMessage `json:"code_evaluators,omitempty"`
 	Alerts                       json.RawMessage `json:"alerts,omitempty"`
@@ -128,9 +143,17 @@ type runRuleAPIResponse struct {
 	Webhooks                     json.RawMessage `json:"webhooks"`
 	SessionName                  *string         `json:"session_name"`
 	DatasetName                  *string         `json:"dataset_name"`
+	AddToAnnotationQueueName     *string         `json:"add_to_annotation_queue_name"`
+	AddToDatasetName             *string         `json:"add_to_dataset_name"`
 	CorrectionsDatasetID         *string         `json:"corrections_dataset_id"`
 	EvaluatorID                  *string         `json:"evaluator_id"`
+	EvaluatorVersion             int64           `json:"evaluator_version"`
 	AlignmentAnnotationQueueID   *string         `json:"alignment_annotation_queue_id"`
+	BackfillID                   *string         `json:"backfill_id"`
+	BackfillStatus               *string         `json:"backfill_status"`
+	BackfillProgress             *float64        `json:"backfill_progress"`
+	BackfillCompletedAt          *string         `json:"backfill_completed_at"`
+	BackfillError                *string         `json:"backfill_error"`
 	TenantID                     string          `json:"tenant_id"`
 	CreatedAt                    string          `json:"created_at"`
 	UpdatedAt                    string          `json:"updated_at"`
@@ -229,8 +252,22 @@ func (r *RunRuleResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Computed:            true,
 			},
 			"group_by": schema.StringAttribute{
-				MarkdownDescription: "Field to group runs by.",
+				MarkdownDescription: "Field to group runs by. The only accepted value is `thread_id`. Changing this value forces replacement because the API rejects `group_by` on update.",
 				Optional:            true,
+				Validators:          []validator.String{stringvalidator.OneOf("thread_id")},
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
+			"create_alignment_queue": schema.BoolAttribute{
+				MarkdownDescription: "If true, instructs the API to create an alignment annotation queue when the rule is created. Write-only; the API does not echo this value back.",
+				Optional:            true,
+				Computed:            true,
+				Default:             booldefault.StaticBool(false),
+			},
+			"evaluator_version": schema.Int64Attribute{
+				MarkdownDescription: "The version of the associated evaluator. Set to pin a specific version, or leave unset to let the API pick.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.Int64{int64planmodifier.UseStateForUnknown()},
 			},
 			"evaluators": schema.StringAttribute{
 				MarkdownDescription: "JSON-encoded array of evaluator configurations.",
@@ -262,11 +299,41 @@ func (r *RunRuleResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Computed:            true,
 			},
 			"evaluator_id": schema.StringAttribute{
-				MarkdownDescription: "The ID of the evaluator.",
+				MarkdownDescription: "The ID of the evaluator. Optional on input to reference an existing evaluator; populated by the API on response.",
+				Optional:            true,
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"alignment_annotation_queue_id": schema.StringAttribute{
 				MarkdownDescription: "The ID of the alignment annotation queue.",
+				Computed:            true,
+			},
+			"add_to_annotation_queue_name": schema.StringAttribute{
+				MarkdownDescription: "The display name of the annotation queue referenced by `add_to_annotation_queue_id`.",
+				Computed:            true,
+			},
+			"add_to_dataset_name": schema.StringAttribute{
+				MarkdownDescription: "The name of the dataset referenced by `add_to_dataset_id`.",
+				Computed:            true,
+			},
+			"backfill_id": schema.StringAttribute{
+				MarkdownDescription: "The ID of the backfill operation triggered by `backfill_from`, if any.",
+				Computed:            true,
+			},
+			"backfill_status": schema.StringAttribute{
+				MarkdownDescription: "The status of the backfill operation.",
+				Computed:            true,
+			},
+			"backfill_progress": schema.Float64Attribute{
+				MarkdownDescription: "The progress of the backfill operation, from 0.0 to 1.0.",
+				Computed:            true,
+			},
+			"backfill_completed_at": schema.StringAttribute{
+				MarkdownDescription: "The timestamp when the backfill operation completed.",
+				Computed:            true,
+			},
+			"backfill_error": schema.StringAttribute{
+				MarkdownDescription: "The error message from a failed backfill operation, if any.",
 				Computed:            true,
 			},
 			"tenant_id": schema.StringAttribute{
@@ -363,6 +430,17 @@ func (r *RunRuleResource) Create(ctx context.Context, req resource.CreateRequest
 		v := data.GroupBy.ValueString()
 		body.GroupBy = &v
 	}
+	if !data.CreateAlignmentQueue.IsNull() && !data.CreateAlignmentQueue.IsUnknown() {
+		body.CreateAlignmentQueue = data.CreateAlignmentQueue.ValueBool()
+	}
+	if !data.EvaluatorID.IsNull() && !data.EvaluatorID.IsUnknown() {
+		v := data.EvaluatorID.ValueString()
+		body.EvaluatorID = &v
+	}
+	if !data.EvaluatorVersion.IsNull() && !data.EvaluatorVersion.IsUnknown() {
+		v := data.EvaluatorVersion.ValueInt64()
+		body.EvaluatorVersion = &v
+	}
 	if !data.Evaluators.IsNull() && !data.Evaluators.IsUnknown() {
 		body.Evaluators = json.RawMessage(data.Evaluators.ValueString())
 	}
@@ -376,11 +454,13 @@ func (r *RunRuleResource) Create(ctx context.Context, req resource.CreateRequest
 		body.Webhooks = json.RawMessage(data.Webhooks.ValueString())
 	}
 
-	// Preserve plan values; the API may normalize or expand JSON array fields.
+	// Preserve plan values; the API may normalize JSON fields or not echo
+	// write-only fields like create_alignment_queue back in the response.
 	planEvaluators := data.Evaluators
 	planCodeEvaluators := data.CodeEvaluators
 	planAlerts := data.Alerts
 	planWebhooks := data.Webhooks
+	planCreateAlignmentQueue := data.CreateAlignmentQueue
 
 	var result runRuleAPIResponse
 	err := r.client.Post(ctx, "/api/v1/runs/rules", body, &result)
@@ -394,6 +474,7 @@ func (r *RunRuleResource) Create(ctx context.Context, req resource.CreateRequest
 	data.CodeEvaluators = planCodeEvaluators
 	data.Alerts = planAlerts
 	data.Webhooks = planWebhooks
+	data.CreateAlignmentQueue = planCreateAlignmentQueue
 
 	tflog.Trace(ctx, "created run rule resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -490,9 +571,18 @@ func (r *RunRuleResource) Update(ctx context.Context, req resource.UpdateRequest
 		v := data.IncludeExtendedStats.ValueBool()
 		body.IncludeExtendedStats = &v
 	}
-	if !data.GroupBy.IsNull() && !data.GroupBy.IsUnknown() {
-		v := data.GroupBy.ValueString()
-		body.GroupBy = &v
+	// Deliberately NOT sending group_by: the API's RunRulesUpdateSchema omits
+	// it, so the resource treats it as RequiresReplace.
+	if !data.EvaluatorID.IsNull() && !data.EvaluatorID.IsUnknown() {
+		v := data.EvaluatorID.ValueString()
+		body.EvaluatorID = &v
+	}
+	if !data.EvaluatorVersion.IsNull() && !data.EvaluatorVersion.IsUnknown() {
+		v := data.EvaluatorVersion.ValueInt64()
+		body.EvaluatorVersion = &v
+	}
+	if !data.CreateAlignmentQueue.IsNull() && !data.CreateAlignmentQueue.IsUnknown() {
+		body.CreateAlignmentQueue = data.CreateAlignmentQueue.ValueBool()
 	}
 	if !data.Evaluators.IsNull() && !data.Evaluators.IsUnknown() {
 		body.Evaluators = json.RawMessage(data.Evaluators.ValueString())
@@ -507,11 +597,13 @@ func (r *RunRuleResource) Update(ctx context.Context, req resource.UpdateRequest
 		body.Webhooks = json.RawMessage(data.Webhooks.ValueString())
 	}
 
-	// Preserve plan values; the API may normalize or expand JSON array fields.
+	// Preserve plan values; the API may normalize JSON fields or not echo
+	// write-only fields like create_alignment_queue back in the response.
 	planEvaluators := data.Evaluators
 	planCodeEvaluators := data.CodeEvaluators
 	planAlerts := data.Alerts
 	planWebhooks := data.Webhooks
+	planCreateAlignmentQueue := data.CreateAlignmentQueue
 
 	var result runRuleAPIResponse
 	err := r.client.Patch(ctx, fmt.Sprintf("/api/v1/runs/rules/%s", data.ID.ValueString()), body, &result)
@@ -525,6 +617,7 @@ func (r *RunRuleResource) Update(ctx context.Context, req resource.UpdateRequest
 	data.CodeEvaluators = planCodeEvaluators
 	data.Alerts = planAlerts
 	data.Webhooks = planWebhooks
+	data.CreateAlignmentQueue = planCreateAlignmentQueue
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -635,9 +728,45 @@ func (r *RunRuleResource) mapResponseToModel(result *runRuleAPIResponse, data *R
 	} else {
 		data.EvaluatorID = types.StringNull()
 	}
+	data.EvaluatorVersion = types.Int64Value(result.EvaluatorVersion)
 	if result.AlignmentAnnotationQueueID != nil {
 		data.AlignmentAnnotationQueueID = types.StringValue(*result.AlignmentAnnotationQueueID)
 	} else {
 		data.AlignmentAnnotationQueueID = types.StringNull()
+	}
+	if result.AddToAnnotationQueueName != nil {
+		data.AddToAnnotationQueueName = types.StringValue(*result.AddToAnnotationQueueName)
+	} else {
+		data.AddToAnnotationQueueName = types.StringNull()
+	}
+	if result.AddToDatasetName != nil {
+		data.AddToDatasetName = types.StringValue(*result.AddToDatasetName)
+	} else {
+		data.AddToDatasetName = types.StringNull()
+	}
+	if result.BackfillID != nil {
+		data.BackfillID = types.StringValue(*result.BackfillID)
+	} else {
+		data.BackfillID = types.StringNull()
+	}
+	if result.BackfillStatus != nil {
+		data.BackfillStatus = types.StringValue(*result.BackfillStatus)
+	} else {
+		data.BackfillStatus = types.StringNull()
+	}
+	if result.BackfillProgress != nil {
+		data.BackfillProgress = types.Float64Value(*result.BackfillProgress)
+	} else {
+		data.BackfillProgress = types.Float64Null()
+	}
+	if result.BackfillCompletedAt != nil {
+		data.BackfillCompletedAt = types.StringValue(*result.BackfillCompletedAt)
+	} else {
+		data.BackfillCompletedAt = types.StringNull()
+	}
+	if result.BackfillError != nil {
+		data.BackfillError = types.StringValue(*result.BackfillError)
+	} else {
+		data.BackfillError = types.StringNull()
 	}
 }

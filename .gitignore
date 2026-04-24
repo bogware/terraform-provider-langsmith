@@ -17,6 +17,7 @@ dist/
 .idea/
 *.iml
 *.test
+.claude/
 
 # Keep windows files with windows line endings
 *.winfile eol=crlf
