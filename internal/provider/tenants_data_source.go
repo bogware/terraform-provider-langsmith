@@ -58,8 +58,8 @@ type tenantForUserAPIResponse struct {
 	OrganizationID *string  `json:"organization_id"`
 	CreatedAt      string   `json:"created_at"`
 	DisplayName    string   `json:"display_name"`
-	IsPersonal     bool     `json:"is_personal"`
-	IsDeleted      bool     `json:"is_deleted"`
+	IsPersonal     *bool    `json:"is_personal"`
+	IsDeleted      *bool    `json:"is_deleted"`
 	TenantHandle   *string  `json:"tenant_handle"`
 	DataPlaneURL   *string  `json:"data_plane_url"`
 	ReadOnly       *bool    `json:"read_only"`
@@ -190,11 +190,14 @@ func (d *TenantsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	tenantElems := make([]attr.Value, 0, len(results))
 	for i := range results {
 		t := &results[i]
-		permElems := make([]attr.Value, 0, len(t.Permissions))
-		for _, p := range t.Permissions {
-			permElems = append(permElems, types.StringValue(p))
+		permList := types.ListNull(types.StringType)
+		if t.Permissions != nil {
+			permElems := make([]attr.Value, 0, len(t.Permissions))
+			for _, p := range t.Permissions {
+				permElems = append(permElems, types.StringValue(p))
+			}
+			permList = types.ListValueMust(types.StringType, permElems)
 		}
-		permList := types.ListValueMust(types.StringType, permElems)
 
 		readOnly := types.BoolValue(false)
 		if t.ReadOnly != nil {
@@ -203,16 +206,16 @@ func (d *TenantsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 
 		obj := types.ObjectValueMust(tenantObjectAttrTypes, map[string]attr.Value{
 			"id":              types.StringValue(t.ID),
-			"organization_id": stringPointerAttrValue(t.OrganizationID),
+			"organization_id": types.StringPointerValue(t.OrganizationID),
 			"created_at":      types.StringValue(t.CreatedAt),
 			"display_name":    types.StringValue(t.DisplayName),
-			"is_personal":     types.BoolValue(t.IsPersonal),
-			"is_deleted":      types.BoolValue(t.IsDeleted),
-			"tenant_handle":   stringPointerAttrValue(t.TenantHandle),
-			"data_plane_url":  stringPointerAttrValue(t.DataPlaneURL),
+			"is_personal":     boolPointerAttrValue(t.IsPersonal),
+			"is_deleted":      boolPointerAttrValue(t.IsDeleted),
+			"tenant_handle":   types.StringPointerValue(t.TenantHandle),
+			"data_plane_url":  types.StringPointerValue(t.DataPlaneURL),
 			"read_only":       readOnly,
-			"role_id":         stringPointerAttrValue(t.RoleID),
-			"role_name":       stringPointerAttrValue(t.RoleName),
+			"role_id":         types.StringPointerValue(t.RoleID),
+			"role_name":       types.StringPointerValue(t.RoleName),
 			"permissions":     permList,
 		})
 		tenantElems = append(tenantElems, obj)
@@ -231,6 +234,9 @@ func (d *TenantsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func stringPointerAttrValue(s *string) types.String {
-	return types.StringPointerValue(s)
+func boolPointerAttrValue(b *bool) types.Bool {
+	if b == nil {
+		return types.BoolNull()
+	}
+	return types.BoolValue(*b)
 }
