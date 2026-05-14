@@ -70,7 +70,7 @@ jobs:
       - run: go test -v -cover -timeout=120s -parallel=10 ./...
 
   # Catches data races in provider and client code. Keep ./... unless a package
-  # must be temporarily excluded — if so, open a Linear issue to remove the skip.
+  # must be temporarily excluded — if so, track removal of the skip in a follow-up issue.
   unit-tests-race:
     name: Unit Tests (race)
     needs: build
