@@ -20,9 +20,10 @@ permissions:
   id-token: write
 
 # Codecov: use OIDC (`use_oidc`) so uploads work without a `CODECOV_TOKEN` secret once
-# the repo is connected in Codecov with GitHub as the provider. Optional
-# `CODECOV_TOKEN` is ignored when OIDC is enabled. Skip uploads for fork PRs (no OIDC;
-# upstream secrets are unavailable).
+# the repo is activated in Codecov. Pass an explicit `slug` because `go.mod` still
+# uses the module path `github.com/bogware/terraform-provider-langsmith` while CI runs
+# in `tsjnsn/terraform-provider-langsmith`, which can otherwise yield "Repository not found".
+# Skip uploads for fork PRs (no OIDC; upstream secrets are unavailable).
 jobs:
   build:
     name: Build
@@ -93,6 +94,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           use_oidc: true
+          slug: tsjnsn/terraform-provider-langsmith
           files: coverage.out
           flags: unit
           fail_ci_if_error: true
