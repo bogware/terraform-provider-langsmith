@@ -1,3 +1,9 @@
+## Unreleased
+
+NOTES:
+
+* CI uploads unit-test coverage to Codecov with path-based minimum coverage checks for `internal/provider` and `internal/client`.
+
 ## 0.5.4 (February 2026)
 
 FEATURES:
