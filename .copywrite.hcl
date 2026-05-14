@@ -17,5 +17,8 @@ project {
 
     # GoReleaser tooling configuration
     ".goreleaser.yml",
+
+    # Codecov configuration (YAML-only; no Copywrite header block)
+    "codecov.yml",
   ]
 }
