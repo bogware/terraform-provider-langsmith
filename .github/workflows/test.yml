@@ -88,5 +88,6 @@ jobs:
         env:
           TF_ACC: "1"
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
-          LANGSMITH_TENANT_ID: ${{ secrets.LANGSMITH_TENANT_ID }}
+          # Tenant/workspace ID: repository variable (plain) or secret — either works.
+          LANGSMITH_TENANT_ID: ${{ vars.LANGSMITH_TENANT_ID || secrets.LANGSMITH_TENANT_ID }}
         run: go test -v -cover -timeout 30m ./internal/provider/

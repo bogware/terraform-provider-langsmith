@@ -4,6 +4,8 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -12,14 +14,18 @@ import (
 // TestAccWorkspaceDataSource_byID verifies the workspace data source can look
 // up a workspace by ID — riding straight to the right saloon without asking around.
 func TestAccWorkspaceDataSource_byID(t *testing.T) {
+	wsID := os.Getenv("LANGSMITH_TENANT_ID")
+	if wsID == "" {
+		t.Skip("LANGSMITH_TENANT_ID not set; skipping workspace data source acceptance test")
+	}
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: `data "langsmith_workspace" "test" {
-  id = "6280a0b8-8bda-455c-8655-6bc7a141668d"
-}`,
+				Config: fmt.Sprintf(`data "langsmith_workspace" "test" {
+  id = %q
+}`, wsID),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("data.langsmith_workspace.test", "id"),
 					resource.TestCheckResourceAttrSet("data.langsmith_workspace.test", "display_name"),
