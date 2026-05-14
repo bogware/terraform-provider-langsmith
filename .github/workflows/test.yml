@@ -18,6 +18,8 @@ on:
 permissions:
   contents: read
 
+# Codecov uploads use the default GITHUB_TOKEN; public repos do not require
+# CODECOV_TOKEN. Set the repository secret if uploads fail (private fork, org policy).
 jobs:
   build:
     name: Build
@@ -62,12 +64,29 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
           cache: true
       - run: go mod download
-      - run: go test -v -cover -timeout=120s -parallel=10 ./...
+      - name: Run unit tests with coverage profile
+        run: |
+          go test ./... \
+            -coverpkg=./... \
+            -coverprofile=coverage.out \
+            -covermode=atomic \
+            -timeout=120s \
+            -parallel=10
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.out
+          flags: unit
+          fail_ci_if_error: true
+          name: unit
 
   # Catches data races in provider and client code. Keep ./... unless a package
   # must be temporarily excluded — if so, track removal of the skip in a follow-up issue.
