@@ -17,9 +17,12 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
-# Codecov uploads use the default GITHUB_TOKEN; public repos do not require
-# CODECOV_TOKEN. Set the repository secret if uploads fail (private fork, org policy).
+# Codecov: use OIDC (`use_oidc`) so uploads work without a `CODECOV_TOKEN` secret once
+# the repo is connected in Codecov with GitHub as the provider. Optional
+# `CODECOV_TOKEN` is ignored when OIDC is enabled. Skip uploads for fork PRs (no OIDC;
+# upstream secrets are unavailable).
 jobs:
   build:
     name: Build
@@ -86,9 +89,10 @@ jobs:
             -timeout=120s \
             -parallel=10
       - name: Upload coverage to Codecov
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
         uses: codecov/codecov-action@v5
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
           files: coverage.out
           flags: unit
           fail_ci_if_error: true
