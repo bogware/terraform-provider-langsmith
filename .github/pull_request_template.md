@@ -1,10 +1,19 @@
-## Summary
+## Related Issue
 
-What changed and why? Link an issue: Fixes #
+Fixes # <!-- INSERT ISSUE NUMBER -->
+
+## Description
+
+Describe the changes made and the reasoning behind your approach.
+
+## Testing
+
+- [ ] Lint and unit tests pass (`make lint`, `make test`)
+- [ ] Acceptance tests pass (`make testacc`) or intentionally N/A (needs `LANGSMITH_API_KEY` and usually `LANGSMITH_TENANT_ID`; fork PRs: see [CONTRIBUTING.md](../CONTRIBUTING.md#fork-pull-requests-and-github-actions-secrets))
+- [ ] Generated docs are up to date (`make generate`) if you changed schemas or `examples/`
 
 ## Checklist
 
-- [ ] `make lint` and `make test`
-- [ ] `make generate` if schemas or `examples/` changed
-- [ ] `CHANGELOG.md` updated if the change is user-visible
-- [ ] `make testacc` run (or N/A) — needs `LANGSMITH_API_KEY` (+ `LANGSMITH_TENANT_ID` for org-scoped keys); fork PRs: see [CONTRIBUTING.md](../CONTRIBUTING.md#fork-pull-requests-and-github-actions-secrets)
+- [ ] Code follows the project conventions in CLAUDE.md
+- [ ] No breaking changes to existing resources
+- [ ] `CHANGELOG.md` updated when the change is user-visible

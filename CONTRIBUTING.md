@@ -1,35 +1,39 @@
 # Contributing
 
-Thanks for helping improve this provider. Please read the [Code of Conduct](.github/CODE_OF_CONDUCT.md).
+This project follows the [Code of Conduct](.github/CODE_OF_CONDUCT.md).
 
-## Before you open a pull request
+For toolchain versions and everyday commands, see **Development** in [README.md](README.md). The sections below spell out what CI expects and how acceptance tests and secrets behave.
 
-From the repository root (GNU Make reads `GNUmakefile` as `make`):
+## Before opening a pull request
+
+From the repository root:
 
 ```bash
-make lint    # golangci-lint — install: https://golangci-lint.run/welcome/install/
-make test    # unit tests (no LangSmith account required)
+make lint    # golangci-lint (install: https://golangci-lint.run/welcome/install/)
+make test    # unit tests; no LangSmith account required
 ```
 
-If you changed resource schemas or anything under `examples/`, regenerate docs and commit the `docs/` updates:
+If you change resource schemas or files under `examples/`, regenerate docs and commit the updates under `docs/`:
 
 ```bash
 make generate
 ```
 
-CI runs the same checks (see `.github/workflows/test.yml`).
+CI mirrors this flow (see `.github/workflows/test.yml`).
 
 ## Acceptance tests (`TF_ACC`)
 
-Acceptance tests call the real LangSmith API. They run only when Terraform’s acceptance mode is enabled by setting **`TF_ACC=1`** (the `make testacc` target does this for you).
+Acceptance tests call the live LangSmith API. Terraform runs them only when **`TF_ACC=1`**; `make testacc` sets that for you.
 
-Set credentials in your environment (same names CI uses):
+Use the same environment variable names as CI and the provider:
 
-| Variable | When you need it |
-|----------|------------------|
-| `LANGSMITH_API_KEY` | Always for acceptance tests |
-| `LANGSMITH_TENANT_ID` | Org-scoped keys (same as provider docs) |
+| Variable | Notes |
+| -------- | ----- |
+| `LANGSMITH_API_KEY` | Required for acceptance tests |
+| `LANGSMITH_TENANT_ID` | Required with org-scoped keys (same as provider docs) |
 | `LANGSMITH_API_URL` | Optional; self-hosted API base URL |
+
+Example:
 
 ```bash
 export LANGSMITH_API_KEY="lsv2_..."
@@ -37,20 +41,16 @@ export LANGSMITH_TENANT_ID="your-workspace-uuid"   # if using an org-scoped key
 make testacc
 ```
 
-Some tests are skipped when the environment or plan tier does not support them; that is expected.
+Some tests skip when the account or plan does not meet their requirements; that is expected.
 
 ## Fork pull requests and GitHub Actions secrets
 
-Workflows read **`LANGSMITH_API_KEY`** and **`LANGSMITH_TENANT_ID`** from [encrypted repository secrets](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions). Those secrets are **not** passed to workflows triggered from forks, so the **acceptance** job on a fork PR typically cannot authenticate.
+Workflows load **`LANGSMITH_API_KEY`** and **`LANGSMITH_TENANT_ID`** from [repository secrets](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions). Workflows triggered from a fork do not receive those secrets, so the acceptance job often cannot run there.
 
-What we still expect from fork contributors:
+Please still run `make lint`, `make test`, and `make generate` when applicable, and run `make testacc` locally if you can. Note in the PR when acceptance tests were not run so reviewers know what was verified.
 
-- `make lint` and `make test` pass locally.
-- `make generate` run and committed when schemas/examples change.
-- If you have credentials, run `make testacc` locally and mention the result in the PR description.
-
-Never commit API keys or tenant IDs; use secrets locally and in GitHub only.
+Do not commit API keys, tenant IDs, or other secrets.
 
 ## Releases
 
-Maintainers cut releases by pushing a version tag (`v*`), which runs `.github/workflows/release.yml` (GoReleaser). Contributors do not need release tooling for normal PRs.
+Releases are created from `v*` tags via `.github/workflows/release.yml` (GoReleaser). Day-to-day contributions do not require release tooling.
