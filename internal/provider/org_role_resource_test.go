@@ -193,7 +193,7 @@ func TestOrgRoleClientCRUD(t *testing.T) {
 		return &http.Response{StatusCode: 500, Body: io.NopCloser(bytes.NewReader([]byte("unexpected request")))}
 	}}
 
-	c := clientpkg.NewClient("http://example", "key", "tenant", "ua")
+	c := clientpkg.NewClient("http://example", "key", "tenant", "", "ua")
 	c.HTTPClient.Transport = rt
 	c.MaxRetries = 0
 

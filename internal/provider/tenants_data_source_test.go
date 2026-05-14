@@ -31,7 +31,8 @@ func testAccPreCheckTenantsAPI(t *testing.T) {
 	}
 	apiKey := os.Getenv("LANGSMITH_API_KEY")
 	tenantID := os.Getenv("LANGSMITH_TENANT_ID")
-	c := client.NewClient(apiURL, apiKey, tenantID, "terraform-provider-langsmith-acc-tenants-precheck")
+	organizationID := os.Getenv("LANGSMITH_ORGANIZATION_ID")
+	c := client.NewClient(apiURL, apiKey, tenantID, organizationID, "terraform-provider-langsmith-acc-tenants-precheck")
 	var probe []map[string]any
 	err := c.Get(ctx, "/api/v1/tenants", nil, &probe)
 	if err != nil {
