@@ -69,6 +69,22 @@ jobs:
       - run: go mod download
       - run: go test -v -cover -timeout=120s -parallel=10 ./...
 
+  # Catches data races in provider and client code. Keep ./... unless a package
+  # must be temporarily excluded — if so, open a Linear issue to remove the skip.
+  unit-tests-race:
+    name: Unit Tests (race)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+      - run: go mod download
+      - run: go test -race -timeout=300s ./...
+
   acceptance-tests:
     name: Acceptance Tests
     needs: build
