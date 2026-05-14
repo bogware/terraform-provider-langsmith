@@ -1,5 +1,14 @@
 ## Unreleased
 
+FEATURES:
+
+* **New Resource:** `langsmith_org_chart` - Manage organization-scoped custom charts (`/api/v1/org-charts/*`)
+* **New Resource:** `langsmith_org_chart_section` - Manage organization-scoped chart sections
+
+ENHANCEMENTS:
+
+* Provider supports optional `organization_id` / `LANGSMITH_ORGANIZATION_ID` so the client sends `X-Organization-Id` for organization-scoped APIs
+
 NOTES:
 
 * CI uploads unit-test coverage to Codecov with path-based minimum coverage checks for `internal/provider` and `internal/client`.

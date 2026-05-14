@@ -3,12 +3,12 @@
 page_title: "langsmith_chart_section Resource - langsmith"
 subcategory: ""
 description: |-
-  Manages a LangSmith custom chart section (dashboard section).
+  Manages a LangSmith workspace-scoped chart section (/api/v1/charts/*). The section clone endpoint (POST /api/v1/charts/section/clone) is not represented as a Terraform resource.
 ---
 
 # langsmith_chart_section (Resource)
 
-Manages a LangSmith custom chart section (dashboard section).
+Manages a LangSmith workspace-scoped chart section (`/api/v1/charts/*`). The section clone endpoint (`POST /api/v1/charts/section/clone`) is not represented as a Terraform resource.
 
 ## Example Usage
 

@@ -27,21 +27,23 @@ const maxRetryAfterSecs = 60
 
 // Client is the LangSmith API client.
 type Client struct {
-	BaseURL    string
-	APIKey     string
-	TenantID   string
-	UserAgent  string
-	HTTPClient *http.Client
-	MaxRetries int
+	BaseURL        string
+	APIKey         string
+	TenantID       string
+	OrganizationID string
+	UserAgent      string
+	HTTPClient     *http.Client
+	MaxRetries     int
 }
 
 // NewClient creates a new LangSmith API client.
-func NewClient(baseURL, apiKey, tenantID, userAgent string) *Client {
+func NewClient(baseURL, apiKey, tenantID, organizationID, userAgent string) *Client {
 	return &Client{
-		BaseURL:   baseURL,
-		APIKey:    apiKey,
-		TenantID:  tenantID,
-		UserAgent: userAgent,
+		BaseURL:        baseURL,
+		APIKey:         apiKey,
+		TenantID:       tenantID,
+		OrganizationID: organizationID,
+		UserAgent:      userAgent,
 		HTTPClient: &http.Client{
 			Timeout: 120 * time.Second,
 		},
@@ -90,6 +92,9 @@ func (c *Client) doRequest(ctx context.Context, method, path string, query url.V
 		req.Header.Set("X-API-Key", c.APIKey)
 		if c.TenantID != "" {
 			req.Header.Set("X-Tenant-Id", c.TenantID)
+		}
+		if c.OrganizationID != "" {
+			req.Header.Set("X-Organization-Id", c.OrganizationID)
 		}
 		if c.UserAgent != "" {
 			req.Header.Set("User-Agent", c.UserAgent)
