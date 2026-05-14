@@ -3,12 +3,12 @@
 page_title: "langsmith_org_chart Resource - langsmith"
 subcategory: ""
 description: |-
-  Manages a LangSmith organization-level custom chart (/api/v1/org-charts/*). The provider must set organization_id or LANGSMITH_ORGANIZATION_ID so the API receives X-Organization-Id.
+  Manages a LangSmith organization-level custom chart (/api/v1/org-charts/*). The provider must set organization_id or LANGSMITH_ORGANIZATION_ID so the API receives X-Organization-Id. Bulk chart read (POST /api/v1/org-charts) and preview (POST /api/v1/org-charts/preview) are not represented as Terraform resources.
 ---
 
 # langsmith_org_chart (Resource)
 
-Manages a LangSmith organization-level custom chart (`/api/v1/org-charts/*`). The provider must set `organization_id` or `LANGSMITH_ORGANIZATION_ID` so the API receives `X-Organization-Id`.
+Manages a LangSmith organization-level custom chart (`/api/v1/org-charts/*`). The provider must set `organization_id` or `LANGSMITH_ORGANIZATION_ID` so the API receives `X-Organization-Id`. Bulk chart read (`POST /api/v1/org-charts`) and preview (`POST /api/v1/org-charts/preview`) are not represented as Terraform resources.
 
 ## Example Usage
 

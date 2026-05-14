@@ -90,7 +90,8 @@ func (r *OrgChartResource) Metadata(ctx context.Context, req resource.MetadataRe
 func (r *OrgChartResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages a LangSmith organization-level custom chart (`/api/v1/org-charts/*`). " +
-			"The provider must set `organization_id` or `LANGSMITH_ORGANIZATION_ID` so the API receives `X-Organization-Id`.",
+			"The provider must set `organization_id` or `LANGSMITH_ORGANIZATION_ID` so the API receives `X-Organization-Id`. " +
+			"Bulk chart read (`POST /api/v1/org-charts`) and preview (`POST /api/v1/org-charts/preview`) are not represented as Terraform resources.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "The unique identifier of the org chart.",

@@ -90,7 +90,7 @@ func (r *ChartResource) Metadata(ctx context.Context, req resource.MetadataReque
 func (r *ChartResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages a LangSmith workspace-scoped custom chart (`/api/v1/charts/*`). " +
-			"Chart listing (`GET /api/v1/charts`) and preview (`POST /api/v1/charts/preview`) are not represented as Terraform resources.",
+			"Bulk chart read (`POST /api/v1/charts`) and preview (`POST /api/v1/charts/preview`) are not represented as Terraform resources.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "The unique identifier of the chart.",
