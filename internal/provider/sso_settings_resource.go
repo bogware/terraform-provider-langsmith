@@ -89,7 +89,10 @@ func (r *SSOSettingsResource) Metadata(ctx context.Context, req resource.Metadat
 
 func (r *SSOSettingsResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Manages LangSmith SSO settings.",
+		MarkdownDescription: "Manages LangSmith **organization** SSO/SAML settings via the control-plane routes `POST /api/v1/orgs/current/sso-settings`, `GET /api/v1/orgs/current/sso-settings`, `PATCH .../sso-settings/{id}`, and `DELETE .../sso-settings/{id}`. " +
+			"Interactive-only flows under `/api/v1/sso/email-lookup` and `/api/v1/sso/email-verification/...` (email discovery and verification) are **not** Terraform resources. " +
+			"Slug-based provider discovery (`GET /api/v1/sso/settings/{sso_login_slug}`) is read-only; use the `langsmith_sso_settings_by_slug` data source instead of this resource. " +
+			"`POST /api/v1/orgs/current/set-default-sso-provision` is not implemented in this provider.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "The unique identifier of the SSO settings.",
