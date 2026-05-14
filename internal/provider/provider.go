@@ -165,6 +165,7 @@ func (p *LangSmithProvider) DataSources(ctx context.Context) []func() datasource
 		NewTagKeyDataSource,
 		NewServiceAccountDataSource,
 		NewUserDataSource,
+		NewToolDataSource,
 	}
 }
 
