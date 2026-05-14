@@ -57,7 +57,10 @@ func (d *WorkspaceDataSource) Metadata(ctx context.Context, req datasource.Metad
 
 func (d *WorkspaceDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Use this data source to look up a LangSmith workspace by ID or display name.",
+		MarkdownDescription: "Use this data source to look up a LangSmith workspace by ID or display name. " +
+			"It calls GET `/api/v1/workspaces` (workspaces visible in the **current** organization) and matches `id` or `display_name`. " +
+			"Each workspace in the response is an OpenAPI `TenantForUser` object—the same shape as GET `/api/v1/tenants`. " +
+			"Use the `langsmith_tenants` data source when you need the `/api/v1/tenants` listing or its `skip_create` / `include_deleted` query parameters.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "The unique identifier of the workspace. Either `id` or `display_name` must be specified.",

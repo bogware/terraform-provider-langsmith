@@ -3,12 +3,12 @@
 page_title: "langsmith_workspace Data Source - langsmith"
 subcategory: ""
 description: |-
-  Use this data source to look up a LangSmith workspace by ID or display name.
+  Use this data source to look up a LangSmith workspace by ID or display name. It calls GET /api/v1/workspaces (workspaces visible in the current organization) and matches id or display_name. Each workspace in the response is an OpenAPI TenantForUser object—the same shape as GET /api/v1/tenants. Use the langsmith_tenants data source when you need the /api/v1/tenants listing or its skip_create / include_deleted query parameters.
 ---
 
 # langsmith_workspace (Data Source)
 
-Use this data source to look up a LangSmith workspace by ID or display name.
+Use this data source to look up a LangSmith workspace by ID or display name. It calls GET `/api/v1/workspaces` (workspaces visible in the **current** organization) and matches `id` or `display_name`. Each workspace in the response is an OpenAPI `TenantForUser` object—the same shape as GET `/api/v1/tenants`. Use the `langsmith_tenants` data source when you need the `/api/v1/tenants` listing or its `skip_create` / `include_deleted` query parameters.
 
 ## Example Usage
 
