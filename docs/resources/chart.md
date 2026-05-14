@@ -3,12 +3,12 @@
 page_title: "langsmith_chart Resource - langsmith"
 subcategory: ""
 description: |-
-  Manages a LangSmith custom chart.
+  Manages a LangSmith workspace-scoped custom chart (/api/v1/charts/*). Bulk chart read (POST /api/v1/charts) and preview (POST /api/v1/charts/preview) are not represented as Terraform resources.
 ---
 
 # langsmith_chart (Resource)
 
-Manages a LangSmith custom chart.
+Manages a LangSmith workspace-scoped custom chart (`/api/v1/charts/*`). Bulk chart read (`POST /api/v1/charts`) and preview (`POST /api/v1/charts/preview`) are not represented as Terraform resources.
 
 ## Example Usage
 

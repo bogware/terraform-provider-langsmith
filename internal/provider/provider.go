@@ -27,9 +27,10 @@ type LangSmithProvider struct {
 
 // LangSmithProviderModel describes the provider configuration.
 type LangSmithProviderModel struct {
-	APIKey   types.String `tfsdk:"api_key"`
-	APIURL   types.String `tfsdk:"api_url"`
-	TenantID types.String `tfsdk:"tenant_id"`
+	APIKey         types.String `tfsdk:"api_key"`
+	APIURL         types.String `tfsdk:"api_url"`
+	TenantID       types.String `tfsdk:"tenant_id"`
+	OrganizationID types.String `tfsdk:"organization_id"`
 }
 
 func (p *LangSmithProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -52,6 +53,10 @@ func (p *LangSmithProvider) Schema(ctx context.Context, req provider.SchemaReque
 			},
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "The LangSmith workspace/tenant ID. Required for org-scoped API keys. Can also be set with the `LANGSMITH_TENANT_ID` environment variable.",
+				Optional:            true,
+			},
+			"organization_id": schema.StringAttribute{
+				MarkdownDescription: "The LangSmith organization ID sent as `X-Organization-Id` on API requests. Required for organization-scoped resources such as `langsmith_org_chart` and `langsmith_org_chart_section`. Can also be set with the `LANGSMITH_ORGANIZATION_ID` environment variable.",
 				Optional:            true,
 			},
 		},
@@ -92,9 +97,14 @@ func (p *LangSmithProvider) Configure(ctx context.Context, req provider.Configur
 		tenantID = data.TenantID.ValueString()
 	}
 
+	organizationID := os.Getenv("LANGSMITH_ORGANIZATION_ID")
+	if !data.OrganizationID.IsNull() {
+		organizationID = strings.TrimSpace(data.OrganizationID.ValueString())
+	}
+
 	userAgent := fmt.Sprintf("terraform-provider-langsmith/%s", p.version)
 
-	c := client.NewClient(apiURL, apiKey, tenantID, userAgent)
+	c := client.NewClient(apiURL, apiKey, tenantID, organizationID, userAgent)
 
 	// Validate the API key by making a lightweight request.
 	var info struct {
@@ -145,6 +155,8 @@ func (p *LangSmithProvider) Resources(ctx context.Context) []func() resource.Res
 		NewFeedbackFormulaResource,
 		NewChartSectionResource,
 		NewChartResource,
+		NewOrgChartSectionResource,
+		NewOrgChartResource,
 		NewAccessPolicyResource,
 		NewSCIMTokenResource,
 	}

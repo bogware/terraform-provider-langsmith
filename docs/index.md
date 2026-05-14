@@ -26,4 +26,5 @@ provider "langsmith" {
 
 - `api_key` (String, Sensitive) The LangSmith API key. Can also be set with the `LANGSMITH_API_KEY` environment variable.
 - `api_url` (String) The LangSmith API base URL. Defaults to `https://api.smith.langchain.com`. Can also be set with the `LANGSMITH_API_URL` environment variable.
+- `organization_id` (String) The LangSmith organization ID sent as `X-Organization-Id` on API requests. Required for organization-scoped resources such as `langsmith_org_chart` and `langsmith_org_chart_section`. Can also be set with the `LANGSMITH_ORGANIZATION_ID` environment variable.
 - `tenant_id` (String) The LangSmith workspace/tenant ID. Required for org-scoped API keys. Can also be set with the `LANGSMITH_TENANT_ID` environment variable.

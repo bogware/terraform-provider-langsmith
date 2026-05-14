@@ -14,8 +14,8 @@ import (
 
 func TestNewClient(t *testing.T) {
 	t.Parallel()
-	c := NewClient("https://api.example", "key", "tenant", "ua/1")
-	if c.BaseURL != "https://api.example" || c.APIKey != "key" || c.TenantID != "tenant" || c.UserAgent != "ua/1" {
+	c := NewClient("https://api.example", "key", "tenant", "org-1", "ua/1")
+	if c.BaseURL != "https://api.example" || c.APIKey != "key" || c.TenantID != "tenant" || c.OrganizationID != "org-1" || c.UserAgent != "ua/1" {
 		t.Fatalf("unexpected fields: %#v", c)
 	}
 	if c.HTTPClient == nil || c.MaxRetries != 5 {
@@ -74,7 +74,7 @@ func TestClient_Get_JSON(t *testing.T) {
 	}))
 	t.Cleanup(ts.Close)
 
-	c := NewClient(ts.URL, "secret", "tid", "test-ua")
+	c := NewClient(ts.URL, "secret", "tid", "", "test-ua")
 	c.HTTPClient = ts.Client()
 
 	var out map[string]bool
@@ -86,6 +86,30 @@ func TestClient_Get_JSON(t *testing.T) {
 	}
 }
 
+func TestClient_Get_sendsOrganizationIdHeader(t *testing.T) {
+	t.Parallel()
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Organization-Id") != "org-42" {
+			http.Error(w, "missing org", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"ok":true}`)
+	}))
+	t.Cleanup(ts.Close)
+
+	c := NewClient(ts.URL, "secret", "", "org-42", "test-ua")
+	c.HTTPClient = ts.Client()
+
+	var out map[string]bool
+	if err := c.Get(context.Background(), "/", nil, &out); err != nil {
+		t.Fatal(err)
+	}
+	if !out["ok"] {
+		t.Fatalf("unexpected decode: %#v", out)
+	}
+}
+
 func TestClient_Get_APIError(t *testing.T) {
 	t.Parallel()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -93,7 +117,7 @@ func TestClient_Get_APIError(t *testing.T) {
 	}))
 	t.Cleanup(ts.Close)
 
-	c := NewClient(ts.URL, "k", "", "")
+	c := NewClient(ts.URL, "k", "", "", "")
 	c.HTTPClient = ts.Client()
 
 	err := c.Get(context.Background(), "/x", nil, nil)
@@ -114,7 +138,7 @@ func TestClient_Delete_noContent(t *testing.T) {
 	}))
 	t.Cleanup(ts.Close)
 
-	c := NewClient(ts.URL, "k", "", "")
+	c := NewClient(ts.URL, "k", "", "", "")
 	c.HTTPClient = ts.Client()
 
 	if err := c.Delete(context.Background(), "/gone"); err != nil {

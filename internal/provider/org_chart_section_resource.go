@@ -20,19 +20,19 @@ import (
 )
 
 var (
-	_ resource.Resource                = &ChartSectionResource{}
-	_ resource.ResourceWithImportState = &ChartSectionResource{}
+	_ resource.Resource                = &OrgChartSectionResource{}
+	_ resource.ResourceWithImportState = &OrgChartSectionResource{}
 )
 
-func NewChartSectionResource() resource.Resource {
-	return &ChartSectionResource{}
+func NewOrgChartSectionResource() resource.Resource {
+	return &OrgChartSectionResource{}
 }
 
-type ChartSectionResource struct {
+type OrgChartSectionResource struct {
 	client *client.Client
 }
 
-type ChartSectionResourceModel struct {
+type OrgChartSectionResourceModel struct {
 	ID          types.String `tfsdk:"id"`
 	Title       types.String `tfsdk:"title"`
 	Description types.String `tfsdk:"description"`
@@ -41,19 +41,19 @@ type ChartSectionResourceModel struct {
 	UpdatedAt   types.String `tfsdk:"updated_at"`
 }
 
-type chartSectionCreateRequest struct {
+type orgChartSectionCreateRequest struct {
 	Title       string  `json:"title"`
 	Description *string `json:"description,omitempty"`
 	Index       *int64  `json:"index,omitempty"`
 }
 
-type chartSectionUpdateRequest struct {
+type orgChartSectionUpdateRequest struct {
 	Title       *string `json:"title,omitempty"`
 	Description *string `json:"description,omitempty"`
 	Index       *int64  `json:"index,omitempty"`
 }
 
-type chartSectionAPIResponse struct {
+type orgChartSectionAPIResponse struct {
 	ID          string  `json:"id"`
 	Title       string  `json:"title"`
 	Description *string `json:"description"`
@@ -62,26 +62,26 @@ type chartSectionAPIResponse struct {
 	ModifiedAt  *string `json:"modified_at"`
 }
 
-func (r *ChartSectionResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_chart_section"
+func (r *OrgChartSectionResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_org_chart_section"
 }
 
-func (r *ChartSectionResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *OrgChartSectionResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Manages a LangSmith workspace-scoped chart section (`/api/v1/charts/*`). " +
-			"The section clone endpoint (`POST /api/v1/charts/section/clone`) is not represented as a Terraform resource.",
+		MarkdownDescription: "Manages a LangSmith organization-level chart section (`/api/v1/org-charts/*`). " +
+			"The provider must set `organization_id` or `LANGSMITH_ORGANIZATION_ID` so the API receives `X-Organization-Id`.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				MarkdownDescription: "The unique identifier of the chart section.",
+				MarkdownDescription: "The unique identifier of the org chart section.",
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"title": schema.StringAttribute{
-				MarkdownDescription: "The title of the chart section.",
+				MarkdownDescription: "The title of the org chart section.",
 				Required:            true,
 			},
 			"description": schema.StringAttribute{
-				MarkdownDescription: "A description of the chart section.",
+				MarkdownDescription: "A description of the org chart section.",
 				Optional:            true,
 			},
 			"index": schema.Int64Attribute{
@@ -103,7 +103,7 @@ func (r *ChartSectionResource) Schema(ctx context.Context, req resource.SchemaRe
 	}
 }
 
-func (r *ChartSectionResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *OrgChartSectionResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -115,14 +115,14 @@ func (r *ChartSectionResource) Configure(ctx context.Context, req resource.Confi
 	r.client = c
 }
 
-func (r *ChartSectionResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var data ChartSectionResourceModel
+func (r *OrgChartSectionResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var data OrgChartSectionResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	body := chartSectionCreateRequest{
+	body := orgChartSectionCreateRequest{
 		Title: data.Title.ValueString(),
 	}
 	setOptionalString(&body.Description, data.Description)
@@ -131,65 +131,60 @@ func (r *ChartSectionResource) Create(ctx context.Context, req resource.CreateRe
 		body.Index = &v
 	}
 
-	var result chartSectionAPIResponse
-	err := r.client.Post(ctx, "/api/v1/charts/section", body, &result)
+	var result orgChartSectionAPIResponse
+	err := r.client.Post(ctx, "/api/v1/org-charts/section", body, &result)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating chart section", err.Error())
+		resp.Diagnostics.AddError("Error creating org chart section", err.Error())
 		return
 	}
 
-	mapChartSectionResponseToState(&data, &result)
-	tflog.Trace(ctx, "created chart section resource", map[string]interface{}{"id": result.ID})
+	mapOrgChartSectionResponseToState(&data, &result)
+	tflog.Trace(ctx, "created org chart section resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *ChartSectionResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var data ChartSectionResourceModel
+func (r *OrgChartSectionResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var data OrgChartSectionResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Save timestamps from state; the read endpoint doesn't return them.
 	savedCreatedAt := data.CreatedAt
 	savedUpdatedAt := data.UpdatedAt
 
-	// Chart section read uses POST and requires start_time/end_time.
-	// Use a minimal 1-minute window to avoid server-side aggregation overhead.
 	body := struct {
 		OmitData  bool   `json:"omit_data"`
 		StartTime string `json:"start_time"`
 		EndTime   string `json:"end_time"`
 	}{OmitData: true, StartTime: "2020-01-01T00:00:00Z", EndTime: "2020-01-01T00:01:00Z"}
-	var result chartSectionAPIResponse
-	err := r.client.Post(ctx, "/api/v1/charts/section/"+data.ID.ValueString(), body, &result)
+	var result orgChartSectionAPIResponse
+	err := r.client.Post(ctx, "/api/v1/org-charts/section/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Error reading chart section", err.Error())
+		resp.Diagnostics.AddError("Error reading org chart section", err.Error())
 		return
 	}
 
-	mapChartSectionResponseToState(&data, &result)
-	// Restore timestamps since the read endpoint doesn't return them.
+	mapOrgChartSectionResponseToState(&data, &result)
 	data.CreatedAt = savedCreatedAt
 	data.UpdatedAt = savedUpdatedAt
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *ChartSectionResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data ChartSectionResourceModel
+func (r *OrgChartSectionResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var data OrgChartSectionResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Preserve created_at from plan; UseStateForUnknown means it should not change.
 	savedCreatedAt := data.CreatedAt
 
-	body := chartSectionUpdateRequest{}
+	body := orgChartSectionUpdateRequest{}
 	setOptionalString(&body.Title, data.Title)
 	setOptionalString(&body.Description, data.Description)
 	if !data.Index.IsNull() && !data.Index.IsUnknown() {
@@ -197,40 +192,40 @@ func (r *ChartSectionResource) Update(ctx context.Context, req resource.UpdateRe
 		body.Index = &v
 	}
 
-	var result chartSectionAPIResponse
-	err := r.client.Patch(ctx, "/api/v1/charts/section/"+data.ID.ValueString(), body, &result)
+	var result orgChartSectionAPIResponse
+	err := r.client.Patch(ctx, "/api/v1/org-charts/section/"+data.ID.ValueString(), body, &result)
 	if err != nil {
-		resp.Diagnostics.AddError("Error updating chart section", err.Error())
+		resp.Diagnostics.AddError("Error updating org chart section", err.Error())
 		return
 	}
 
-	mapChartSectionResponseToState(&data, &result)
+	mapOrgChartSectionResponseToState(&data, &result)
 	data.CreatedAt = savedCreatedAt
-	tflog.Trace(ctx, "updated chart section resource", map[string]interface{}{"id": result.ID})
+	tflog.Trace(ctx, "updated org chart section resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *ChartSectionResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data ChartSectionResourceModel
+func (r *OrgChartSectionResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var data OrgChartSectionResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v1/charts/section/"+data.ID.ValueString())
+	err := r.client.Delete(ctx, "/api/v1/org-charts/section/"+data.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
-		resp.Diagnostics.AddError("Error deleting chart section", err.Error())
+		resp.Diagnostics.AddError("Error deleting org chart section", err.Error())
 		return
 	}
 
-	tflog.Trace(ctx, "deleted chart section resource", map[string]interface{}{"id": data.ID.ValueString()})
+	tflog.Trace(ctx, "deleted org chart section resource", map[string]interface{}{"id": data.ID.ValueString()})
 }
 
-func (r *ChartSectionResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *OrgChartSectionResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-func mapChartSectionResponseToState(data *ChartSectionResourceModel, result *chartSectionAPIResponse) {
+func mapOrgChartSectionResponseToState(data *OrgChartSectionResourceModel, result *orgChartSectionAPIResponse) {
 	data.ID = types.StringValue(result.ID)
 	data.Title = types.StringValue(result.Title)
 	setStateOptionalString(&data.CreatedAt, result.CreatedAt)
