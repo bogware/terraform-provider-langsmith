@@ -1,3 +1,11 @@
+## Unreleased
+
+NOTES:
+
+* CI uploads unit-test coverage to Codecov with path-based minimum coverage checks for `internal/provider` and `internal/client`.
+* Codecov uploads use **GitHub Actions OIDC** (`id-token: write`, `use_oidc`) when the upload step runs; fork PRs skip upload (no token/OIDC path).
+* The Codecov upload passes **`slug: tsjnsn/terraform-provider-langsmith`** so the project resolves correctly despite the Go module path still being `github.com/bogware/terraform-provider-langsmith`.
+
 ## 0.5.4 (February 2026)
 
 FEATURES:

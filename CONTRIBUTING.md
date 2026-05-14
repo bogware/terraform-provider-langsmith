@@ -51,6 +51,14 @@ Please still run `make lint`, `make test`, and `make generate` when applicable, 
 
 Do not commit API keys, tenant IDs, or other secrets.
 
+## Codecov
+
+CI uploads unit-test coverage to [Codecov](https://codecov.io). The workflow uses **GitHub OIDC** and forces the repository slug **`tsjnsn/terraform-provider-langsmith`** (the Go module path is still `github.com/bogware/terraform-provider-langsmith`, which Codecov must not be left to infer alone).
+
+Before uploads can succeed, an owner must **activate this repo** in Codecov (GitHub app / OAuth for the `tsjnsn` org) so the project exists. If CI logs show `Repository not found`, the Codecov project is missing or the wrong GitHub org is connected—complete setup in the Codecov UI for `tsjnsn/terraform-provider-langsmith`, then re-run the workflow.
+
+Fork PRs skip the upload step; coverage is still produced locally via `go test -cover`.
+
 ## Releases
 
 Releases are created from `v*` tags via `.github/workflows/release.yml` (GoReleaser). Day-to-day contributions do not require release tooling.

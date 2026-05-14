@@ -17,7 +17,13 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
+# Codecov: use OIDC (`use_oidc`) so uploads work without a `CODECOV_TOKEN` secret once
+# the repo is activated in Codecov. Pass an explicit `slug` because `go.mod` still
+# uses the module path `github.com/bogware/terraform-provider-langsmith` while CI runs
+# in `tsjnsn/terraform-provider-langsmith`, which can otherwise yield "Repository not found".
+# Skip uploads for fork PRs (no OIDC; upstream secrets are unavailable).
 jobs:
   build:
     name: Build
@@ -81,6 +87,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
@@ -92,7 +100,24 @@ jobs:
         with:
           terraform_wrapper: false
       - run: go mod download
-      - run: go test -v -cover -timeout=120s -parallel=10 ./...
+      - name: Run unit tests with coverage profile
+        run: |
+          go test ./... \
+            -coverpkg=./... \
+            -coverprofile=coverage.out \
+            -covermode=atomic \
+            -timeout=120s \
+            -parallel=10
+      - name: Upload coverage to Codecov
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: codecov/codecov-action@v5
+        with:
+          use_oidc: true
+          slug: tsjnsn/terraform-provider-langsmith
+          files: coverage.out
+          flags: unit
+          fail_ci_if_error: true
+          name: unit
 
   # Catches data races in provider and client code. Keep ./... unless a package
   # must be temporarily excluded — if so, track removal of the skip in a follow-up issue.
