@@ -70,6 +70,12 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache: true
+      # terraform-plugin-testing shells out to Terraform; without a binary on PATH
+      # it falls back to hc-install + release checksum verification (can fail when
+      # Hashicorp's signing key material is stale in transitive deps).
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
       - run: go mod download
       - name: Run unit tests with coverage profile
         run: |
@@ -101,6 +107,9 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache: true
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
       - run: go mod download
       - run: go test -race -timeout=300s ./...
 
