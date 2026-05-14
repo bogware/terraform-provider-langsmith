@@ -232,8 +232,5 @@ func (d *TenantsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 }
 
 func stringPointerAttrValue(s *string) types.String {
-	if s == nil {
-		return types.StringNull()
-	}
-	return types.StringValue(*s)
+	return types.StringPointerValue(s)
 }
