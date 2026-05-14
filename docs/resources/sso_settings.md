@@ -3,12 +3,12 @@
 page_title: "langsmith_sso_settings Resource - langsmith"
 subcategory: ""
 description: |-
-  Manages LangSmith SSO settings.
+  Manages LangSmith organization SSO/SAML settings via the control-plane routes POST /api/v1/orgs/current/sso-settings, GET /api/v1/orgs/current/sso-settings, PATCH .../sso-settings/{id}, and DELETE .../sso-settings/{id}. Interactive-only flows under /api/v1/sso/email-lookup and /api/v1/sso/email-verification/... (email discovery and verification) are not Terraform resources. Slug-based provider discovery (GET /api/v1/sso/settings/{sso_login_slug}) is read-only; use the langsmith_sso_settings_by_slug data source instead of this resource. POST /api/v1/orgs/current/set-default-sso-provision is not implemented in this provider.
 ---
 
 # langsmith_sso_settings (Resource)
 
-Manages LangSmith SSO settings.
+Manages LangSmith **organization** SSO/SAML settings via the control-plane routes `POST /api/v1/orgs/current/sso-settings`, `GET /api/v1/orgs/current/sso-settings`, `PATCH .../sso-settings/{id}`, and `DELETE .../sso-settings/{id}`. Interactive-only flows under `/api/v1/sso/email-lookup` and `/api/v1/sso/email-verification/...` (email discovery and verification) are **not** Terraform resources. Slug-based provider discovery (`GET /api/v1/sso/settings/{sso_login_slug}`) is read-only; use the `langsmith_sso_settings_by_slug` data source instead of this resource. `POST /api/v1/orgs/current/set-default-sso-provision` is not implemented in this provider.
 
 ## Example Usage
 

@@ -83,6 +83,15 @@ curl -s -H "X-API-Key: $LANGSMITH_API_KEY" \
   https://api.smith.langchain.com/api/v1/workspaces | jq '.[].id'
 ```
 
+### SSO (SAML) API surface
+
+| LangSmith route | Terraform |
+|-----------------|-----------|
+| `GET`/`POST` `/api/v1/orgs/current/sso-settings`, `PATCH`/`DELETE` `/api/v1/orgs/current/sso-settings/{id}` | `langsmith_sso_settings` resource |
+| `GET` `/api/v1/sso/settings/{sso_login_slug}` | `langsmith_sso_settings_by_slug` data source (read-only `SSOProviderSlim` list) |
+| `POST` `/api/v1/sso/email-lookup`, `POST` `/api/v1/sso/email-verification/*` | Not supported (interactive / UI flows) |
+| `POST` `/api/v1/orgs/current/set-default-sso-provision` | Not implemented |
+
 ### Self-Hosted Instances
 
 Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
@@ -128,6 +137,7 @@ Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
 | `langsmith_organization` | Current organization details |
 | `langsmith_prompt_commit` | Read a specific prompt commit by hash, tag, or `latest` |
 | `langsmith_tool` | Look up a platform registry tool by stable `handle` or `id` |
+| `langsmith_sso_settings_by_slug` | Resolve SSO providers for a login slug (`GET /api/v1/sso/settings/{sso_login_slug}`) |
 
 ## Development
 
