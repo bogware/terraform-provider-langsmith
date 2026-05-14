@@ -8,6 +8,7 @@ FEATURES:
 ENHANCEMENTS:
 
 * Provider supports optional `organization_id` / `LANGSMITH_ORGANIZATION_ID` so the client sends `X-Organization-Id` for organization-scoped APIs
+* `langsmith_chart` and `langsmith_org_chart` updates now preserve `created_at` and `updated_at` from state when the API response does not include timestamps, avoiding unknown values after apply
 
 NOTES:
 
