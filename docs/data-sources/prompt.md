@@ -32,9 +32,6 @@ data "langsmith_prompt" "example" {
 - `id` (String) The unique identifier of the prompt repo.
 - `is_archived` (Boolean) Whether the prompt is archived.
 - `is_public` (Boolean) Whether the prompt is publicly visible.
-- `last_commit_hash` (String) The hash of the latest commit.
-- `num_commits` (Number) The number of commits.
-- `num_likes` (Number) The number of likes.
 - `readme` (String) The readme content.
 - `tenant_id` (String) The tenant ID.
 - `updated_at` (String) When the prompt was last updated.
