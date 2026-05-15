@@ -30,6 +30,12 @@ func TestAccInsightsConfigResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttr("langsmith_insights_config.test", "description", "test config"),
 				),
 			},
+			// Idempotency: server-side null expansion in `config` must not surface as drift.
+			{
+				Config:             testAccInsightsConfigResourceConfig(projectName, configName, "test config"),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false,
+			},
 			{
 				Config: testAccInsightsConfigResourceConfig(projectName, configName, "updated description"),
 				Check: resource.ComposeAggregateTestCheckFunc(

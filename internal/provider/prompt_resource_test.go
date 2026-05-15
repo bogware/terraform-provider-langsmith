@@ -43,6 +43,12 @@ func TestAccPromptResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttr("langsmith_prompt.test", "description", "updated description"),
 				),
 			},
+			// Idempotency: the owner/full_name path fixes must produce zero diff on replay.
+			{
+				Config:             testAccPromptResourceConfig(handle, false, "updated description"),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false,
+			},
 		},
 	})
 }

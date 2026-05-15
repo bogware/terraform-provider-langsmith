@@ -111,8 +111,10 @@ func (c *Client) doRequest(ctx context.Context, method, path string, query url.V
 			continue
 		}
 
-		if resp.StatusCode == 429 || resp.StatusCode >= 500 {
+		if resp.StatusCode == 408 || resp.StatusCode == 429 || resp.StatusCode >= 500 {
 			lastErr = &APIError{
+				Method:     method,
+				Path:       path,
 				StatusCode: resp.StatusCode,
 				Body:       string(respBody),
 			}
@@ -140,6 +142,8 @@ func (c *Client) doRequest(ctx context.Context, method, path string, query url.V
 
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			return &APIError{
+				Method:     method,
+				Path:       path,
 				StatusCode: resp.StatusCode,
 				Body:       string(respBody),
 			}
@@ -209,13 +213,20 @@ func (c *Client) DeleteWithBody(ctx context.Context, path string, body interface
 	return c.doRequest(ctx, http.MethodDelete, path, nil, body, nil)
 }
 
-// APIError represents an error response from the LangSmith API.
+// APIError represents an error response from the LangSmith API. Method and
+// Path are populated where available so error messages identify which call
+// failed; they may be empty on older code paths or constructed values.
 type APIError struct {
+	Method     string
+	Path       string
 	StatusCode int
 	Body       string
 }
 
 func (e *APIError) Error() string {
+	if e.Method != "" && e.Path != "" {
+		return fmt.Sprintf("LangSmith %s %s returned %d: %s", e.Method, e.Path, e.StatusCode, e.Body)
+	}
 	return fmt.Sprintf("LangSmith API error (status %d): %s", e.StatusCode, e.Body)
 }
 

@@ -37,16 +37,22 @@ type PromptDataSourceModel struct {
 	UpdatedAt   types.String `tfsdk:"updated_at"`
 }
 
+// promptDataSourceAPIResponse mirrors what GET /api/v1/repos/-/{handle}
+// actually returns — everything nested under a top-level "repo" object.
+// Without this nesting the struct decoded to all-zero values (the bug fixed
+// in 0.9.0).
 type promptDataSourceAPIResponse struct {
-	ID          string  `json:"id"`
-	RepoHandle  string  `json:"repo_handle"`
-	Description *string `json:"description"`
-	Readme      *string `json:"readme"`
-	IsPublic    bool    `json:"is_public"`
-	IsArchived  bool    `json:"is_archived"`
-	TenantID    string  `json:"tenant_id"`
-	CreatedAt   string  `json:"created_at"`
-	UpdatedAt   string  `json:"updated_at"`
+	Repo struct {
+		ID          string  `json:"id"`
+		RepoHandle  string  `json:"repo_handle"`
+		Description *string `json:"description"`
+		Readme      *string `json:"readme"`
+		IsPublic    bool    `json:"is_public"`
+		IsArchived  bool    `json:"is_archived"`
+		TenantID    string  `json:"tenant_id"`
+		CreatedAt   string  `json:"created_at"`
+		UpdatedAt   string  `json:"updated_at"`
+	} `json:"repo"`
 }
 
 func (d *PromptDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -123,25 +129,25 @@ func (d *PromptDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		return
 	}
 
-	data.ID = types.StringValue(result.ID)
-	data.RepoHandle = types.StringValue(result.RepoHandle)
-	data.IsPublic = types.BoolValue(result.IsPublic)
-	data.IsArchived = types.BoolValue(result.IsArchived)
-	data.TenantID = types.StringValue(result.TenantID)
-	data.CreatedAt = types.StringValue(result.CreatedAt)
-	data.UpdatedAt = types.StringValue(result.UpdatedAt)
+	data.ID = types.StringValue(result.Repo.ID)
+	data.RepoHandle = types.StringValue(result.Repo.RepoHandle)
+	data.IsPublic = types.BoolValue(result.Repo.IsPublic)
+	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
+	data.TenantID = types.StringValue(result.Repo.TenantID)
+	data.CreatedAt = types.StringValue(result.Repo.CreatedAt)
+	data.UpdatedAt = types.StringValue(result.Repo.UpdatedAt)
 
-	if result.Description != nil {
-		data.Description = types.StringValue(*result.Description)
+	if result.Repo.Description != nil {
+		data.Description = types.StringValue(*result.Repo.Description)
 	} else {
 		data.Description = types.StringNull()
 	}
-	if result.Readme != nil {
-		data.Readme = types.StringValue(*result.Readme)
+	if result.Repo.Readme != nil {
+		data.Readme = types.StringValue(*result.Repo.Readme)
 	} else {
 		data.Readme = types.StringNull()
 	}
 
-	tflog.Trace(ctx, "read prompt data source", map[string]interface{}{"id": result.ID})
+	tflog.Trace(ctx, "read prompt data source", map[string]interface{}{"id": result.Repo.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

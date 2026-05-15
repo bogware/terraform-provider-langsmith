@@ -29,6 +29,12 @@ func TestAccEvaluatorResource_code(t *testing.T) {
 					resource.TestCheckResourceAttrSet("langsmith_evaluator.test", "code_evaluator.language"),
 				),
 			},
+			// Idempotency: replaying the same config must produce zero diff.
+			{
+				Config:             testAccEvaluatorResourceCodeConfig(name, evaluatorCodeV1),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false,
+			},
 			{
 				ResourceName:      "langsmith_evaluator.test",
 				ImportState:       true,

@@ -16,7 +16,7 @@ terraform {
   required_providers {
     langsmith = {
       source  = "bogware/langsmith"
-      version = "~> 0.5"
+      version = "~> 0.9"
     }
   }
 }
@@ -87,65 +87,144 @@ curl -s -H "X-API-Key: $LANGSMITH_API_KEY" \
 
 Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
 
+### Managing multiple workspaces
+
+`tenant_id` is configured at the provider level, so to manage resources across several workspaces from one Terraform configuration today, declare a provider alias per workspace:
+
+```hcl
+provider "langsmith" {
+  alias     = "prod"
+  tenant_id = "00000000-0000-0000-0000-prod"
+}
+
+provider "langsmith" {
+  alias     = "staging"
+  tenant_id = "00000000-0000-0000-0000-stg"
+}
+
+resource "langsmith_project" "prod_traces" {
+  provider = langsmith.prod
+  name     = "production"
+}
+
+resource "langsmith_project" "staging_traces" {
+  provider = langsmith.staging
+  name     = "staging"
+}
+```
+
+This pattern works well for a known, static set of workspaces. Dynamic `for_each` over a list of workspaces is not currently supported — see [issue #21](https://github.com/bogware/terraform-provider-langsmith/issues/21).
+
 ## Resources
+
+### Projects, datasets, examples
 
 | Resource | Description |
 |----------|-------------|
 | `langsmith_project` | Tracing projects (tracer sessions) |
 | `langsmith_dataset` | Evaluation datasets |
 | `langsmith_example` | Dataset examples (input/output pairs) |
-| `langsmith_annotation_queue` | Annotation queues for human review |
-| `langsmith_service_account` | Service accounts (create + delete only) |
-| `langsmith_service_key` | API service keys (create + delete only, key is sensitive) |
-| `langsmith_prompt` | Prompts in the LangSmith Hub (with manifest/content management) |
-| `langsmith_prompt_tag` | Named version tags on prompt commits (e.g., `production`, `staging`) |
-| `langsmith_run_rule` | Automation rules for run routing |
-| `langsmith_webhook` | Prompt webhooks |
-| `langsmith_feedback_config` | Feedback score configurations |
-| `langsmith_workspace` | Workspaces |
-| `langsmith_tag_key` | Tag keys for resource tagging |
-| `langsmith_tag_value` | Tag values (nested under tag keys) |
-| `langsmith_bulk_export_destination` | Bulk export S3 destinations |
-| `langsmith_bulk_export` | Bulk export jobs |
-| `langsmith_model_price_map` | Model pricing configuration |
-| `langsmith_usage_limit` | Usage limits |
-| `langsmith_playground_settings` | Playground settings |
-| `langsmith_secret` | Workspace secrets (key/value store) |
-| `langsmith_ttl_settings` | Trace retention (TTL) settings |
-| `langsmith_alert_rule` | Alert rules for project monitoring |
-| `langsmith_org_role` | Organization roles (RBAC) |
-| `langsmith_sso_settings` | SSO/SAML settings |
-| `langsmith_workspace_member` | Workspace member management |
-| `langsmith_org_chart` | Organization-scoped custom charts |
-| `langsmith_org_chart_section` | Organization-scoped chart sections |
-| `langsmith_evaluator` | Code and LLM-as-judge evaluators |
-| `langsmith_gateway_policy` | LLM Gateway policies (spend caps, allow/deny) |
-| `langsmith_tool` | Agent Builder tool definitions |
-| `langsmith_hub_environment` | Prompt-hub environment list (e.g. staging/production) |
-| `langsmith_personal_access_token` | Org-scoped personal access tokens (create+delete only) |
-| `langsmith_feedback_ingest_token` | Run-scoped feedback ingest tokens (no delete; expire naturally) |
 | `langsmith_dataset_share` | Public share state per dataset |
 | `langsmith_dataset_split` | Named split membership within a dataset |
-| `langsmith_annotation_queue_reviewer` | Add/remove a reviewer identity on a queue |
+
+### Prompts (LangSmith Hub)
+
+| Resource | Description |
+|----------|-------------|
+| `langsmith_prompt` | Prompts in the LangSmith Hub (with manifest/content management) |
+| `langsmith_prompt_tag` | Named version tags on prompt commits (e.g., `production`, `staging`) |
 | `langsmith_repo_owner` | Prompt-repo collaborators (added by email) |
-| `langsmith_insights_config` | Beta: run-insights (clustering) job configs |
+| `langsmith_hub_environment` | Prompt-hub environment list (1–4 named environments) |
+
+### Annotation, feedback, evaluation
+
+| Resource | Description |
+|----------|-------------|
+| `langsmith_annotation_queue` | Annotation queues for human review |
+| `langsmith_annotation_queue_reviewer` | Add/remove a reviewer identity on a queue |
+| `langsmith_feedback_config` | Feedback score configurations |
+| `langsmith_feedback_formula` | Derived-feedback formulas |
+| `langsmith_feedback_ingest_token` | Run-scoped feedback ingest tokens (create-only; expire naturally) |
+| `langsmith_evaluator` | Code and LLM-as-judge evaluators |
+| `langsmith_run_rule` | Automation rules for run routing |
+| `langsmith_filter_view` | Saved filter views on a tracing project |
+
+### Charts and dashboards
+
+| Resource | Description |
+|----------|-------------|
+| `langsmith_chart` | Workspace-scoped custom charts |
+| `langsmith_chart_section` | Workspace-scoped chart sections |
+| `langsmith_chart_section_clone` | Clone an existing chart section |
+| `langsmith_org_chart` | Organization-scoped custom charts |
+| `langsmith_org_chart_section` | Organization-scoped chart sections |
+| `langsmith_insights_config` | **Beta:** run-insights (clustering) job configs |
+
+### Workspaces, tagging, secrets
+
+| Resource | Description |
+|----------|-------------|
+| `langsmith_workspace` | Workspaces |
+| `langsmith_workspace_member` | Workspace member management |
+| `langsmith_tag_key` | Tag keys for resource tagging |
+| `langsmith_tag_value` | Tag values (nested under tag keys) |
+| `langsmith_tagging` | Assign a tag value to a resource |
+| `langsmith_secret` | Workspace secrets (key/value store) |
+| `langsmith_ttl_settings` | Trace retention (TTL) settings |
+| `langsmith_usage_limit` | Usage limits |
+
+### Org / identity / access
+
+| Resource | Description |
+|----------|-------------|
+| `langsmith_service_account` | Service accounts (create + delete only) |
+| `langsmith_service_key` | API service keys (create + delete only, key is sensitive) |
+| `langsmith_personal_access_token` | Org-scoped personal access tokens (create + delete only) |
+| `langsmith_org_role` | Organization roles (RBAC) |
+| `langsmith_org_member` | Organization members |
+| `langsmith_sso_settings` | SSO/SAML settings |
+| `langsmith_access_policy` | Access policies (RBAC bindings) |
+| `langsmith_scim_token` | SCIM provisioning tokens |
+
+### Integrations, gateway, tools
+
+| Resource | Description |
+|----------|-------------|
+| `langsmith_webhook` | Prompt webhooks |
+| `langsmith_alert_rule` | Alert rules for project monitoring |
+| `langsmith_gateway_policy` | LLM Gateway policies (spend caps, allow/deny) |
+| `langsmith_tool` | Agent Builder platform-level tool definitions |
+| `langsmith_playground_settings` | Playground settings |
+| `langsmith_model_price_map` | Model pricing configuration |
+| `langsmith_bulk_export_destination` | Bulk export S3 destinations |
+| `langsmith_bulk_export` | Bulk export jobs |
 
 ## Data Sources
 
 | Data Source | Description |
 |-------------|-------------|
-| `langsmith_project` | Look up a project by name or ID |
-| `langsmith_dataset` | Look up a dataset by name or ID |
-| `langsmith_workspace` | Look up a workspace by name or ID |
 | `langsmith_info` | LangSmith server information |
 | `langsmith_organization` | Current organization details |
+| `langsmith_workspace` | Look up a workspace by name or ID |
+| `langsmith_user` | Look up a user by email |
+| `langsmith_project` | Look up a project by name or ID |
+| `langsmith_dataset` | Look up a dataset by name or ID |
+| `langsmith_annotation_queue` | Look up an annotation queue by name or ID |
+| `langsmith_prompt` | Look up a prompt repo by handle |
 | `langsmith_prompt_commit` | Read a specific prompt commit by hash, tag, or `latest` |
+| `langsmith_run_rule` | Look up a run rule by ID |
+| `langsmith_service_account` | Look up a service account by name or ID |
+| `langsmith_org_role` | Look up an org role by name or ID |
+| `langsmith_tag_key` | Look up a tag key |
 | `langsmith_evaluator` | Look up an evaluator by ID |
-| `langsmith_tool` | Look up a tool by handle |
+| `langsmith_tool` | Look up a platform tool by handle |
 | `langsmith_gateway_policy` | Look up a gateway policy by ID |
 | `langsmith_mcp_vendor` | Look up an MCP vendor by slug |
 | `langsmith_audit_log` | Page audit log entries (OCSF format) |
 | `langsmith_data_planes` | List self-hosted data planes for the org |
+| `langsmith_chart` / `langsmith_chart_section` | Look up workspace charts and sections |
+| `langsmith_org_chart` / `langsmith_org_chart_section` | Look up org-scoped charts and sections |
+| `langsmith_chart_preview` / `langsmith_org_chart_preview` | Preview chart data points |
 
 ## Development
 
