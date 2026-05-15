@@ -12,6 +12,7 @@ import (
 )
 
 func TestAccOrgChartSectionDataSource_byID(t *testing.T) {
+	t.Skip("Requires organization:manage permission (enterprise tier)")
 	title := fmt.Sprintf("tf-org-section-%s", acctest.RandStringFromCharSet(8, acctest.CharSetAlphaNum))
 
 	resource.Test(t, resource.TestCase{
@@ -30,6 +31,7 @@ func TestAccOrgChartSectionDataSource_byID(t *testing.T) {
 }
 
 func TestAccOrgChartSectionDataSource_byTitle(t *testing.T) {
+	t.Skip("Requires organization:manage permission (enterprise tier)")
 	title := fmt.Sprintf("tf-org-section-%s", acctest.RandStringFromCharSet(8, acctest.CharSetAlphaNum))
 
 	resource.Test(t, resource.TestCase{

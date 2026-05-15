@@ -12,6 +12,7 @@ import (
 )
 
 func TestAccOrgChartDataSource_basic(t *testing.T) {
+	t.Skip("Requires organization:manage permission (enterprise tier)")
 	projectName := fmt.Sprintf("tf-proj-%s", acctest.RandStringFromCharSet(8, acctest.CharSetAlphaNum))
 	sectionTitle := fmt.Sprintf("tf-org-section-%s", acctest.RandStringFromCharSet(8, acctest.CharSetAlphaNum))
 	chartTitle := fmt.Sprintf("tf-org-chart-%s", acctest.RandStringFromCharSet(8, acctest.CharSetAlphaNum))

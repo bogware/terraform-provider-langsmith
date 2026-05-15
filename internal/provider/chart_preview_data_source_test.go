@@ -28,6 +28,7 @@ func TestAccChartPreviewDataSource_basic(t *testing.T) {
 }
 
 func TestAccOrgChartPreviewDataSource_basic(t *testing.T) {
+	t.Skip("Requires organization:manage permission (enterprise tier)")
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
