@@ -74,7 +74,7 @@ func chartPreviewSchema(orgScope bool) schema.Schema {
 			scope, endpoint),
 		Attributes: map[string]schema.Attribute{
 			"series": schema.StringAttribute{
-				MarkdownDescription: "JSON-encoded array of chart series configurations.",
+				MarkdownDescription: "JSON-encoded array of chart series configurations. **Each series must include an `id`** (any UUID — preview series IDs have no persistence; the API requires the field for request validation).",
 				Required:            true,
 			},
 			"common_filters": schema.StringAttribute{

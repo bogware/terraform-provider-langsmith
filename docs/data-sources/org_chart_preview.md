@@ -20,6 +20,8 @@ data "langsmith_org_chart_preview" "example" {
 
   series = jsonencode([
     {
+      # Each preview series requires an id (any UUID — it has no persistence).
+      id     = "00000000-0000-0000-0000-000000000001"
       name   = "Run Count"
       metric = "run_count"
     }
@@ -32,7 +34,7 @@ data "langsmith_org_chart_preview" "example" {
 
 ### Required
 
-- `series` (String) JSON-encoded array of chart series configurations.
+- `series` (String) JSON-encoded array of chart series configurations. **Each series must include an `id`** (any UUID — preview series IDs have no persistence; the API requires the field for request validation).
 
 ### Optional
 

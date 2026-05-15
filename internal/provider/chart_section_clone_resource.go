@@ -78,8 +78,10 @@ func (r *ChartSectionCloneResource) Schema(ctx context.Context, req resource.Sch
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"description": schema.StringAttribute{
-				MarkdownDescription: "A description of the section. Applied as a follow-up PATCH after cloning if set.",
+				MarkdownDescription: "A description of the section. If omitted, the cloned section inherits the source's description. Applied as a follow-up PATCH after cloning if set to a different value.",
 				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"index": schema.Int64Attribute{
 				MarkdownDescription: "The display order index. Applied as a follow-up PATCH after cloning if set.",

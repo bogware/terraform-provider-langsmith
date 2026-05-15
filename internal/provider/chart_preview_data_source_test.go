@@ -51,6 +51,7 @@ data "langsmith_chart_preview" "test" {
   stride     = jsonencode({ hours = 1 })
   series = jsonencode([
     {
+      id     = "00000000-0000-0000-0000-000000000001"
       name   = "Run Count"
       metric = "run_count"
     }
@@ -67,6 +68,7 @@ data "langsmith_org_chart_preview" "test" {
   stride     = jsonencode({ hours = 1 })
   series = jsonencode([
     {
+      id     = "00000000-0000-0000-0000-000000000001"
       name   = "Run Count"
       metric = "run_count"
     }

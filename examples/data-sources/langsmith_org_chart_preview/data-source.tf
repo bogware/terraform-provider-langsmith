@@ -5,6 +5,8 @@ data "langsmith_org_chart_preview" "example" {
 
   series = jsonencode([
     {
+      # Each preview series requires an id (any UUID — it has no persistence).
+      id     = "00000000-0000-0000-0000-000000000001"
       name   = "Run Count"
       metric = "run_count"
     }

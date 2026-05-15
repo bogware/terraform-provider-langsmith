@@ -27,7 +27,7 @@ resource "langsmith_chart_section_clone" "example" {
 
 ### Optional
 
-- `description` (String) A description of the section. Applied as a follow-up PATCH after cloning if set.
+- `description` (String) A description of the section. If omitted, the cloned section inherits the source's description. Applied as a follow-up PATCH after cloning if set to a different value.
 - `index` (Number) The display order index. Applied as a follow-up PATCH after cloning if set.
 - `session_id` (String) Optional session/project ID to associate with the cloned section. Changing this forces a new clone.
 - `source_section_id` (String) The ID of the source section to clone. Changing this forces a new clone.
