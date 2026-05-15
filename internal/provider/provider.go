@@ -145,6 +145,9 @@ func (p *LangSmithProvider) Resources(ctx context.Context) []func() resource.Res
 		NewFeedbackFormulaResource,
 		NewChartSectionResource,
 		NewChartResource,
+		NewOrgChartSectionResource,
+		NewOrgChartResource,
+		NewChartSectionCloneResource,
 		NewAccessPolicyResource,
 		NewSCIMTokenResource,
 	}
@@ -165,6 +168,12 @@ func (p *LangSmithProvider) DataSources(ctx context.Context) []func() datasource
 		NewTagKeyDataSource,
 		NewServiceAccountDataSource,
 		NewUserDataSource,
+		NewChartDataSource,
+		NewChartSectionDataSource,
+		NewOrgChartDataSource,
+		NewOrgChartSectionDataSource,
+		NewChartPreviewDataSource,
+		NewOrgChartPreviewDataSource,
 	}
 }
 
