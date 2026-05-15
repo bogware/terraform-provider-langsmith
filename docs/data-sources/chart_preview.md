@@ -3,12 +3,12 @@
 page_title: "langsmith_chart_preview Data Source - langsmith"
 subcategory: ""
 description: |-
-  Computes preview data points for a hypothetical workspace-scoped chart via POST /api/v1/charts/preview without persisting it. Returns the raw data point series as JSON. Note: the result depends on the current state of LangSmith data, so consecutive plans may return different values; this data source is intended for inspection/debugging rather than long-lived Terraform state.
+  Computes preview data points for a hypothetical workspace-scoped chart via POST /api/v1/charts/preview without persisting it. Returns the raw data point series as JSON. Workspace-scoped previews require each series to include a filters.session array (project IDs) — the API rejects requests without one with a 422. Note: the result depends on the current state of LangSmith data, so consecutive plans may return different values; this data source is intended for inspection/debugging rather than long-lived Terraform state.
 ---
 
 # langsmith_chart_preview (Data Source)
 
-Computes preview data points for a hypothetical workspace-scoped chart via `POST /api/v1/charts/preview` without persisting it. Returns the raw data point series as JSON. **Note:** the result depends on the current state of LangSmith data, so consecutive plans may return different values; this data source is intended for inspection/debugging rather than long-lived Terraform state.
+Computes preview data points for a hypothetical workspace-scoped chart via `POST /api/v1/charts/preview` without persisting it. Returns the raw data point series as JSON. Workspace-scoped previews require each series to include a `filters.session` array (project IDs) — the API rejects requests without one with a 422. **Note:** the result depends on the current state of LangSmith data, so consecutive plans may return different values; this data source is intended for inspection/debugging rather than long-lived Terraform state.
 
 ## Example Usage
 
@@ -24,6 +24,12 @@ data "langsmith_chart_preview" "example" {
       id     = "00000000-0000-0000-0000-000000000001"
       name   = "Run Count"
       metric = "run_count"
+
+      # Workspace-scoped previews require a `session` (project) filter on each
+      # series, otherwise the API returns 422.
+      filters = {
+        session = [data.langsmith_project.example.id]
+      }
     }
   ])
 }

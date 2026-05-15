@@ -9,6 +9,12 @@ data "langsmith_chart_preview" "example" {
       id     = "00000000-0000-0000-0000-000000000001"
       name   = "Run Count"
       metric = "run_count"
+
+      # Workspace-scoped previews require a `session` (project) filter on each
+      # series, otherwise the API returns 422.
+      filters = {
+        session = [data.langsmith_project.example.id]
+      }
     }
   ])
 }

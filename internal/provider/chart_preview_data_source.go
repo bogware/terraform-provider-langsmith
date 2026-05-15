@@ -61,17 +61,19 @@ type chartPreviewResponse struct {
 func chartPreviewSchema(orgScope bool) schema.Schema {
 	scope := "workspace"
 	endpoint := "/api/v1/charts/preview"
+	scopeNote := " Workspace-scoped previews require each series to include a `filters.session` array (project IDs) — the API rejects requests without one with a 422."
 	if orgScope {
 		scope = "organization"
 		endpoint = "/api/v1/org-charts/preview"
+		scopeNote = ""
 	}
 	return schema.Schema{
 		MarkdownDescription: fmt.Sprintf(
 			"Computes preview data points for a hypothetical %s-scoped chart via `POST %s` without persisting it. "+
-				"Returns the raw data point series as JSON. "+
+				"Returns the raw data point series as JSON.%s "+
 				"**Note:** the result depends on the current state of LangSmith data, so consecutive plans may return different values; "+
 				"this data source is intended for inspection/debugging rather than long-lived Terraform state.",
-			scope, endpoint),
+			scope, endpoint, scopeNote),
 		Attributes: map[string]schema.Attribute{
 			"series": schema.StringAttribute{
 				MarkdownDescription: "JSON-encoded array of chart series configurations. **Each series must include an `id`** (any UUID — preview series IDs have no persistence; the API requires the field for request validation).",
