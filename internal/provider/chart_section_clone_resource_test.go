@@ -35,10 +35,13 @@ func TestAccChartSectionCloneResource_basic(t *testing.T) {
 				),
 			},
 			{
-				ResourceName:            "langsmith_chart_section_clone.test",
-				ImportState:             true,
-				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"source_section_id", "session_id"},
+				ResourceName:      "langsmith_chart_section_clone.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+				// source_section_id and session_id are clone-time inputs not returned by the API.
+				// created_at/updated_at are returned by the clone endpoint but not by the
+				// single-section read endpoint, so they go null on import.
+				ImportStateVerifyIgnore: []string{"source_section_id", "session_id", "created_at", "updated_at"},
 			},
 		},
 	})
