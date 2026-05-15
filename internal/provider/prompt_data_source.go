@@ -26,33 +26,33 @@ type PromptDataSource struct {
 }
 
 type PromptDataSourceModel struct {
-	ID             types.String `tfsdk:"id"`
-	RepoHandle     types.String `tfsdk:"repo_handle"`
-	Description    types.String `tfsdk:"description"`
-	Readme         types.String `tfsdk:"readme"`
-	IsPublic       types.Bool   `tfsdk:"is_public"`
-	IsArchived     types.Bool   `tfsdk:"is_archived"`
-	TenantID       types.String `tfsdk:"tenant_id"`
-	LastCommitHash types.String `tfsdk:"last_commit_hash"`
-	NumLikes       types.Int64  `tfsdk:"num_likes"`
-	NumCommits     types.Int64  `tfsdk:"num_commits"`
-	CreatedAt      types.String `tfsdk:"created_at"`
-	UpdatedAt      types.String `tfsdk:"updated_at"`
+	ID          types.String `tfsdk:"id"`
+	RepoHandle  types.String `tfsdk:"repo_handle"`
+	Description types.String `tfsdk:"description"`
+	Readme      types.String `tfsdk:"readme"`
+	IsPublic    types.Bool   `tfsdk:"is_public"`
+	IsArchived  types.Bool   `tfsdk:"is_archived"`
+	TenantID    types.String `tfsdk:"tenant_id"`
+	CreatedAt   types.String `tfsdk:"created_at"`
+	UpdatedAt   types.String `tfsdk:"updated_at"`
 }
 
+// promptDataSourceAPIResponse mirrors what GET /api/v1/repos/-/{handle}
+// actually returns — everything nested under a top-level "repo" object.
+// Without this nesting the struct decoded to all-zero values (the bug fixed
+// in 0.9.0).
 type promptDataSourceAPIResponse struct {
-	ID             string  `json:"id"`
-	RepoHandle     string  `json:"repo_handle"`
-	Description    *string `json:"description"`
-	Readme         *string `json:"readme"`
-	IsPublic       bool    `json:"is_public"`
-	IsArchived     bool    `json:"is_archived"`
-	TenantID       string  `json:"tenant_id"`
-	LastCommitHash *string `json:"last_commit_hash"`
-	NumLikes       int64   `json:"num_likes"`
-	NumCommits     int64   `json:"num_commits"`
-	CreatedAt      string  `json:"created_at"`
-	UpdatedAt      string  `json:"updated_at"`
+	Repo struct {
+		ID          string  `json:"id"`
+		RepoHandle  string  `json:"repo_handle"`
+		Description *string `json:"description"`
+		Readme      *string `json:"readme"`
+		IsPublic    bool    `json:"is_public"`
+		IsArchived  bool    `json:"is_archived"`
+		TenantID    string  `json:"tenant_id"`
+		CreatedAt   string  `json:"created_at"`
+		UpdatedAt   string  `json:"updated_at"`
+	} `json:"repo"`
 }
 
 func (d *PromptDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -89,18 +89,6 @@ func (d *PromptDataSource) Schema(ctx context.Context, req datasource.SchemaRequ
 			},
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "The tenant ID.",
-				Computed:            true,
-			},
-			"last_commit_hash": schema.StringAttribute{
-				MarkdownDescription: "The hash of the latest commit.",
-				Computed:            true,
-			},
-			"num_likes": schema.Int64Attribute{
-				MarkdownDescription: "The number of likes.",
-				Computed:            true,
-			},
-			"num_commits": schema.Int64Attribute{
-				MarkdownDescription: "The number of commits.",
 				Computed:            true,
 			},
 			"created_at": schema.StringAttribute{
@@ -141,32 +129,25 @@ func (d *PromptDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		return
 	}
 
-	data.ID = types.StringValue(result.ID)
-	data.RepoHandle = types.StringValue(result.RepoHandle)
-	data.IsPublic = types.BoolValue(result.IsPublic)
-	data.IsArchived = types.BoolValue(result.IsArchived)
-	data.TenantID = types.StringValue(result.TenantID)
-	data.NumLikes = types.Int64Value(result.NumLikes)
-	data.NumCommits = types.Int64Value(result.NumCommits)
-	data.CreatedAt = types.StringValue(result.CreatedAt)
-	data.UpdatedAt = types.StringValue(result.UpdatedAt)
+	data.ID = types.StringValue(result.Repo.ID)
+	data.RepoHandle = types.StringValue(result.Repo.RepoHandle)
+	data.IsPublic = types.BoolValue(result.Repo.IsPublic)
+	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
+	data.TenantID = types.StringValue(result.Repo.TenantID)
+	data.CreatedAt = types.StringValue(result.Repo.CreatedAt)
+	data.UpdatedAt = types.StringValue(result.Repo.UpdatedAt)
 
-	if result.Description != nil {
-		data.Description = types.StringValue(*result.Description)
+	if result.Repo.Description != nil {
+		data.Description = types.StringValue(*result.Repo.Description)
 	} else {
 		data.Description = types.StringNull()
 	}
-	if result.Readme != nil {
-		data.Readme = types.StringValue(*result.Readme)
+	if result.Repo.Readme != nil {
+		data.Readme = types.StringValue(*result.Repo.Readme)
 	} else {
 		data.Readme = types.StringNull()
 	}
-	if result.LastCommitHash != nil {
-		data.LastCommitHash = types.StringValue(*result.LastCommitHash)
-	} else {
-		data.LastCommitHash = types.StringNull()
-	}
 
-	tflog.Trace(ctx, "read prompt data source", map[string]interface{}{"id": result.ID})
+	tflog.Trace(ctx, "read prompt data source", map[string]interface{}{"id": result.Repo.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
