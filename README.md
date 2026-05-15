@@ -116,6 +116,19 @@ Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
 | `langsmith_org_role` | Organization roles (RBAC) |
 | `langsmith_sso_settings` | SSO/SAML settings |
 | `langsmith_workspace_member` | Workspace member management |
+| `langsmith_org_chart` | Organization-scoped custom charts |
+| `langsmith_org_chart_section` | Organization-scoped chart sections |
+| `langsmith_evaluator` | Code and LLM-as-judge evaluators |
+| `langsmith_gateway_policy` | LLM Gateway policies (spend caps, allow/deny) |
+| `langsmith_tool` | Agent Builder tool definitions |
+| `langsmith_hub_environment` | Prompt-hub environment list (e.g. staging/production) |
+| `langsmith_personal_access_token` | Org-scoped personal access tokens (create+delete only) |
+| `langsmith_feedback_ingest_token` | Run-scoped feedback ingest tokens (no delete; expire naturally) |
+| `langsmith_dataset_share` | Public share state per dataset |
+| `langsmith_dataset_split` | Named split membership within a dataset |
+| `langsmith_annotation_queue_reviewer` | Add/remove a reviewer identity on a queue |
+| `langsmith_repo_owner` | Prompt-repo collaborators (added by email) |
+| `langsmith_insights_config` | Beta: run-insights (clustering) job configs |
 
 ## Data Sources
 
@@ -127,6 +140,12 @@ Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
 | `langsmith_info` | LangSmith server information |
 | `langsmith_organization` | Current organization details |
 | `langsmith_prompt_commit` | Read a specific prompt commit by hash, tag, or `latest` |
+| `langsmith_evaluator` | Look up an evaluator by ID |
+| `langsmith_tool` | Look up a tool by handle |
+| `langsmith_gateway_policy` | Look up a gateway policy by ID |
+| `langsmith_mcp_vendor` | Look up an MCP vendor by slug |
+| `langsmith_audit_log` | Page audit log entries (OCSF format) |
+| `langsmith_data_planes` | List self-hosted data planes for the org |
 
 ## Development
 

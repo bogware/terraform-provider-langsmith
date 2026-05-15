@@ -1,3 +1,32 @@
+## 0.9.0 (Unreleased)
+
+FEATURES:
+
+* **New Resource:** `langsmith_org_chart` - Organization-scoped custom charts (mirror of `langsmith_chart` at org scope)
+* **New Resource:** `langsmith_org_chart_section` - Organization-scoped chart sections
+* **New Resource:** `langsmith_evaluator` - Code and LLM-as-judge evaluators
+* **New Resource:** `langsmith_gateway_policy` - LLM Gateway policies (spend caps, allow/deny)
+* **New Resource:** `langsmith_tool` - Agent Builder platform-level tool definitions
+* **New Resource:** `langsmith_hub_environment` - Prompt-hub environment list (1–4 named environments)
+* **New Resource:** `langsmith_personal_access_token` - Org-scoped personal access tokens (create + delete only)
+* **New Resource:** `langsmith_feedback_ingest_token` - Scoped feedback ingest tokens (no delete; tokens expire on their own)
+* **New Resource:** `langsmith_dataset_share` - Public share state per dataset
+* **New Resource:** `langsmith_dataset_split` - Named split membership within a dataset
+* **New Resource:** `langsmith_annotation_queue_reviewer` - Reviewer membership on annotation queues
+* **New Resource:** `langsmith_repo_owner` - Prompt-repo collaborators (added by email)
+* **New Resource:** `langsmith_insights_config` - **Beta:** run-insights (clustering) job configs
+* **New Data Source:** `langsmith_evaluator` - Look up an evaluator by ID
+* **New Data Source:** `langsmith_tool` - Look up a tool by handle
+* **New Data Source:** `langsmith_gateway_policy` - Look up a gateway policy by ID
+* **New Data Source:** `langsmith_mcp_vendor` - Look up an MCP vendor by slug
+* **New Data Source:** `langsmith_audit_log` - Page audit log entries in OCSF format
+* **New Data Source:** `langsmith_data_planes` - List self-hosted data planes for the org
+
+ENHANCEMENTS:
+
+* `internal/client/client.go`: added `PutWithQuery` to support endpoints (like dataset share) that take query parameters on PUT
+* `provider.Configure`: trailing slashes on `api_url` are now trimmed, preventing double-slash URLs against self-hosted instances
+
 ## 0.5.4 (February 2026)
 
 FEATURES:

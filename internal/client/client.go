@@ -189,6 +189,11 @@ func (c *Client) Put(ctx context.Context, path string, body interface{}, result 
 	return c.doRequest(ctx, http.MethodPut, path, nil, body, result)
 }
 
+// PutWithQuery sends an HTTP PUT with query parameters.
+func (c *Client) PutWithQuery(ctx context.Context, path string, query url.Values, body interface{}, result interface{}) error {
+	return c.doRequest(ctx, http.MethodPut, path, query, body, result)
+}
+
 // Delete sends an HTTP DELETE request.
 func (c *Client) Delete(ctx context.Context, path string) error {
 	return c.doRequest(ctx, http.MethodDelete, path, nil, nil, nil)

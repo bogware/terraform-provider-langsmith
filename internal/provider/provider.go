@@ -86,6 +86,7 @@ func (p *LangSmithProvider) Configure(ctx context.Context, req provider.Configur
 	if !data.APIURL.IsNull() {
 		apiURL = data.APIURL.ValueString()
 	}
+	apiURL = strings.TrimRight(apiURL, "/")
 
 	tenantID := os.Getenv("LANGSMITH_TENANT_ID")
 	if !data.TenantID.IsNull() {
@@ -150,6 +151,17 @@ func (p *LangSmithProvider) Resources(ctx context.Context) []func() resource.Res
 		NewChartSectionCloneResource,
 		NewAccessPolicyResource,
 		NewSCIMTokenResource,
+		NewEvaluatorResource,
+		NewGatewayPolicyResource,
+		NewToolResource,
+		NewHubEnvironmentResource,
+		NewPersonalAccessTokenResource,
+		NewFeedbackIngestTokenResource,
+		NewDatasetShareResource,
+		NewDatasetSplitResource,
+		NewAnnotationQueueReviewerResource,
+		NewRepoOwnerResource,
+		NewInsightsConfigResource,
 	}
 }
 
@@ -174,6 +186,12 @@ func (p *LangSmithProvider) DataSources(ctx context.Context) []func() datasource
 		NewOrgChartSectionDataSource,
 		NewChartPreviewDataSource,
 		NewOrgChartPreviewDataSource,
+		NewEvaluatorDataSource,
+		NewToolDataSource,
+		NewGatewayPolicyDataSource,
+		NewMCPVendorDataSource,
+		NewAuditLogDataSource,
+		NewDataPlanesDataSource,
 	}
 }
 
