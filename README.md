@@ -92,6 +92,16 @@ curl -s -H "X-API-Key: $LANGSMITH_API_KEY" \
 | `POST` `/api/v1/sso/email-lookup`, `POST` `/api/v1/sso/email-verification/*` | Not supported (interactive / UI flows) |
 | `POST` `/api/v1/orgs/current/set-default-sso-provision` | Not implemented |
 
+### Feedback (`/api/v1/feedback*`)
+
+| LangSmith route | Terraform |
+|-----------------|-----------|
+| `POST` `/api/v1/feedback/tokens`, `GET` `/api/v1/feedback/tokens?run_id=` | `langsmith_feedback_ingest_token` resource and `langsmith_feedback_ingest_tokens` data source |
+| `GET` / `POST` `/api/v1/feedback/tokens/{token}` | Not supported (operational: submit feedback with a token) |
+| `GET` / `POST` `/api/v1/feedback`, `POST` `/api/v1/feedback/eager`, `GET` / `PATCH` / `DELETE` `/api/v1/feedback/{feedback_id}` | Not supported (operational: scores on traces) |
+| `GET` / `POST` / `PATCH` / `DELETE` `/api/v1/feedback-configs` | `langsmith_feedback_config` resource |
+| `POST` / `GET` / `PUT` / `DELETE` `/api/v1/feedback/formulas` | `langsmith_feedback_formula` resource |
+
 ### Self-Hosted Instances
 
 Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
@@ -111,6 +121,8 @@ Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
 | `langsmith_run_rule` | Automation rules for run routing |
 | `langsmith_webhook` | Prompt webhooks |
 | `langsmith_feedback_config` | Feedback score configurations |
+| `langsmith_feedback_formula` | Computed feedback formulas (`/api/v1/feedback/formulas`) |
+| `langsmith_feedback_ingest_token` | Feedback ingest tokens for external submission (`POST /api/v1/feedback/tokens`) |
 | `langsmith_workspace` | Workspaces |
 | `langsmith_tag_key` | Tag keys for resource tagging |
 | `langsmith_tag_value` | Tag values (nested under tag keys) |
@@ -138,6 +150,7 @@ Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
 | `langsmith_prompt_commit` | Read a specific prompt commit by hash, tag, or `latest` |
 | `langsmith_tool` | Look up a platform registry tool by stable `handle` or `id` |
 | `langsmith_sso_settings_by_slug` | Resolve SSO providers for a login slug (`GET /api/v1/sso/settings/{sso_login_slug}`) |
+| `langsmith_feedback_ingest_tokens` | List feedback ingest tokens for a run (`GET /api/v1/feedback/tokens`) |
 
 ## Development
 

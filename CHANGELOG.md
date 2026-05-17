@@ -2,6 +2,8 @@
 
 FEATURES:
 
+* **New Resource:** `langsmith_feedback_ingest_token` - Mint feedback ingest tokens (`POST /api/v1/feedback/tokens`)
+* **New Data Source:** `langsmith_feedback_ingest_tokens` - List ingest tokens for a run (`GET /api/v1/feedback/tokens`)
 * **New Resource:** `langsmith_org_chart` - Manage organization-scoped custom charts (`/api/v1/org-charts/*`)
 * **New Resource:** `langsmith_org_chart_section` - Manage organization-scoped chart sections
 
@@ -16,6 +18,7 @@ NOTES:
 * CI uploads unit-test coverage to Codecov with path-based minimum coverage checks for `internal/provider` and `internal/client`.
 * Codecov uploads use **GitHub Actions OIDC** (`id-token: write`, `use_oidc`) when the upload step runs; fork PRs skip upload (no token/OIDC path).
 * The Codecov upload passes **`slug: tsjnsn/terraform-provider-langsmith`** so the project resolves correctly despite the Go module path still being `github.com/bogware/terraform-provider-langsmith`.
+* **Feedback API coverage:** `POST /api/v1/feedback`, `POST /api/v1/feedback/eager`, and submitting feedback via `/api/v1/feedback/tokens/{token}` remain intentionally unmanaged (operational APIs). Ingest token lifecycle uses `langsmith_feedback_ingest_token` / `langsmith_feedback_ingest_tokens`; `terraform destroy` on the resource does not revoke tokens server-side (no LangSmith delete endpoint).
 
 ## 0.5.4 (February 2026)
 

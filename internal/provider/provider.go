@@ -160,6 +160,7 @@ func (p *LangSmithProvider) Resources(ctx context.Context) []func() resource.Res
 		NewAccessPolicyResource,
 		NewGatewayPolicyResource,
 		NewSCIMTokenResource,
+		NewFeedbackIngestTokenResource,
 	}
 }
 
@@ -182,6 +183,7 @@ func (p *LangSmithProvider) DataSources(ctx context.Context) []func() datasource
 		NewUserDataSource,
 		NewToolDataSource,
 		NewSSOSettingsBySlugDataSource,
+		NewFeedbackIngestTokensDataSource,
 	}
 }
 
