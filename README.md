@@ -116,6 +116,7 @@ Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
 | `langsmith_annotation_queue` | Annotation queues for human review |
 | `langsmith_service_account` | Service accounts (create + delete only) |
 | `langsmith_service_key` | API service keys (create + delete only, key is sensitive) |
+| `langsmith_api_key` | Tenant/workspace API keys via `/api/v1/api-key` (secret shown once at create) |
 | `langsmith_prompt` | Prompts in the LangSmith Hub (with manifest/content management) |
 | `langsmith_prompt_tag` | Named version tags on prompt commits (e.g., `production`, `staging`) |
 | `langsmith_run_rule` | Automation rules for run routing |
