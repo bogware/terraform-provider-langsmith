@@ -158,6 +158,7 @@ func (p *LangSmithProvider) Resources(ctx context.Context) []func() resource.Res
 		NewOrgChartSectionResource,
 		NewOrgChartResource,
 		NewAccessPolicyResource,
+		NewGatewayPolicyResource,
 		NewSCIMTokenResource,
 	}
 }
