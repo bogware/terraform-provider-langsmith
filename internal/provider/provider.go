@@ -165,6 +165,7 @@ func (p *LangSmithProvider) Resources(ctx context.Context) []func() resource.Res
 		NewSCIMTokenResource,
 		NewFeedbackIngestTokenResource,
 		NewPlatformFeatureResource,
+		NewEvaluatorResource,
 	}
 }
 
@@ -191,6 +192,7 @@ func (p *LangSmithProvider) DataSources(ctx context.Context) []func() datasource
 		NewFeedbackIngestTokensDataSource,
 		NewAuditLogsDataSource,
 		NewPlatformFeaturesDataSource,
+		NewEvaluatorDataSource,
 	}
 }
 

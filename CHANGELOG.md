@@ -2,6 +2,8 @@
 
 FEATURES:
 
+* **New Resource:** `langsmith_evaluator` - Manage hosted evaluators (`/v1/platform/evaluators`, `PATCH/DELETE /v1/platform/evaluators/{evaluator_id}`)
+* **New Data Source:** `langsmith_evaluator` - Read a hosted evaluator by ID (`GET /v1/platform/evaluators/{evaluator_id}`)
 * **New Resource:** `langsmith_platform_feature` - Manage per-feature default and disabled models (`/v1/platform/features/*`)
 * **New Data Source:** `langsmith_platform_features` - List consolidated feature model configuration (`GET /v1/platform/features`)
 * **New Data Source:** `langsmith_audit_logs` - List organization audit events (`GET /api/v1/audit-logs`, OCSF API Activity)
