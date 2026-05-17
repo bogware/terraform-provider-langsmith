@@ -4,6 +4,7 @@ FEATURES:
 
 * **New Resource:** `langsmith_platform_feature` - Manage per-feature default and disabled models (`/v1/platform/features/*`)
 * **New Data Source:** `langsmith_platform_features` - List consolidated feature model configuration (`GET /v1/platform/features`)
+* **New Data Source:** `langsmith_audit_logs` - List organization audit events (`GET /api/v1/audit-logs`, OCSF API Activity)
 * **New Resource:** `langsmith_api_key` - Manage tenant/workspace API keys (`/api/v1/api-key`)
 * **New Resource:** `langsmith_feedback_ingest_token` - Mint feedback ingest tokens (`POST /api/v1/feedback/tokens`)
 * **New Data Source:** `langsmith_feedback_ingest_tokens` - List ingest tokens for a run (`GET /api/v1/feedback/tokens`)

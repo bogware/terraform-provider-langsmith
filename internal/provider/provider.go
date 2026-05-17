@@ -189,6 +189,7 @@ func (p *LangSmithProvider) DataSources(ctx context.Context) []func() datasource
 		NewToolDataSource,
 		NewSSOSettingsBySlugDataSource,
 		NewFeedbackIngestTokensDataSource,
+		NewAuditLogsDataSource,
 		NewPlatformFeaturesDataSource,
 	}
 }
