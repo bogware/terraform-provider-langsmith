@@ -102,6 +102,13 @@ curl -s -H "X-API-Key: $LANGSMITH_API_KEY" \
 | `GET` / `POST` / `PATCH` / `DELETE` `/api/v1/feedback-configs` | `langsmith_feedback_config` resource |
 | `POST` / `GET` / `PUT` / `DELETE` `/api/v1/feedback/formulas` | `langsmith_feedback_formula` resource |
 
+### Workspace settings (`/api/v1/settings*`)
+
+| LangSmith route | Terraform |
+|-----------------|-----------|
+| `GET` `/api/v1/settings` | `langsmith_settings` data source (read-only) and `langsmith_settings` resource (read) |
+| `POST` `/api/v1/settings/handle` | `langsmith_settings` resource (set tenant handle) |
+
 ### Self-Hosted Instances
 
 Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
@@ -134,6 +141,7 @@ Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
 | `langsmith_usage_limit` | Usage limits |
 | `langsmith_playground_settings` | Playground settings |
 | `langsmith_secret` | Workspace secrets (key/value store) |
+| `langsmith_settings` | Current workspace settings: tenant handle via `POST /api/v1/settings/handle` |
 | `langsmith_ttl_settings` | Trace retention (TTL) settings |
 | `langsmith_alert_rule` | Alert rules for project monitoring |
 | `langsmith_org_role` | Organization roles (RBAC) |
@@ -150,6 +158,7 @@ Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
 | `langsmith_info` | LangSmith server information |
 | `langsmith_organization` | Current organization details |
 | `langsmith_prompt_commit` | Read a specific prompt commit by hash, tag, or `latest` |
+| `langsmith_settings` | Current workspace (`GET /api/v1/settings`, OpenAPI `Tenant`) |
 | `langsmith_tool` | Look up a platform registry tool by stable `handle` or `id` |
 | `langsmith_sso_settings_by_slug` | Resolve SSO providers for a login slug (`GET /api/v1/sso/settings/{sso_login_slug}`) |
 | `langsmith_feedback_ingest_tokens` | List feedback ingest tokens for a run (`GET /api/v1/feedback/tokens`) |
