@@ -128,6 +128,7 @@ func (p *LangSmithProvider) Resources(ctx context.Context) []func() resource.Res
 		NewDatasetResource,
 		NewExampleResource,
 		NewAnnotationQueueResource,
+		NewAnnotationQueueReviewerResource,
 		NewServiceAccountResource,
 		NewServiceKeyResource,
 		NewAPIKeyResource,

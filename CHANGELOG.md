@@ -5,6 +5,7 @@ FEATURES:
 * **New Resource:** `langsmith_api_key` - Manage tenant/workspace API keys (`/api/v1/api-key`)
 * **New Resource:** `langsmith_feedback_ingest_token` - Mint feedback ingest tokens (`POST /api/v1/feedback/tokens`)
 * **New Data Source:** `langsmith_feedback_ingest_tokens` - List ingest tokens for a run (`GET /api/v1/feedback/tokens`)
+* **New Resource:** `langsmith_annotation_queue_reviewer` - Manage annotation queue reviewer membership (`/v1/platform/annotation-queues/{queue_id}/reviewers`)
 * **New Resource:** `langsmith_org_chart` - Manage organization-scoped custom charts (`/api/v1/org-charts/*`)
 * **New Resource:** `langsmith_org_chart_section` - Manage organization-scoped chart sections
 
