@@ -165,6 +165,7 @@ func (p *LangSmithProvider) Resources(ctx context.Context) []func() resource.Res
 func (p *LangSmithProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewProjectDataSource,
+		NewProjectAgentVersionsDataSource,
 		NewDatasetDataSource,
 		NewWorkspaceDataSource,
 		NewTenantsDataSource,
