@@ -53,11 +53,7 @@ Do not commit API keys, tenant IDs, or other secrets.
 
 ## Codecov
 
-CI uploads unit-test coverage to [Codecov](https://codecov.io). The workflow uses **GitHub OIDC** and passes an explicit Codecov **slug** equal to the GitHub repository (`owner/repo`). That matters because the Go module path in `go.mod` (`github.com/bogware/terraform-provider-langsmith`) does not tell Codecov which GitHub repo to attach reports to, and inference can fail with `Repository not found`.
-
-Before uploads can succeed, a maintainer must **enable this repository** in Codecov (GitHub app / OAuth for the org that owns the repo). If CI logs show `Repository not found`, finish Codecov onboarding for this exact GitHub repository, then re-run the workflow.
-
-Fork PRs skip the upload step; coverage is still produced locally via `go test -cover`.
+CI uploads unit-test coverage via OIDC with `slug` set to this GitHub repository (`owner/repo`). Enable the repo in [Codecov](https://codecov.io) before expecting uploads to succeed. Fork PRs skip upload; run `go test -cover` locally to inspect coverage.
 
 ## Releases
 

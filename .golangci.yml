@@ -33,7 +33,6 @@ linters-settings:
           - pkg: "github.com/hashicorp/terraform-plugin-sdk/v2"
             desc: "Use Terraform Plugin Framework"
   gosec:
-    # Severity does not affect golangci exit code; included for clearer CI output.
     severity: medium
     confidence: medium
 

@@ -6,13 +6,12 @@ package client
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -165,20 +164,9 @@ func (c *Client) doRequest(ctx context.Context, method, path string, query url.V
 // retryDelay calculates exponential backoff with jitter: base * 2^(attempt-1) +/- 20%.
 func retryDelay(attempt int) time.Duration {
 	base := math.Pow(2, float64(attempt-1)) * float64(time.Second)
-	jitter := base * 0.2 * (2*jitterFraction() - 1) // +/- 20%
+	//nolint:gosec // G404: non-cryptographic jitter for HTTP retry backoff.
+	jitter := base * 0.2 * (2*rand.Float64() - 1)
 	return time.Duration(base + jitter)
-}
-
-// jitterFraction returns a value in [0, 1) for backoff randomization. It uses
-// crypto/rand because retry timing can amplify observability of network behavior.
-func jitterFraction() float64 {
-	var buf [8]byte
-	if _, err := rand.Read(buf[:]); err != nil {
-		// Unlikely; sub-millisecond wall clock noise is sufficient for non-crypto jitter.
-		return float64(time.Now().UnixNano()%1000) / 1000.0
-	}
-	v := binary.LittleEndian.Uint64(buf[:])
-	return float64(v>>11) / (1 << 53)
 }
 
 // Get sends an HTTP GET request.
