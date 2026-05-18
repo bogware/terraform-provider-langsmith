@@ -166,6 +166,7 @@ func (p *LangSmithProvider) Resources(ctx context.Context) []func() resource.Res
 		NewFeedbackIngestTokenResource,
 		NewPlatformFeatureResource,
 		NewEvaluatorResource,
+		NewFleetMCPServerResource,
 	}
 }
 

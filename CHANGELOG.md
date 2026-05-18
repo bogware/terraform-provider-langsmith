@@ -2,6 +2,7 @@
 
 FEATURES:
 
+* **New Resource:** `langsmith_fleet_mcp_server` - Register workspace MCP servers (`/v1/platform/fleet/mcp-servers`)
 * **New Data Source:** `langsmith_organizations` - List organizations visible to the caller (`GET /api/v1/orgs`)
 * **New Data Source:** `langsmith_organization_permissions` - List permission catalog entries (`GET /api/v1/orgs/permissions`)
 * **New Data Source:** `langsmith_organization_pending_invites` - List pending organization invitations (`GET /api/v1/orgs/pending`)
