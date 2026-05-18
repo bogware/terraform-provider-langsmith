@@ -3,23 +3,19 @@
 page_title: "langsmith_org_chart_section Resource - langsmith"
 subcategory: ""
 description: |-
-  Manages a LangSmith organization-level chart section (/api/v1/org-charts/*). The provider must set organization_id or LANGSMITH_ORGANIZATION_ID so the API receives X-Organization-Id.
+  Manages a LangSmith organization-scoped chart section (dashboard section). Sections created via this resource live under /api/v1/org-charts/section and host langsmith_org_chart resources. Use langsmith_chart_section for workspace-scoped sections.
 ---
 
 # langsmith_org_chart_section (Resource)
 
-Manages a LangSmith organization-level chart section (`/api/v1/org-charts/*`). The provider must set `organization_id` or `LANGSMITH_ORGANIZATION_ID` so the API receives `X-Organization-Id`.
+Manages a LangSmith organization-scoped chart section (dashboard section). Sections created via this resource live under `/api/v1/org-charts/section` and host `langsmith_org_chart` resources. Use `langsmith_chart_section` for workspace-scoped sections.
 
 ## Example Usage
 
 ```terraform
-# Organization chart sections require X-Organization-Id. Set provider
-# organization_id or LANGSMITH_ORGANIZATION_ID (for example from
-# data.langsmith_organization in a separate workspace / provider alias).
-
 resource "langsmith_org_chart_section" "example" {
-  title       = "Org KPIs"
-  description = "Organization-wide dashboards"
+  title       = "Production Health"
+  description = "Org-wide production metrics dashboard."
 }
 ```
 
@@ -28,11 +24,11 @@ resource "langsmith_org_chart_section" "example" {
 
 ### Required
 
-- `title` (String) The title of the org chart section.
+- `title` (String) The title of the chart section.
 
 ### Optional
 
-- `description` (String) A description of the org chart section.
+- `description` (String) A description of the chart section.
 - `index` (Number) The display order index.
 
 ### Read-Only

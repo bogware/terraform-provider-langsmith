@@ -1,11 +1,11 @@
 resource "langsmith_org_chart" "example" {
-  title      = "Run volume"
+  title      = "Run Latency (Org)"
   chart_type = "line"
   section_id = langsmith_org_chart_section.example.id
   series = jsonencode([
     {
-      name   = "Run Count"
-      metric = "run_count"
+      name   = "p50 latency"
+      metric = "latency_p50"
     }
   ])
 }

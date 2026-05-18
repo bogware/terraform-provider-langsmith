@@ -1,26 +1,32 @@
-# Copyright (c) Bogware, Inc. 2025
-# SPDX-License-Identifier: MPL-2.0
+resource "langsmith_evaluator" "llm_judge" {
+  name = "answer-correctness"
+  type = "llm"
 
-# Code evaluator (OpenAPI `evaluators.EvaluatorType` = `code`)
-resource "langsmith_evaluator" "code_example" {
-  name = "my-code-evaluator"
-  type = "code"
-  code_evaluator = jsonencode({
-    code     = <<-EOT
-      def score(run, example=None, **kwargs):
-          return {"key": "pass", "score": True}
-    EOT
-    language = "python"
-  })
+  llm_evaluator = {
+    prompt_repo_handle = "my-team/correctness-judge"
+    commit_hash_or_tag = "production"
+    variable_mapping = jsonencode({
+      question = "input.question"
+      answer   = "output.answer"
+    })
+  }
 }
 
-# LLM evaluator backed by a Hub prompt (OpenAPI `type` = `llm`)
-resource "langsmith_evaluator" "llm_example" {
-  name = "my-llm-evaluator"
-  type = "llm"
-  llm_evaluator = jsonencode({
-    prompt_repo_handle = "my-org/my-prompt"
-    commit_hash_or_tag = "latest"
-    variable_mapping   = { input = "inputs.question" }
-  })
+resource "langsmith_evaluator" "code_check" {
+  name = "json-shape"
+  type = "code"
+
+  code_evaluator = {
+    # The entry-point must be named `perform_eval(run, example)`.
+    code     = <<-EOT
+      def perform_eval(run, example):
+          try:
+              import json
+              json.loads(run.outputs["raw"])
+              return {"score": 1}
+          except Exception:
+              return {"score": 0}
+    EOT
+    language = "python"
+  }
 }

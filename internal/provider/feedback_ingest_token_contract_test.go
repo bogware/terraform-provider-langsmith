@@ -25,7 +25,7 @@ func TestAccFeedbackIngestTokenResource_contract(t *testing.T) {
 			return
 		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/feedback/tokens":
 			body, _ := io.ReadAll(r.Body)
-			var cr feedbackIngestTokenCreateRequest
+			var cr feedbackTokenCreateRequest
 			if err := json.Unmarshal(body, &cr); err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
@@ -34,7 +34,7 @@ func TestAccFeedbackIngestTokenResource_contract(t *testing.T) {
 				http.Error(w, "unexpected create body", http.StatusBadRequest)
 				return
 			}
-			resp := feedbackIngestTokenAPIResponse{
+			resp := feedbackTokenAPI{
 				ID:          tokenID,
 				URL:         "https://api.smith.langchain.com/api/v1/feedback/tokens/" + tokenID + "/ingest?sig=secret",
 				ExpiresAt:   "2030-01-01T00:00:00Z",
@@ -48,7 +48,7 @@ func TestAccFeedbackIngestTokenResource_contract(t *testing.T) {
 				http.Error(w, "missing run_id", http.StatusBadRequest)
 				return
 			}
-			resp := []feedbackIngestTokenAPIResponse{
+			resp := []feedbackTokenAPI{
 				{
 					ID:          tokenID,
 					URL:         "https://api.smith.langchain.com/api/v1/feedback/tokens/" + tokenID + "/ingest?sig=secret",
@@ -73,8 +73,6 @@ func TestAccFeedbackIngestTokenResource_contract(t *testing.T) {
 resource "langsmith_feedback_ingest_token" "tok" {
   run_id        = "` + runID + `"
   feedback_key  = "quality"
-  expires_in    = jsonencode({ days = 1 })
-  feedback_config = jsonencode({ "type" = "continuous" })
 }
 `
 
@@ -90,13 +88,7 @@ resource "langsmith_feedback_ingest_token" "tok" {
 					resource.TestCheckResourceAttr("langsmith_feedback_ingest_token.tok", "feedback_key", "quality"),
 					resource.TestCheckResourceAttr("langsmith_feedback_ingest_token.tok", "expires_at", "2030-01-01T00:00:00Z"),
 					resource.TestCheckResourceAttrSet("langsmith_feedback_ingest_token.tok", "url"),
-					resource.TestCheckResourceAttr("langsmith_feedback_ingest_token.tok", "expires_in", `{"days":1}`),
 				),
-			},
-			{
-				ResourceName:  "langsmith_feedback_ingest_token.tok",
-				ImportState:   true,
-				ImportStateId: tokenID + "/" + runID,
 			},
 		},
 	})
@@ -116,7 +108,7 @@ func TestAccFeedbackIngestTokensDataSource_contract(t *testing.T) {
 				http.Error(w, "bad run_id", http.StatusBadRequest)
 				return
 			}
-			resp := []feedbackIngestTokenAPIResponse{
+			resp := []feedbackTokenAPI{
 				{
 					ID:          "880e8400-e29b-41d4-a716-446655440003",
 					URL:         "https://example.invalid/token",

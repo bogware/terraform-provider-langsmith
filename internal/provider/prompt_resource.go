@@ -37,26 +37,25 @@ type PromptResource struct {
 }
 
 // PromptResourceModel maps the Terraform schema to Go types for a prompt repo.
+//
+// Note: usage counters (num_likes, num_views, num_downloads, num_commits) and
+// last_commit_hash were intentionally removed in v0.9.0 — they were
+// observability data that caused phantom drift on every plan. See CHANGELOG.
 type PromptResourceModel struct {
-	ID             types.String `tfsdk:"id"`
-	RepoHandle     types.String `tfsdk:"repo_handle"`
-	Manifest       types.String `tfsdk:"manifest"`
-	IsPublic       types.Bool   `tfsdk:"is_public"`
-	Description    types.String `tfsdk:"description"`
-	Readme         types.String `tfsdk:"readme"`
-	Tags           types.List   `tfsdk:"tags"`
-	IsArchived     types.Bool   `tfsdk:"is_archived"`
-	Owner          types.String `tfsdk:"owner"`
-	FullName       types.String `tfsdk:"full_name"`
-	CommitHash     types.String `tfsdk:"commit_hash"`
-	TenantID       types.String `tfsdk:"tenant_id"`
-	NumCommits     types.Int64  `tfsdk:"num_commits"`
-	NumLikes       types.Int64  `tfsdk:"num_likes"`
-	NumViews       types.Int64  `tfsdk:"num_views"`
-	NumDownloads   types.Int64  `tfsdk:"num_downloads"`
-	LastCommitHash types.String `tfsdk:"last_commit_hash"`
-	CreatedAt      types.String `tfsdk:"created_at"`
-	UpdatedAt      types.String `tfsdk:"updated_at"`
+	ID          types.String `tfsdk:"id"`
+	RepoHandle  types.String `tfsdk:"repo_handle"`
+	Manifest    types.String `tfsdk:"manifest"`
+	IsPublic    types.Bool   `tfsdk:"is_public"`
+	Description types.String `tfsdk:"description"`
+	Readme      types.String `tfsdk:"readme"`
+	Tags        types.List   `tfsdk:"tags"`
+	IsArchived  types.Bool   `tfsdk:"is_archived"`
+	Owner       types.String `tfsdk:"owner"`
+	FullName    types.String `tfsdk:"full_name"`
+	CommitHash  types.String `tfsdk:"commit_hash"`
+	TenantID    types.String `tfsdk:"tenant_id"`
+	CreatedAt   types.String `tfsdk:"created_at"`
+	UpdatedAt   types.String `tfsdk:"updated_at"`
 }
 
 // promptCreateRequest is the payload for staking a new claim in the Hub.
@@ -97,28 +96,38 @@ type promptLatestCommitResponse struct {
 	Manifest   json.RawMessage `json:"manifest"`
 }
 
-// promptAPIResponse is what the LangSmith API sends back when you come asking about a prompt.
-// Like Miss Kitty keeping the books, every field the API knows gets tallied here.
+// promptAPIResponse is what the LangSmith API sends back when you come asking
+// about a prompt. Note: owner and full_name live INSIDE repo (the API does
+// not echo them at the top level). owner is null when the prompt was created
+// by a service account; for path construction, callers should fall back to
+// the "-" wildcard via repoOwnerSegment.
 type promptAPIResponse struct {
 	Repo struct {
-		ID             string   `json:"id"`
-		RepoHandle     string   `json:"repo_handle"`
-		Description    string   `json:"description"`
-		Readme         string   `json:"readme"`
-		IsPublic       bool     `json:"is_public"`
-		IsArchived     bool     `json:"is_archived"`
-		Tags           []string `json:"tags"`
-		TenantID       string   `json:"tenant_id"`
-		NumCommits     int64    `json:"num_commits"`
-		NumLikes       int64    `json:"num_likes"`
-		NumViews       int64    `json:"num_views"`
-		NumDownloads   int64    `json:"num_downloads"`
-		LastCommitHash *string  `json:"last_commit_hash"`
-		CreatedAt      string   `json:"created_at"`
-		UpdatedAt      string   `json:"updated_at"`
+		ID          string   `json:"id"`
+		RepoHandle  string   `json:"repo_handle"`
+		Description string   `json:"description"`
+		Readme      string   `json:"readme"`
+		IsPublic    bool     `json:"is_public"`
+		IsArchived  bool     `json:"is_archived"`
+		Tags        []string `json:"tags"`
+		TenantID    string   `json:"tenant_id"`
+		NumCommits  int64    `json:"num_commits"`
+		Owner       *string  `json:"owner"`
+		FullName    string   `json:"full_name"`
+		CreatedAt   string   `json:"created_at"`
+		UpdatedAt   string   `json:"updated_at"`
 	} `json:"repo"`
-	Owner    string `json:"owner"`
-	FullName string `json:"full_name"`
+}
+
+// repoOwnerSegment returns the URL segment to use for the {owner} portion of
+// /api/v1/repos/{owner}/{repo}. Falls back to "-" (wildcard for current
+// tenant) when no concrete owner is known — e.g. for prompts created by a
+// service account, where owner is null.
+func repoOwnerSegment(owner string) string {
+	if owner == "" {
+		return "-"
+	}
+	return owner
 }
 
 func (r *PromptResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -187,26 +196,6 @@ func (r *PromptResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"num_commits": schema.Int64Attribute{
-				MarkdownDescription: "The number of commits in the prompt repo.",
-				Computed:            true,
-			},
-			"num_likes": schema.Int64Attribute{
-				MarkdownDescription: "The number of likes on the prompt.",
-				Computed:            true,
-			},
-			"num_views": schema.Int64Attribute{
-				MarkdownDescription: "The number of views on the prompt.",
-				Computed:            true,
-			},
-			"num_downloads": schema.Int64Attribute{
-				MarkdownDescription: "The number of downloads of the prompt.",
-				Computed:            true,
-			},
-			"last_commit_hash": schema.StringAttribute{
-				MarkdownDescription: "The hash of the last commit -- the latest brand on the cattle.",
-				Computed:            true,
-			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "When the prompt was created.",
 				Computed:            true,
@@ -267,8 +256,12 @@ func (r *PromptResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	data.ID = types.StringValue(result.Repo.ID)
-	data.Owner = types.StringValue(result.Owner)
-	data.FullName = types.StringValue(result.FullName)
+	if result.Repo.Owner != nil {
+		data.Owner = types.StringValue(*result.Repo.Owner)
+	} else {
+		data.Owner = types.StringValue("")
+	}
+	data.FullName = types.StringValue(result.Repo.FullName)
 	data.CreatedAt = types.StringValue(result.Repo.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.Repo.UpdatedAt)
 
@@ -284,21 +277,14 @@ func (r *PromptResource) Create(ctx context.Context, req resource.CreateRequest,
 			return
 		}
 		data.CommitHash = types.StringValue(commitResult.Commit.CommitHash)
-		data.LastCommitHash = types.StringValue(commitResult.Commit.CommitHash)
-		data.NumCommits = types.Int64Value(1)
 	} else {
 		data.Manifest = types.StringNull()
 		data.CommitHash = types.StringNull()
-		data.LastCommitHash = types.StringNull()
-		data.NumCommits = types.Int64Value(0)
 	}
 
 	// Set remaining computed fields that the create response may not populate.
 	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
 	data.TenantID = types.StringValue(result.Repo.TenantID)
-	data.NumLikes = types.Int64Value(result.Repo.NumLikes)
-	data.NumViews = types.Int64Value(result.Repo.NumViews)
-	data.NumDownloads = types.Int64Value(result.Repo.NumDownloads)
 
 	tflog.Trace(ctx, "created prompt resource", map[string]interface{}{"id": result.Repo.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -322,7 +308,7 @@ func (r *PromptResource) Read(ctx context.Context, req resource.ReadRequest, res
 	}
 
 	var result promptAPIResponse
-	err := r.client.Get(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", owner, repoHandle), nil, &result)
+	err := r.client.Get(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", repoOwnerSegment(owner), repoHandle), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -336,22 +322,15 @@ func (r *PromptResource) Read(ctx context.Context, req resource.ReadRequest, res
 	data.RepoHandle = types.StringValue(result.Repo.RepoHandle)
 	data.IsPublic = types.BoolValue(result.Repo.IsPublic)
 	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
-	data.Owner = types.StringValue(result.Owner)
-	data.FullName = types.StringValue(result.FullName)
+	if result.Repo.Owner != nil {
+		data.Owner = types.StringValue(*result.Repo.Owner)
+	} else {
+		data.Owner = types.StringValue("")
+	}
+	data.FullName = types.StringValue(result.Repo.FullName)
 	data.TenantID = types.StringValue(result.Repo.TenantID)
-	data.NumCommits = types.Int64Value(result.Repo.NumCommits)
-	data.NumLikes = types.Int64Value(result.Repo.NumLikes)
-	data.NumViews = types.Int64Value(result.Repo.NumViews)
-	data.NumDownloads = types.Int64Value(result.Repo.NumDownloads)
 	data.CreatedAt = types.StringValue(result.Repo.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.Repo.UpdatedAt)
-
-	// Last commit hash may be nil if nobody's ridden through yet.
-	if result.Repo.LastCommitHash != nil {
-		data.LastCommitHash = types.StringValue(*result.Repo.LastCommitHash)
-	} else {
-		data.LastCommitHash = types.StringNull()
-	}
 
 	if result.Repo.Description != "" {
 		data.Description = types.StringValue(result.Repo.Description)
@@ -405,7 +384,7 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	owner := state.Owner.ValueString()
+	owner := repoOwnerSegment(state.Owner.ValueString())
 	repoHandle := state.RepoHandle.ValueString()
 
 	body := promptUpdateRequest{}
@@ -452,7 +431,6 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 			return
 		}
 		data.CommitHash = types.StringValue(commitResult.Commit.CommitHash)
-		data.LastCommitHash = types.StringValue(commitResult.Commit.CommitHash)
 	}
 
 	// PATCH doesn't return the full resource, so we ride back to the API for the latest state.
@@ -464,23 +442,16 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 
 	data.ID = types.StringValue(result.Repo.ID)
-	data.Owner = types.StringValue(result.Owner)
-	data.FullName = types.StringValue(result.FullName)
+	if result.Repo.Owner != nil {
+		data.Owner = types.StringValue(*result.Repo.Owner)
+	} else {
+		data.Owner = types.StringValue("")
+	}
+	data.FullName = types.StringValue(result.Repo.FullName)
 	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
 	data.TenantID = types.StringValue(result.Repo.TenantID)
-	data.NumCommits = types.Int64Value(result.Repo.NumCommits)
-	data.NumLikes = types.Int64Value(result.Repo.NumLikes)
-	data.NumViews = types.Int64Value(result.Repo.NumViews)
-	data.NumDownloads = types.Int64Value(result.Repo.NumDownloads)
 	data.CreatedAt = types.StringValue(result.Repo.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.Repo.UpdatedAt)
-
-	// Even after an update, the last commit hash might still be a no-show.
-	if result.Repo.LastCommitHash != nil {
-		data.LastCommitHash = types.StringValue(*result.Repo.LastCommitHash)
-	} else {
-		data.LastCommitHash = types.StringNull()
-	}
 
 	// Fetch the latest manifest if we haven't just committed one.
 	if data.CommitHash.IsNull() || data.CommitHash.IsUnknown() {
@@ -493,6 +464,7 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 			}
 		} else {
 			data.CommitHash = types.StringNull()
+			data.Manifest = types.StringNull()
 		}
 	}
 
@@ -506,7 +478,7 @@ func (r *PromptResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		return
 	}
 
-	owner := data.Owner.ValueString()
+	owner := repoOwnerSegment(data.Owner.ValueString())
 	repoHandle := data.RepoHandle.ValueString()
 
 	err := r.client.Delete(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", owner, repoHandle))

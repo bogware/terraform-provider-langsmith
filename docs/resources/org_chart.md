@@ -3,24 +3,24 @@
 page_title: "langsmith_org_chart Resource - langsmith"
 subcategory: ""
 description: |-
-  Manages a LangSmith organization-level custom chart (/api/v1/org-charts/*). The provider must set organization_id or LANGSMITH_ORGANIZATION_ID so the API receives X-Organization-Id. Bulk chart read (POST /api/v1/org-charts) and preview (POST /api/v1/org-charts/preview) are not represented as Terraform resources.
+  Manages a LangSmith organization-scoped custom chart. Charts created via this resource live under /api/v1/org-charts and are visible across the organization rather than scoped to a single workspace. Use langsmith_chart for workspace-scoped charts.
 ---
 
 # langsmith_org_chart (Resource)
 
-Manages a LangSmith organization-level custom chart (`/api/v1/org-charts/*`). The provider must set `organization_id` or `LANGSMITH_ORGANIZATION_ID` so the API receives `X-Organization-Id`. Bulk chart read (`POST /api/v1/org-charts`) and preview (`POST /api/v1/org-charts/preview`) are not represented as Terraform resources.
+Manages a LangSmith organization-scoped custom chart. Charts created via this resource live under `/api/v1/org-charts` and are visible across the organization rather than scoped to a single workspace. Use `langsmith_chart` for workspace-scoped charts.
 
 ## Example Usage
 
 ```terraform
 resource "langsmith_org_chart" "example" {
-  title      = "Run volume"
+  title      = "Run Latency (Org)"
   chart_type = "line"
   section_id = langsmith_org_chart_section.example.id
   series = jsonencode([
     {
-      name   = "Run Count"
-      metric = "run_count"
+      name   = "p50 latency"
+      metric = "latency_p50"
     }
   ])
 }
@@ -33,12 +33,12 @@ resource "langsmith_org_chart" "example" {
 
 - `chart_type` (String) The chart type. Valid values: `line`, `bar`.
 - `series` (String) JSON-encoded array of chart series configurations.
-- `title` (String) The title of the org chart.
+- `title` (String) The title of the chart.
 
 ### Optional
 
 - `common_filters` (String) JSON-encoded common filter configuration.
-- `description` (String) A description of the org chart.
+- `description` (String) A description of the chart.
 - `index` (Number) The display order index (0-100).
 - `metadata` (String) JSON-encoded metadata object.
 - `section_id` (String) The ID of the org chart section this chart belongs to.

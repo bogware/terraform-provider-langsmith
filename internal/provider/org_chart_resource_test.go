@@ -13,18 +13,20 @@ import (
 )
 
 func TestAccOrgChartResource_basic(t *testing.T) {
+	t.Skip("Requires organization:manage permission (enterprise tier)")
+	projectName := fmt.Sprintf("tf-proj-%s", acctest.RandStringFromCharSet(8, acctest.CharSetAlphaNum))
 	sectionTitle := fmt.Sprintf("tf-org-section-%s", acctest.RandStringFromCharSet(8, acctest.CharSetAlphaNum))
 	chartTitle := fmt.Sprintf("tf-org-chart-%s", acctest.RandStringFromCharSet(8, acctest.CharSetAlphaNum))
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheckOrgCharts(t) },
+		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy: func(s *terraform.State) error {
 			return nil
 		},
 		Steps: []resource.TestStep{
 			{
-				Config: testAccOrgChartResourceConfig(sectionTitle, chartTitle),
+				Config: testAccOrgChartResourceConfig(projectName, sectionTitle, chartTitle),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("langsmith_org_chart.test", "id"),
 					resource.TestCheckResourceAttr("langsmith_org_chart.test", "title", chartTitle),
@@ -41,22 +43,29 @@ func TestAccOrgChartResource_basic(t *testing.T) {
 	})
 }
 
-func testAccOrgChartResourceConfig(sectionTitle, chartTitle string) string {
+func testAccOrgChartResourceConfig(projectName, sectionTitle, chartTitle string) string {
 	return fmt.Sprintf(`
+resource "langsmith_project" "test" {
+  name = %[1]q
+}
+
 resource "langsmith_org_chart_section" "test" {
-  title = %[1]q
+  title = %[2]q
 }
 
 resource "langsmith_org_chart" "test" {
-  title      = %[2]q
+  title      = %[3]q
   chart_type = "line"
   section_id = langsmith_org_chart_section.test.id
   series     = jsonencode([
     {
       name   = "Run Count"
       metric = "run_count"
+      filters = {
+        session = [langsmith_project.test.id]
+      }
     }
   ])
 }
-`, sectionTitle, chartTitle)
+`, projectName, sectionTitle, chartTitle)
 }

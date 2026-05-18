@@ -123,7 +123,7 @@ func (d *FeedbackIngestTokensDataSource) Read(ctx context.Context, req datasourc
 
 	q := url.Values{}
 	q.Set("run_id", runID)
-	var results []feedbackIngestTokenAPIResponse
+	var results []feedbackTokenAPI
 	if err := d.client.Get(ctx, "/api/v1/feedback/tokens", q, &results); err != nil {
 		resp.Diagnostics.AddError("Error reading feedback ingest tokens", err.Error())
 		return

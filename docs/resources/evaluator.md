@@ -3,41 +3,47 @@
 page_title: "langsmith_evaluator Resource - langsmith"
 subcategory: ""
 description: |-
-  Manages a LangSmith hosted evaluator (POST/PATCH/DELETE /v1/platform/evaluators, GET /v1/platform/evaluators/{evaluator_id}). Use type llm with llm_evaluator or type code with code_evaluator as JSON objects matching the OpenAPI evaluators.CreateEvaluatorRequest nested payloads. On read, llm_evaluator and code_evaluator contain JSON for evaluators.LLMEvaluator / evaluators.CodeEvaluator as returned by the API.
+  Manages a LangSmith evaluator. An evaluator scores runs either by executing user code (type = "code") or by invoking a prompt as an LLM-as-judge (type = "llm"). Exactly one of code_evaluator or llm_evaluator must be set, matching type.
 ---
 
 # langsmith_evaluator (Resource)
 
-Manages a LangSmith **hosted evaluator** (`POST/PATCH/DELETE /v1/platform/evaluators`, `GET /v1/platform/evaluators/{evaluator_id}`). Use `type` `llm` with `llm_evaluator` or `type` `code` with `code_evaluator` as JSON objects matching the OpenAPI `evaluators.CreateEvaluatorRequest` nested payloads. On read, `llm_evaluator` and `code_evaluator` contain JSON for `evaluators.LLMEvaluator` / `evaluators.CodeEvaluator` as returned by the API.
+Manages a LangSmith evaluator. An evaluator scores runs either by executing user code (`type = "code"`) or by invoking a prompt as an LLM-as-judge (`type = "llm"`). Exactly one of `code_evaluator` or `llm_evaluator` must be set, matching `type`.
 
 ## Example Usage
 
 ```terraform
-# Copyright (c) Bogware, Inc. 2025
-# SPDX-License-Identifier: MPL-2.0
+resource "langsmith_evaluator" "llm_judge" {
+  name = "answer-correctness"
+  type = "llm"
 
-# Code evaluator (OpenAPI `evaluators.EvaluatorType` = `code`)
-resource "langsmith_evaluator" "code_example" {
-  name = "my-code-evaluator"
-  type = "code"
-  code_evaluator = jsonencode({
-    code     = <<-EOT
-      def score(run, example=None, **kwargs):
-          return {"key": "pass", "score": True}
-    EOT
-    language = "python"
-  })
+  llm_evaluator = {
+    prompt_repo_handle = "my-team/correctness-judge"
+    commit_hash_or_tag = "production"
+    variable_mapping = jsonencode({
+      question = "input.question"
+      answer   = "output.answer"
+    })
+  }
 }
 
-# LLM evaluator backed by a Hub prompt (OpenAPI `type` = `llm`)
-resource "langsmith_evaluator" "llm_example" {
-  name = "my-llm-evaluator"
-  type = "llm"
-  llm_evaluator = jsonencode({
-    prompt_repo_handle = "my-org/my-prompt"
-    commit_hash_or_tag = "latest"
-    variable_mapping   = { input = "inputs.question" }
-  })
+resource "langsmith_evaluator" "code_check" {
+  name = "json-shape"
+  type = "code"
+
+  code_evaluator = {
+    # The entry-point must be named `perform_eval(run, example)`.
+    code     = <<-EOT
+      def perform_eval(run, example):
+          try:
+              import json
+              json.loads(run.outputs["raw"])
+              return {"score": 1}
+          except Exception:
+              return {"score": 0}
+    EOT
+    language = "python"
+  }
 }
 ```
 
@@ -46,21 +52,45 @@ resource "langsmith_evaluator" "llm_example" {
 
 ### Required
 
-- `name` (String) Display name (`name` in the API).
-- `type` (String) Evaluator discriminator: `llm` or `code` (`evaluators.EvaluatorType`).
+- `name` (String) Human-readable evaluator name.
+- `type` (String) Evaluator type. One of `code` or `llm`.
 
 ### Optional
 
-- `code_evaluator` (String) JSON object for `code_evaluator` on create/update (`evaluators.CreateCodeEvaluatorRequest` / `evaluators.UpdateCodeEvaluatorRequest` fields). Conflicts with `llm_evaluator`.
-- `delete_run_rules` (Boolean) When true, `DELETE` sends `delete_run_rules=true` so the API removes dependent run rules before deleting the evaluator.
-- `llm_evaluator` (String) JSON object for `llm_evaluator` on create/update (`evaluators.CreateLLMEvaluatorRequest` / `evaluators.UpdateLLMEvaluatorRequest` fields). Conflicts with `code_evaluator`.
+- `code_evaluator` (Attributes) Configuration for a code evaluator. Required when `type = "code"`. (see [below for nested schema](#nestedatt--code_evaluator))
+- `llm_evaluator` (Attributes) Configuration for an LLM-as-judge evaluator. Required when `type = "llm"`. (see [below for nested schema](#nestedatt--llm_evaluator))
 
 ### Read-Only
 
-- `created_at` (String) Creation timestamp from the API.
-- `created_by` (String) Creator user ID from the API.
-- `feedback_keys` (List of String) Feedback keys associated with this evaluator (`feedback_keys` in the API).
-- `id` (String) Evaluator ID (`evaluator_id` in the API).
-- `run_rules` (String) JSON-encoded `run_rules` array from the API (`evaluators.EvaluatorRunRule`).
-- `tenant_id` (String) Workspace tenant ID owning the evaluator.
-- `updated_at` (String) Last update timestamp from the API.
+- `created_at` (String) Creation timestamp.
+- `created_by` (String) Identity that created the evaluator.
+- `feedback_keys` (List of String) Feedback keys this evaluator writes to. Derived server-side from `name`, so changing `name` changes this set.
+- `id` (String) The unique identifier of the evaluator.
+- `tenant_id` (String) The workspace/tenant the evaluator lives in.
+- `updated_at` (String) Last update timestamp.
+
+<a id="nestedatt--code_evaluator"></a>
+### Nested Schema for `code_evaluator`
+
+Required:
+
+- `code` (String) Source code for the evaluator. The entry-point function must be named `perform_eval(run, example)` (e.g. `def perform_eval(run, example): return {"score": 1}`).
+
+Optional:
+
+- `language` (String) Language of the evaluator code (defaults server-side to `python`).
+
+
+<a id="nestedatt--llm_evaluator"></a>
+### Nested Schema for `llm_evaluator`
+
+Required:
+
+- `prompt_repo_handle` (String) Handle of the prompt repo (LangSmith Hub) to use as the judge prompt.
+
+Optional:
+
+- `commit_hash_or_tag` (String) Commit hash or named tag of the prompt to pin. Defaults to the latest commit when omitted.
+- `num_few_shot_examples` (Number) Number of few-shot examples to draw from a corrections dataset on each invocation.
+- `use_corrections_dataset` (Boolean) Whether to source few-shot examples from a corrections dataset attached via a run rule.
+- `variable_mapping` (String) JSON-encoded object that maps prompt variables to run fields.

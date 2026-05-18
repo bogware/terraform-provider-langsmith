@@ -42,6 +42,9 @@ jobs:
         with:
           # Pinned v1.x: repo `.golangci.yml` uses golangci-lint v1 format (see AGENTS.md).
           version: v1.64.8
+          # Prebuilt golangci-lint binaries can lag the `go` version in go.mod (e.g. after
+          # toolchain bumps). Compile the linter with the same Go release as `setup-go`.
+          install-mode: goinstall
 
   govulncheck:
     name: govulncheck

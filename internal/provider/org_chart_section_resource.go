@@ -13,7 +13,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/bogware/terraform-provider-langsmith/internal/client"
@@ -32,44 +31,13 @@ type OrgChartSectionResource struct {
 	client *client.Client
 }
 
-type OrgChartSectionResourceModel struct {
-	ID          types.String `tfsdk:"id"`
-	Title       types.String `tfsdk:"title"`
-	Description types.String `tfsdk:"description"`
-	Index       types.Int64  `tfsdk:"index"`
-	CreatedAt   types.String `tfsdk:"created_at"`
-	UpdatedAt   types.String `tfsdk:"updated_at"`
-}
-
-type orgChartSectionCreateRequest struct {
-	Title       string  `json:"title"`
-	Description *string `json:"description,omitempty"`
-	Index       *int64  `json:"index,omitempty"`
-}
-
-type orgChartSectionUpdateRequest struct {
-	Title       *string `json:"title,omitempty"`
-	Description *string `json:"description,omitempty"`
-	Index       *int64  `json:"index,omitempty"`
-}
-
-type orgChartSectionAPIResponse struct {
-	ID          string  `json:"id"`
-	Title       string  `json:"title"`
-	Description *string `json:"description"`
-	Index       *int64  `json:"index"`
-	CreatedAt   *string `json:"created_at"`
-	ModifiedAt  *string `json:"modified_at"`
-}
-
 func (r *OrgChartSectionResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_org_chart_section"
 }
 
 func (r *OrgChartSectionResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Manages a LangSmith organization-level chart section (`/api/v1/org-charts/*`). " +
-			"The provider must set `organization_id` or `LANGSMITH_ORGANIZATION_ID` so the API receives `X-Organization-Id`.",
+		MarkdownDescription: "Manages a LangSmith organization-scoped chart section (dashboard section). Sections created via this resource live under `/api/v1/org-charts/section` and host `langsmith_org_chart` resources. Use `langsmith_chart_section` for workspace-scoped sections.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "The unique identifier of the org chart section.",
@@ -77,11 +45,11 @@ func (r *OrgChartSectionResource) Schema(ctx context.Context, req resource.Schem
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"title": schema.StringAttribute{
-				MarkdownDescription: "The title of the org chart section.",
+				MarkdownDescription: "The title of the chart section.",
 				Required:            true,
 			},
 			"description": schema.StringAttribute{
-				MarkdownDescription: "A description of the org chart section.",
+				MarkdownDescription: "A description of the chart section.",
 				Optional:            true,
 			},
 			"index": schema.Int64Attribute{
@@ -116,13 +84,13 @@ func (r *OrgChartSectionResource) Configure(ctx context.Context, req resource.Co
 }
 
 func (r *OrgChartSectionResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var data OrgChartSectionResourceModel
+	var data ChartSectionResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	body := orgChartSectionCreateRequest{
+	body := chartSectionCreateRequest{
 		Title: data.Title.ValueString(),
 	}
 	setOptionalString(&body.Description, data.Description)
@@ -131,20 +99,20 @@ func (r *OrgChartSectionResource) Create(ctx context.Context, req resource.Creat
 		body.Index = &v
 	}
 
-	var result orgChartSectionAPIResponse
+	var result chartSectionAPIResponse
 	err := r.client.Post(ctx, "/api/v1/org-charts/section", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating org chart section", err.Error())
 		return
 	}
 
-	mapOrgChartSectionResponseToState(&data, &result)
+	mapChartSectionResponseToState(&data, &result)
 	tflog.Trace(ctx, "created org chart section resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *OrgChartSectionResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var data OrgChartSectionResourceModel
+	var data ChartSectionResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -153,12 +121,13 @@ func (r *OrgChartSectionResource) Read(ctx context.Context, req resource.ReadReq
 	savedCreatedAt := data.CreatedAt
 	savedUpdatedAt := data.UpdatedAt
 
+	// /api/v1/org-charts/section/{id} uses CustomChartsRequestBase (no group_by).
 	body := struct {
 		OmitData  bool   `json:"omit_data"`
 		StartTime string `json:"start_time"`
 		EndTime   string `json:"end_time"`
 	}{OmitData: true, StartTime: "2020-01-01T00:00:00Z", EndTime: "2020-01-01T00:01:00Z"}
-	var result orgChartSectionAPIResponse
+	var result chartSectionAPIResponse
 	err := r.client.Post(ctx, "/api/v1/org-charts/section/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
@@ -169,22 +138,28 @@ func (r *OrgChartSectionResource) Read(ctx context.Context, req resource.ReadReq
 		return
 	}
 
-	mapOrgChartSectionResponseToState(&data, &result)
+	mapChartSectionResponseToState(&data, &result)
 	data.CreatedAt = savedCreatedAt
 	data.UpdatedAt = savedUpdatedAt
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *OrgChartSectionResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data OrgChartSectionResourceModel
+	var data ChartSectionResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	savedCreatedAt := data.CreatedAt
+	var prior ChartSectionResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &prior)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	savedCreatedAt := prior.CreatedAt
+	savedUpdatedAt := prior.UpdatedAt
 
-	body := orgChartSectionUpdateRequest{}
+	body := chartSectionUpdateRequest{}
 	setOptionalString(&body.Title, data.Title)
 	setOptionalString(&body.Description, data.Description)
 	if !data.Index.IsNull() && !data.Index.IsUnknown() {
@@ -192,21 +167,22 @@ func (r *OrgChartSectionResource) Update(ctx context.Context, req resource.Updat
 		body.Index = &v
 	}
 
-	var result orgChartSectionAPIResponse
+	var result chartSectionAPIResponse
 	err := r.client.Patch(ctx, "/api/v1/org-charts/section/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating org chart section", err.Error())
 		return
 	}
 
-	mapOrgChartSectionResponseToState(&data, &result)
+	mapChartSectionResponseToState(&data, &result)
 	data.CreatedAt = savedCreatedAt
+	data.UpdatedAt = savedUpdatedAt
 	tflog.Trace(ctx, "updated org chart section resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *OrgChartSectionResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data OrgChartSectionResourceModel
+	var data ChartSectionResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -223,17 +199,4 @@ func (r *OrgChartSectionResource) Delete(ctx context.Context, req resource.Delet
 
 func (r *OrgChartSectionResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
-}
-
-func mapOrgChartSectionResponseToState(data *OrgChartSectionResourceModel, result *orgChartSectionAPIResponse) {
-	data.ID = types.StringValue(result.ID)
-	data.Title = types.StringValue(result.Title)
-	setStateOptionalString(&data.CreatedAt, result.CreatedAt)
-	setStateOptionalString(&data.UpdatedAt, result.ModifiedAt)
-	setStateOptionalString(&data.Description, result.Description)
-	if result.Index != nil {
-		data.Index = types.Int64Value(*result.Index)
-	} else {
-		data.Index = types.Int64Null()
-	}
 }

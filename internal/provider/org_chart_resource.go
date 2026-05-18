@@ -35,63 +35,13 @@ type OrgChartResource struct {
 	client *client.Client
 }
 
-type OrgChartResourceModel struct {
-	ID            types.String `tfsdk:"id"`
-	Title         types.String `tfsdk:"title"`
-	Description   types.String `tfsdk:"description"`
-	Index         types.Int64  `tfsdk:"index"`
-	ChartType     types.String `tfsdk:"chart_type"`
-	Series        types.String `tfsdk:"series"`
-	SectionID     types.String `tfsdk:"section_id"`
-	Metadata      types.String `tfsdk:"metadata"`
-	CommonFilters types.String `tfsdk:"common_filters"`
-	CreatedAt     types.String `tfsdk:"created_at"`
-	UpdatedAt     types.String `tfsdk:"updated_at"`
-}
-
-type orgChartCreateRequest struct {
-	Title         string           `json:"title"`
-	Description   *string          `json:"description,omitempty"`
-	Index         *int64           `json:"index,omitempty"`
-	ChartType     string           `json:"chart_type"`
-	Series        json.RawMessage  `json:"series"`
-	SectionID     *string          `json:"section_id,omitempty"`
-	Metadata      *json.RawMessage `json:"metadata,omitempty"`
-	CommonFilters *json.RawMessage `json:"common_filters,omitempty"`
-}
-
-type orgChartUpdateRequest struct {
-	Title         *string          `json:"title,omitempty"`
-	Description   *string          `json:"description,omitempty"`
-	Index         *int64           `json:"index,omitempty"`
-	ChartType     *string          `json:"chart_type,omitempty"`
-	Series        json.RawMessage  `json:"series,omitempty"`
-	SectionID     *string          `json:"section_id,omitempty"`
-	Metadata      *json.RawMessage `json:"metadata,omitempty"`
-	CommonFilters *json.RawMessage `json:"common_filters,omitempty"`
-}
-
-type orgChartAPIResponse struct {
-	ID            string          `json:"id"`
-	Title         string          `json:"title"`
-	Description   *string         `json:"description"`
-	Index         *int64          `json:"index"`
-	ChartType     string          `json:"chart_type"`
-	Series        json.RawMessage `json:"series"`
-	SectionID     *string         `json:"section_id"`
-	Metadata      json.RawMessage `json:"metadata"`
-	CommonFilters json.RawMessage `json:"common_filters"`
-}
-
 func (r *OrgChartResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_org_chart"
 }
 
 func (r *OrgChartResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Manages a LangSmith organization-level custom chart (`/api/v1/org-charts/*`). " +
-			"The provider must set `organization_id` or `LANGSMITH_ORGANIZATION_ID` so the API receives `X-Organization-Id`. " +
-			"Bulk chart read (`POST /api/v1/org-charts`) and preview (`POST /api/v1/org-charts/preview`) are not represented as Terraform resources.",
+		MarkdownDescription: "Manages a LangSmith organization-scoped custom chart. Charts created via this resource live under `/api/v1/org-charts` and are visible across the organization rather than scoped to a single workspace. Use `langsmith_chart` for workspace-scoped charts.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "The unique identifier of the org chart.",
@@ -99,11 +49,11 @@ func (r *OrgChartResource) Schema(ctx context.Context, req resource.SchemaReques
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"title": schema.StringAttribute{
-				MarkdownDescription: "The title of the org chart.",
+				MarkdownDescription: "The title of the chart.",
 				Required:            true,
 			},
 			"description": schema.StringAttribute{
-				MarkdownDescription: "A description of the org chart.",
+				MarkdownDescription: "A description of the chart.",
 				Optional:            true,
 			},
 			"index": schema.Int64Attribute{
@@ -159,13 +109,13 @@ func (r *OrgChartResource) Configure(ctx context.Context, req resource.Configure
 }
 
 func (r *OrgChartResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var data OrgChartResourceModel
+	var data ChartResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	body := orgChartCreateRequest{
+	body := chartCreateRequest{
 		Title:     data.Title.ValueString(),
 		ChartType: data.ChartType.ValueString(),
 		Series:    json.RawMessage(data.Series.ValueString()),
@@ -187,14 +137,14 @@ func (r *OrgChartResource) Create(ctx context.Context, req resource.CreateReques
 
 	planSeries := data.Series
 
-	var result orgChartAPIResponse
+	var result chartAPIResponse
 	err := r.client.Post(ctx, "/api/v1/org-charts/create", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating org chart", err.Error())
 		return
 	}
 
-	mapOrgChartResponseToState(&data, &result)
+	mapChartResponseToState(&data, &result)
 	data.Series = planSeries
 	data.CreatedAt = types.StringNull()
 	data.UpdatedAt = types.StringNull()
@@ -203,7 +153,7 @@ func (r *OrgChartResource) Create(ctx context.Context, req resource.CreateReques
 }
 
 func (r *OrgChartResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var data OrgChartResourceModel
+	var data ChartResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -219,7 +169,7 @@ func (r *OrgChartResource) Read(ctx context.Context, req resource.ReadRequest, r
 		StartTime string `json:"start_time"`
 		EndTime   string `json:"end_time"`
 	}{OmitData: true, StartTime: "2020-01-01T00:00:00Z", EndTime: "2020-01-01T00:01:00Z"}
-	var result orgChartAPIResponse
+	var result chartAPIResponse
 	err := r.client.Post(ctx, "/api/v1/org-charts/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
@@ -230,7 +180,7 @@ func (r *OrgChartResource) Read(ctx context.Context, req resource.ReadRequest, r
 		return
 	}
 
-	mapOrgChartResponseToState(&data, &result)
+	mapChartResponseToState(&data, &result)
 	data.CreatedAt = savedCreatedAt
 	data.UpdatedAt = savedUpdatedAt
 	data.Series = savedSeries
@@ -239,13 +189,13 @@ func (r *OrgChartResource) Read(ctx context.Context, req resource.ReadRequest, r
 }
 
 func (r *OrgChartResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data OrgChartResourceModel
+	var data ChartResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	var prior OrgChartResourceModel
+	var prior ChartResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &prior)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -253,7 +203,7 @@ func (r *OrgChartResource) Update(ctx context.Context, req resource.UpdateReques
 	savedCreatedAt := prior.CreatedAt
 	savedUpdatedAt := prior.UpdatedAt
 
-	body := orgChartUpdateRequest{}
+	body := chartUpdateRequest{}
 	setOptionalString(&body.Title, data.Title)
 	setOptionalString(&body.Description, data.Description)
 	setOptionalString(&body.ChartType, data.ChartType)
@@ -276,14 +226,14 @@ func (r *OrgChartResource) Update(ctx context.Context, req resource.UpdateReques
 
 	planSeries := data.Series
 
-	var result orgChartAPIResponse
+	var result chartAPIResponse
 	err := r.client.Patch(ctx, "/api/v1/org-charts/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating org chart", err.Error())
 		return
 	}
 
-	mapOrgChartResponseToState(&data, &result)
+	mapChartResponseToState(&data, &result)
 	data.Series = planSeries
 	data.CreatedAt = savedCreatedAt
 	data.UpdatedAt = savedUpdatedAt
@@ -292,7 +242,7 @@ func (r *OrgChartResource) Update(ctx context.Context, req resource.UpdateReques
 }
 
 func (r *OrgChartResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data OrgChartResourceModel
+	var data ChartResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -309,20 +259,4 @@ func (r *OrgChartResource) Delete(ctx context.Context, req resource.DeleteReques
 
 func (r *OrgChartResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
-}
-
-func mapOrgChartResponseToState(data *OrgChartResourceModel, result *orgChartAPIResponse) {
-	data.ID = types.StringValue(result.ID)
-	data.Title = types.StringValue(result.Title)
-	data.ChartType = types.StringValue(result.ChartType)
-	data.Series = jsonStringValue(result.Series)
-	data.Metadata = jsonStringValue(result.Metadata)
-	data.CommonFilters = jsonStringValue(result.CommonFilters)
-	setStateOptionalString(&data.Description, result.Description)
-	setStateOptionalString(&data.SectionID, result.SectionID)
-	if result.Index != nil {
-		data.Index = types.Int64Value(*result.Index)
-	} else {
-		data.Index = types.Int64Null()
-	}
 }

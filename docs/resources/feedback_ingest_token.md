@@ -3,21 +3,25 @@
 page_title: "langsmith_feedback_ingest_token Resource - langsmith"
 subcategory: ""
 description: |-
-  Creates a LangSmith feedback ingest token via POST /api/v1/feedback/tokens. These tokens expose a URL for submitting feedback for a specific run_id and feedback_key without full API credentials. LangSmith does not expose a delete/revoke endpoint for ingest tokens; terraform destroy removes the object from Terraform state only and does not revoke the token server-side. Generic feedback submission (POST /api/v1/feedback, POST /api/v1/feedback/eager, and token-based submission on /api/v1/feedback/tokens/{token}) is intentionally not modeled here because it is operational rather than declarative infrastructure.
+  Issues a short-lived feedback ingest token bound to a single run and feedback key. The token URL is a signed endpoint that accepts feedback submissions without an API key. The API does not expose a delete endpoint — tokens expire on their own at expires_at; terraform destroy removes the resource from state but does not invalidate the token. Mutating any attribute forces replacement (a new token).
 ---
 
 # langsmith_feedback_ingest_token (Resource)
 
-Creates a LangSmith **feedback ingest token** via POST `/api/v1/feedback/tokens`. These tokens expose a URL for submitting feedback for a specific `run_id` and `feedback_key` without full API credentials. LangSmith does not expose a delete/revoke endpoint for ingest tokens; `terraform destroy` removes the object from Terraform state only and does not revoke the token server-side. Generic feedback submission (`POST /api/v1/feedback`, `POST /api/v1/feedback/eager`, and token-based submission on `/api/v1/feedback/tokens/{token}`) is intentionally not modeled here because it is operational rather than declarative infrastructure.
+Issues a short-lived feedback ingest token bound to a single run and feedback key. The token URL is a signed endpoint that accepts feedback submissions without an API key. **The API does not expose a delete endpoint** — tokens expire on their own at `expires_at`; `terraform destroy` removes the resource from state but does not invalidate the token. Mutating any attribute forces replacement (a new token).
 
 ## Example Usage
 
 ```terraform
-resource "langsmith_feedback_ingest_token" "external_rater" {
-  run_id       = "00000000-0000-4000-8000-000000000001"
-  feedback_key = "human_notes"
-  # Optional relative lifetime (OpenAPI TimedeltaInput)
-  # expires_in = jsonencode({ days = 7 })
+resource "langsmith_feedback_ingest_token" "thumbs" {
+  run_id       = "00000000-0000-0000-0000-000000000000"
+  feedback_key = "user_thumbs"
+  expires_at   = "2026-06-01T00:00:00Z"
+}
+
+output "ingest_url" {
+  value     = langsmith_feedback_ingest_token.thumbs.url
+  sensitive = true
 }
 ```
 
@@ -26,16 +30,14 @@ resource "langsmith_feedback_ingest_token" "external_rater" {
 
 ### Required
 
-- `feedback_key` (String) Feedback key name for this ingest token (OpenAPI `FeedbackIngestTokenCreateSchema.feedback_key`).
-- `run_id` (String) Run UUID this ingest token is scoped to (required by GET `/api/v1/feedback/tokens` when refreshing state).
+- `feedback_key` (String) Feedback key (score name) this token can write.
+- `run_id` (String) UUID of the run this token can post feedback for.
 
 ### Optional
 
-- `expires_at` (String) Optional RFC3339 timestamp sent as `expires_at` on create. After apply, this attribute reflects the canonical `expires_at` returned by the API.
-- `expires_in` (String) Optional JSON object matching OpenAPI `TimedeltaInput`, e.g. `jsonencode({"days" = 7})`. Sent as `expires_in` on create only; not echoed by read APIs, so the configured value is preserved in state after refresh.
-- `feedback_config` (String) Optional JSON object matching OpenAPI `FeedbackConfig`, sent on create only and preserved in Terraform state (not returned on reads).
+- `expires_at` (String) ISO 8601 expiration timestamp. If omitted, the server defaults are used.
 
 ### Read-Only
 
-- `id` (String) Token UUID returned by the API (distinct from the secret embedded in `url`).
-- `url` (String, Sensitive) Full ingest URL returned by the API (treat as a secret; it authorizes feedback submission).
+- `id` (String) The ID of this resource.
+- `url` (String, Sensitive) Signed feedback-submission URL.

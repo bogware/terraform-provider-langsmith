@@ -24,12 +24,3 @@ func testAccPreCheck(t *testing.T) {
 		t.Fatal("LANGSMITH_API_KEY must be set for acceptance tests")
 	}
 }
-
-// testAccPreCheckOrgCharts requires LANGSMITH_ORGANIZATION_ID for org chart API calls
-// (X-Organization-Id), in addition to the usual API key.
-func testAccPreCheckOrgCharts(t *testing.T) {
-	testAccPreCheck(t)
-	if os.Getenv("LANGSMITH_ORGANIZATION_ID") == "" {
-		t.Skip("LANGSMITH_ORGANIZATION_ID must be set for org chart acceptance tests")
-	}
-}

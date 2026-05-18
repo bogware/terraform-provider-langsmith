@@ -3,39 +3,35 @@
 page_title: "langsmith_gateway_policy Resource - langsmith"
 subcategory: ""
 description: |-
-  Manages a LangSmith LLM Gateway policy for the organization (/v1/platform/gateway-policies). Policies are evaluated on gateway traffic; they are not the same as workspace langsmith_secret values. Guard policies may enable detect.secrets / detect.pii in the policy config to redact model traffic — that refers to secrets embedded in prompts/responses, not LangSmith secret store keys. Use subject_matchers to scope a policy (for example workspace_id to a single workspace, or organization_id for the whole org). Requires organization_id on the provider (or LANGSMITH_ORGANIZATION_ID) so requests include X-Organization-Id, and an org API key with gateway permissions. Note: policy_type cannot be changed in place; update the resource in Terraform by replacing it.
+  Manages a LangSmith LLM Gateway policy. Policies select subjects via subject_matchers and apply an action (e.g. spend cap, allow/deny) governed by the policy-type-specific config.
 ---
 
 # langsmith_gateway_policy (Resource)
 
-Manages a LangSmith **LLM Gateway** policy for the organization (`/v1/platform/gateway-policies`). Policies are evaluated on gateway traffic; they are **not** the same as workspace `langsmith_secret` values. **Guard** policies may enable `detect.secrets` / `detect.pii` in the policy `config` to redact model traffic — that refers to secrets embedded in prompts/responses, not LangSmith secret store keys. Use `subject_matchers` to scope a policy (for example `workspace_id` to a single workspace, or `organization_id` for the whole org). **Requires** `organization_id` on the provider (or `LANGSMITH_ORGANIZATION_ID`) so requests include `X-Organization-Id`, and an org API key with gateway permissions. **Note:** `policy_type` cannot be changed in place; update the resource in Terraform by replacing it.
+Manages a LangSmith LLM Gateway policy. Policies select subjects via `subject_matchers` and apply an `action` (e.g. spend cap, allow/deny) governed by the policy-type-specific `config`.
 
 ## Example Usage
 
 ```terraform
-# LangSmith LLM Gateway policies are organization-scoped. Set
-# LANGSMITH_ORGANIZATION_ID (or provider `organization_id`) and use an API key
-# with gateway permissions. This example uses a lightweight guard policy scoped
-# to the organization; adjust `subject_matchers` to target a workspace (`workspace_id`)
-# or other subjects per the OpenAPI `gateway_policies` schemas.
-
-resource "langsmith_gateway_policy" "example" {
-  name        = "example-guard"
-  description = "Example guard policy managed by Terraform"
-  policy_type = "guard"
+resource "langsmith_gateway_policy" "monthly_cap" {
+  name        = "monthly-spend-cap"
+  description = "Cap production org spend to $1k/month"
+  policy_type = "spend_cap"
   action      = "block"
-  subject_matchers = jsonencode([
-    { key = "organization_id", value = "<organization-uuid>" }
-  ])
+  enabled     = true
+  priority    = 10
+
   config = jsonencode({
-    version = 1
-    detect = {
-      pii     = true
-      secrets = true
-    }
+    amount_usd = 1000
+    window     = "month"
   })
-  enabled  = true
-  priority = 0
+
+  subject_matchers = [
+    {
+      key   = "workspace_id"
+      value = langsmith_workspace.production.id
+    },
+  ]
 }
 ```
 
@@ -44,25 +40,33 @@ resource "langsmith_gateway_policy" "example" {
 
 ### Required
 
-- `action` (String) Enforcement action. The API currently supports `block`.
-- `config` (String) JSON policy configuration. Shape depends on `policy_type` (see LangSmith OpenAPI `gateway_policies.CreateGatewayPolicyRequest`). Examples: spend cap `{"window":"monthly","limit_usd":100}`; guard `{"version":1,"detect":{"pii":true,"secrets":true}}`.
-- `name` (String) Policy name (unique per organization).
-- `policy_type` (String) One of `spend_cap`, `default_spend_cap`, or `guard`. Immutable after create.
-- `subject_matchers` (String) JSON array of `{"key","value"}` matchers. `key` is one of `organization_id`, `workspace_id`, `user_id`, `api_key_id`. Matchers are ANDed. For `default_spend_cap`, the API may use `{ "key": "...", "value": "" }` so runtime children are materialized per subject.
+- `action` (String) Action applied when the policy matches (e.g. `block`).
+- `name` (String) Policy name.
+- `policy_type` (String) Policy kind (e.g. `spend_cap`). Cannot be changed after creation.
 
 ### Optional
 
-- `description` (String) Optional human-readable description.
-- `enabled` (Boolean) Whether the policy is active. Omit to use the API default on create.
-- `priority` (Number) Evaluation priority (lower runs first). Omit to use the API default on create.
+- `config` (String) JSON-encoded policy-type-specific configuration (e.g. for `spend_cap`: `{"amount_usd": 100, "window": "month"}`).
+- `description` (String) Free-form description.
+- `enabled` (Boolean) Whether the policy is active.
+- `priority` (Number) Evaluation priority — lower values are evaluated first.
+- `subject_matchers` (Attributes List) Predicates that select which API calls the policy applies to. (see [below for nested schema](#nestedatt--subject_matchers))
 
 ### Read-Only
 
-- `created_at` (String) Creation timestamp.
-- `created_by` (String) Actor that created the policy, when exposed by the API.
-- `current_spend_usd` (Number) Spend accumulated in the active window for spend-cap policies; unset for guard policies.
-- `id` (String) Gateway policy UUID.
-- `is_system_generated` (Boolean) True when the row was materialized or managed by the platform.
-- `organization_id` (String) Organization that owns this policy (from the API).
-- `parent_policy_id` (String) Set on materialized children of a `default_spend_cap` template policy.
-- `updated_at` (String) Last update timestamp.
+- `created_at` (String)
+- `created_by` (String)
+- `current_spend_usd` (Number) Current spend in the policy's window for `spend_cap` policies. Null otherwise.
+- `id` (String) The ID of this resource.
+- `is_system_generated` (Boolean) True for policies materialized from a default spend cap.
+- `organization_id` (String)
+- `parent_policy_id` (String) Set on materialized children of a default spend cap; references the parent policy.
+- `updated_at` (String)
+
+<a id="nestedatt--subject_matchers"></a>
+### Nested Schema for `subject_matchers`
+
+Required:
+
+- `key` (String)
+- `value` (String)

@@ -1,3 +1,3 @@
-data "langsmith_tool" "example" {
-  handle = "example-tool-handle"
+data "langsmith_tool" "lookup_customer" {
+  handle = "lookup-customer"
 }

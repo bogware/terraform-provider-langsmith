@@ -3,25 +3,19 @@
 page_title: "langsmith_annotation_queue_reviewer Resource - langsmith"
 subcategory: ""
 description: |-
-  Manages a reviewer identity on a LangSmith annotation queue using the platform API (POST /v1/platform/annotation-queues/{queue_id}/reviewers, GET /v1/platform/annotation-queues/{queue_id}/reviewers/{identity_id}, DELETE /v1/platform/annotation-queues/{queue_id}/reviewers/{identity_id}). Membership cannot be edited in place; change queue_id or identity_id to replace the resource.
+  Assigns an identity as a reviewer on a LangSmith annotation queue. The LangSmith API does not expose a per-pair read endpoint; Read for this resource is a no-op (the membership is taken to exist as long as it is in state).
 ---
 
 # langsmith_annotation_queue_reviewer (Resource)
 
-Manages a **reviewer identity** on a LangSmith annotation queue using the platform API (`POST /v1/platform/annotation-queues/{queue_id}/reviewers`, `GET /v1/platform/annotation-queues/{queue_id}/reviewers/{identity_id}`, `DELETE /v1/platform/annotation-queues/{queue_id}/reviewers/{identity_id}`). Membership cannot be edited in place; change `queue_id` or `identity_id` to replace the resource.
+Assigns an identity as a reviewer on a LangSmith annotation queue. The LangSmith API does not expose a per-pair read endpoint; Read for this resource is a no-op (the membership is taken to exist as long as it is in state).
 
 ## Example Usage
 
 ```terraform
-resource "langsmith_annotation_queue" "example" {
-  name = "example-review-queue"
-}
-
-# identity_id is typically a workspace member id from
-# GET /api/v1/workspaces/current/members (the member's "id" field).
-resource "langsmith_annotation_queue_reviewer" "example" {
-  queue_id    = langsmith_annotation_queue.example.id
-  identity_id = "00000000-0000-4000-8000-000000000000"
+resource "langsmith_annotation_queue_reviewer" "alice" {
+  queue_id    = langsmith_annotation_queue.review.id
+  identity_id = data.langsmith_user.alice.id
 }
 ```
 
@@ -30,9 +24,9 @@ resource "langsmith_annotation_queue_reviewer" "example" {
 
 ### Required
 
-- `identity_id` (String) The reviewer identity ID (for example a workspace member `id` from `GET /api/v1/workspaces/current/members`).
-- `queue_id` (String) The annotation queue ID (`langsmith_annotation_queue.id`).
+- `identity_id` (String) UUID of the reviewer identity (user or service account).
+- `queue_id` (String) UUID of the annotation queue.
 
 ### Read-Only
 
-- `id` (String) Stable composite identifier: `queue_id`/`identity_id`.
+- `id` (String) The ID of this resource.
