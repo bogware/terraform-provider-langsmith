@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -49,7 +50,8 @@ func (d *AuditLogDataSource) Metadata(ctx context.Context, req datasource.Metada
 
 func (d *AuditLogDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Retrieves a page of LangSmith audit log entries in OCSF format. `start_time` and `end_time` are required (ISO 8601). Each entry is surfaced as a JSON-encoded string in `items` because the OCSF payload is large and heterogeneous.",
+		MarkdownDescription: "Retrieves a page of LangSmith audit log entries via GET `/api/v1/audit-logs` (OCSF API Activity). `start_time` and `end_time` are required (ISO 8601). Each entry is a normalized JSON string in `items`. " +
+			"Set `organization_id` on the provider or `LANGSMITH_ORGANIZATION_ID` when using an organization-scoped API key.",
 		Attributes: map[string]schema.Attribute{
 			"start_time":   schema.StringAttribute{Required: true, MarkdownDescription: "ISO 8601 start timestamp (inclusive)."},
 			"end_time":     schema.StringAttribute{Required: true, MarkdownDescription: "ISO 8601 end timestamp (exclusive)."},
@@ -57,15 +59,25 @@ func (d *AuditLogDataSource) Schema(ctx context.Context, req datasource.SchemaRe
 			"operations": schema.ListAttribute{
 				Optional:            true,
 				ElementType:         types.StringType,
-				MarkdownDescription: "Filter to specific operation names.",
+				MarkdownDescription: "When non-empty, each element is sent as a repeated `operations` query parameter (OpenAPI `AuditLogOperation` values), for example `create_api_key`.",
 			},
-			"limit":       schema.Int64Attribute{Optional: true},
-			"cursor":      schema.StringAttribute{Optional: true, MarkdownDescription: "Pagination cursor returned from a prior call."},
-			"next_cursor": schema.StringAttribute{Computed: true, MarkdownDescription: "Cursor for the next page, or null when there are no more results."},
-			"items": schema.ListAttribute{
+			"limit": schema.Int64Attribute{
+				Optional:            true,
+				MarkdownDescription: "Maximum number of events to return (1–100). When unset, the API default applies.",
+			},
+			"cursor": schema.StringAttribute{
+				Optional:            true,
+				MarkdownDescription: "Opaque pagination cursor from a previous response (`next_cursor`) to fetch the next page.",
+			},
+			"next_cursor": schema.StringAttribute{
 				Computed:            true,
-				ElementType:         types.StringType,
-				MarkdownDescription: "JSON-encoded audit log entries (one OCSF activity per element).",
+				MarkdownDescription: "Cursor returned by the API for the following page, if any.",
+			},
+			"items": schema.ListAttribute{
+				Computed:    true,
+				ElementType: types.StringType,
+				MarkdownDescription: "Audit events from the `items` array; each string is normalized JSON (OCSF API Activity). " +
+					"Parse in your stack or use `jsondecode()` in Terraform expressions.",
 			},
 		},
 	}
@@ -89,18 +101,52 @@ func (d *AuditLogDataSource) Read(ctx context.Context, req datasource.ReadReques
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	if data.StartTime.IsNull() || data.StartTime.IsUnknown() || data.EndTime.IsNull() || data.EndTime.IsUnknown() {
+		resp.Diagnostics.AddError(
+			"Missing Required Attribute",
+			"The attributes \"start_time\" and \"end_time\" must be specified.",
+		)
+		return
+	}
+
+	start := strings.TrimSpace(data.StartTime.ValueString())
+	end := strings.TrimSpace(data.EndTime.ValueString())
+	if start == "" || end == "" {
+		resp.Diagnostics.AddError(
+			"Missing Required Attribute",
+			"The attributes \"start_time\" and \"end_time\" must be non-empty ISO 8601 timestamps.",
+		)
+		return
+	}
+
 	q := url.Values{}
-	q.Set("start_time", data.StartTime.ValueString())
-	q.Set("end_time", data.EndTime.ValueString())
+	q.Set("start_time", start)
+	q.Set("end_time", end)
+
+	workspaceID := ""
 	if !data.WorkspaceID.IsNull() && !data.WorkspaceID.IsUnknown() {
-		q.Set("workspace_id", data.WorkspaceID.ValueString())
+		workspaceID = strings.TrimSpace(data.WorkspaceID.ValueString())
 	}
+	if workspaceID != "" {
+		q.Set("workspace_id", workspaceID)
+	}
+
 	if !data.Limit.IsNull() && !data.Limit.IsUnknown() {
-		q.Set("limit", fmt.Sprintf("%d", data.Limit.ValueInt64()))
+		limit := data.Limit.ValueInt64()
+		if limit < 1 || limit > 100 {
+			resp.Diagnostics.AddError("Invalid limit", "limit must be between 1 and 100 when set.")
+			return
+		}
+		q.Set("limit", fmt.Sprintf("%d", limit))
 	}
+
 	if !data.Cursor.IsNull() && !data.Cursor.IsUnknown() {
-		q.Set("cursor", data.Cursor.ValueString())
+		if cursor := strings.TrimSpace(data.Cursor.ValueString()); cursor != "" {
+			q.Set("cursor", cursor)
+		}
 	}
+
 	if !data.Operations.IsNull() && !data.Operations.IsUnknown() {
 		var ops []string
 		resp.Diagnostics.Append(data.Operations.ElementsAs(ctx, &ops, false)...)
@@ -108,6 +154,11 @@ func (d *AuditLogDataSource) Read(ctx context.Context, req datasource.ReadReques
 			return
 		}
 		for _, op := range ops {
+			op = strings.TrimSpace(op)
+			if op == "" {
+				resp.Diagnostics.AddError("Invalid operations", "operations entries must be non-empty strings.")
+				return
+			}
 			q.Add("operations", op)
 		}
 	}
@@ -117,17 +168,17 @@ func (d *AuditLogDataSource) Read(ctx context.Context, req datasource.ReadReques
 		resp.Diagnostics.AddError("Error reading audit logs", err.Error())
 		return
 	}
-	if api.Cursor != nil {
-		data.NextCursor = types.StringValue(*api.Cursor)
-	} else {
-		data.NextCursor = types.StringNull()
-	}
+	data.NextCursor = types.StringPointerValue(api.Cursor)
+
 	elems := make([]attr.Value, 0, len(api.Items))
 	for _, raw := range api.Items {
-		elems = append(elems, types.StringValue(string(raw)))
+		elems = append(elems, jsonStringValue(raw))
 	}
 	list, diags := types.ListValue(types.StringType, elems)
 	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	data.Items = list
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

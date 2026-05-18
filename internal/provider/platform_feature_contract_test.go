@@ -41,9 +41,9 @@ func TestAccPlatformFeatureResource_contract(t *testing.T) {
 			}
 			out := []map[string]any{
 				{
-					"feature":          "playground",
-					"default_model":    dmPtr,
-					"disabled_models":  dis,
+					"feature":         "playground",
+					"default_model":   dmPtr,
+					"disabled_models": dis,
 				},
 			}
 			w.Header().Set("Content-Type", "application/json")

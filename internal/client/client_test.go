@@ -363,7 +363,9 @@ func TestClient_PostWithQuery_Patch_Put_Delete_Variants(t *testing.T) {
 		t.Fatalf("Delete: method=%q path=%q", lastMethod, lastPath)
 	}
 
-	var resp struct{ OK bool `json:"ok"` }
+	var resp struct {
+		OK bool `json:"ok"`
+	}
 	if err := c.PostWithQuery(ctx, "/with-result", q, nil, &resp); err != nil {
 		t.Fatalf("PostWithQuery result: %v", err)
 	}

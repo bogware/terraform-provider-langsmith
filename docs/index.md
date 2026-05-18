@@ -16,6 +16,9 @@ provider "langsmith" {
   api_key   = var.langsmith_api_key
   api_url   = "https://api.smith.langchain.com"
   tenant_id = var.langsmith_tenant_id # Required for org-scoped API keys
+
+  # Optional: required for org-scoped resources (org charts, audit logs, org listings).
+  # organization_id = var.langsmith_organization_id
 }
 ```
 

@@ -3,20 +3,21 @@
 page_title: "langsmith_audit_log Data Source - langsmith"
 subcategory: ""
 description: |-
-  Retrieves a page of LangSmith audit log entries in OCSF format. start_time and end_time are required (ISO 8601). Each entry is surfaced as a JSON-encoded string in items because the OCSF payload is large and heterogeneous.
+  Retrieves a page of LangSmith audit log entries via GET /api/v1/audit-logs (OCSF API Activity). start_time and end_time are required (ISO 8601). Each entry is a normalized JSON string in items. Set organization_id on the provider or LANGSMITH_ORGANIZATION_ID when using an organization-scoped API key.
 ---
 
 # langsmith_audit_log (Data Source)
 
-Retrieves a page of LangSmith audit log entries in OCSF format. `start_time` and `end_time` are required (ISO 8601). Each entry is surfaced as a JSON-encoded string in `items` because the OCSF payload is large and heterogeneous.
+Retrieves a page of LangSmith audit log entries via GET `/api/v1/audit-logs` (OCSF API Activity). `start_time` and `end_time` are required (ISO 8601). Each entry is a normalized JSON string in `items`. Set `organization_id` on the provider or `LANGSMITH_ORGANIZATION_ID` when using an organization-scoped API key.
 
 ## Example Usage
 
 ```terraform
-data "langsmith_audit_log" "last_hour" {
-  start_time = "2026-05-14T12:00:00Z"
-  end_time   = "2026-05-14T13:00:00Z"
-  limit      = 100
+data "langsmith_audit_log" "recent" {
+  start_time = "2026-01-01T00:00:00Z"
+  end_time   = "2026-01-31T23:59:59Z"
+  operations = ["create_api_key", "delete_api_key"]
+  limit      = 50
 }
 ```
 
@@ -30,12 +31,12 @@ data "langsmith_audit_log" "last_hour" {
 
 ### Optional
 
-- `cursor` (String) Pagination cursor returned from a prior call.
-- `limit` (Number)
-- `operations` (List of String) Filter to specific operation names.
+- `cursor` (String) Opaque pagination cursor from a previous response (`next_cursor`) to fetch the next page.
+- `limit` (Number) Maximum number of events to return (1–100). When unset, the API default applies.
+- `operations` (List of String) When non-empty, each element is sent as a repeated `operations` query parameter (OpenAPI `AuditLogOperation` values), for example `create_api_key`.
 - `workspace_id` (String) Filter to a single workspace UUID.
 
 ### Read-Only
 
-- `items` (List of String) JSON-encoded audit log entries (one OCSF activity per element).
-- `next_cursor` (String) Cursor for the next page, or null when there are no more results.
+- `items` (List of String) Audit events from the `items` array; each string is normalized JSON (OCSF API Activity). Parse in your stack or use `jsondecode()` in Terraform expressions.
+- `next_cursor` (String) Cursor returned by the API for the following page, if any.

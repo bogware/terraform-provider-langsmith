@@ -233,12 +233,19 @@ This pattern works well for a known, static set of workspaces. Dynamic `for_each
 | `langsmith_platform_features` | Consolidated platform feature configuration |
 | `langsmith_gateway_policy` | Look up a gateway policy by ID |
 | `langsmith_mcp_vendor` | Look up an MCP vendor by slug |
-| `langsmith_audit_log` | Page audit log entries (OCSF format) |
-| `langsmith_audit_logs` | List organization audit events (`GET /api/v1/audit-logs`) |
+| `langsmith_audit_log` | Page audit log entries (OCSF format, `GET /api/v1/audit-logs`) |
 | `langsmith_data_planes` | List self-hosted data planes for the org |
 | `langsmith_chart` / `langsmith_chart_section` | Look up workspace charts and sections |
 | `langsmith_org_chart` / `langsmith_org_chart_section` | Look up org-scoped charts and sections |
 | `langsmith_chart_preview` / `langsmith_org_chart_preview` | Preview chart data points |
+
+## Fork vs upstream
+
+This repository tracks [bogware/terraform-provider-langsmith](https://github.com/bogware/terraform-provider-langsmith) as the upstream baseline. All upstream resources and data sources are kept under the same Terraform type names.
+
+**Fork-only extensions** (APIs upstream does not yet expose in Terraform) include `langsmith_api_key`, `langsmith_settings`, `langsmith_platform_feature`, `langsmith_fleet_mcp_server`, org listing data sources (`langsmith_organizations`, `langsmith_organization_permissions`, `langsmith_organization_pending_invites`), `langsmith_tenants`, `langsmith_platform_features`, `langsmith_project_agent_versions`, `langsmith_sso_settings_by_slug`, `langsmith_feedback_ingest_tokens`, and provider `organization_id`. See [API_COVERAGE_AUDIT.md](./API_COVERAGE_AUDIT.md) for the full table.
+
+We do not register duplicate Terraform types for the same HTTP endpoint. For audit logs, use upstream's `langsmith_audit_log` (not `langsmith_audit_logs`).
 
 ## Development
 

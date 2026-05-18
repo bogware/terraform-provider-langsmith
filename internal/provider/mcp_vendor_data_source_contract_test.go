@@ -15,7 +15,7 @@ import (
 func TestAccMCPVendorDataSource_contract(t *testing.T) {
 	apiBody := mcpVendorAPI{
 		VendorID:    "vid-1",
-		ProviderID: "pid-1",
+		ProviderID:  "pid-1",
 		Name:        "Acme",
 		Description: "ACME MCP",
 		Icon:        "icon.png",

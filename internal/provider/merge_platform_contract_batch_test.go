@@ -22,7 +22,7 @@ func TestAccGatewayPolicyDataSource_contract(t *testing.T) {
 		ID: pid, Name: "P", Description: "d", PolicyType: "spend_cap", Action: "block",
 		Priority: 10, Enabled: true, Config: map[string]interface{}{"a": 1},
 		SubjectMatchers: []gatewayPolicySubjectMatcher{{Key: "k", Value: "v"}},
-		OrganizationID: "org-1", IsSystemGenerated: false, CurrentSpendUSD: &spend,
+		OrganizationID:  "org-1", IsSystemGenerated: false, CurrentSpendUSD: &spend,
 		CreatedAt: "2026-01-01T00:00:00Z", UpdatedAt: "2026-01-02T00:00:00Z",
 	}
 	raw, _ := json.Marshal(api)
