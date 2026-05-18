@@ -9,6 +9,10 @@
 
 Manage your [LangSmith](https://smith.langchain.com/) infrastructure as code. This provider gives you full control over projects, datasets, annotation queues, prompts, automation rules, workspaces, and more through Terraform.
 
+## API coverage audit
+
+The **2026-05** OpenAPI comparison and explicit **won’t do** decisions for operational surfaces are recorded in [`API_COVERAGE_AUDIT.md`](API_COVERAGE_AUDIT.md). That file maps Linear **[TYTY-79](https://linear.app/team-tyty/issue/TYTY-79/meta-langsmith-api-vs-terraform-provider-coverage-audit-2026-05)** child issues (TYTY-64–TYTY-78) to provider resources and data sources so the meta ticket can be closed with rationale in-repo.
+
 ## Quick Start
 
 ```hcl
@@ -126,12 +130,9 @@ Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
 | `langsmith_service_key` | API service keys (create + delete only, key is sensitive) |
 | `langsmith_api_key` | Tenant/workspace API keys via `/api/v1/api-key` (secret shown once at create) |
 | `langsmith_prompt` | Prompts in the LangSmith Hub (with manifest/content management) |
-| `langsmith_prompt_tag` | Named version tags on prompt commits (e.g., `production`, `staging`) |
 | `langsmith_run_rule` | Automation rules for run routing |
 | `langsmith_webhook` | Prompt webhooks |
 | `langsmith_feedback_config` | Feedback score configurations |
-| `langsmith_feedback_formula` | Computed feedback formulas (`/api/v1/feedback/formulas`) |
-| `langsmith_feedback_ingest_token` | Feedback ingest tokens for external submission (`POST /api/v1/feedback/tokens`) |
 | `langsmith_workspace` | Workspaces |
 | `langsmith_tag_key` | Tag keys for resource tagging |
 | `langsmith_tag_value` | Tag values (nested under tag keys) |
@@ -147,21 +148,48 @@ Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
 | `langsmith_org_role` | Organization roles (RBAC) |
 | `langsmith_sso_settings` | SSO/SAML settings |
 | `langsmith_workspace_member` | Workspace member management |
+| `langsmith_prompt_tag` | Named version tags on prompt commits (e.g., `production`, `staging`) |
+| `langsmith_org_member` | Organization membership |
+| `langsmith_filter_view` | Saved filter views |
+| `langsmith_tagging` | Apply tag key/value pairs to LangSmith resources |
+| `langsmith_feedback_formula` | Computed feedback formulas (`/api/v1/feedback/formulas`) |
+| `langsmith_chart_section` | Chart sections within a project |
+| `langsmith_chart` | Charts (project-scoped) |
+| `langsmith_org_chart_section` | Org chart sections |
+| `langsmith_org_chart` | Organization charts |
+| `langsmith_access_policy` | Access policies |
+| `langsmith_gateway_policy` | Gateway policies (`/v1/platform/gateway-policies`) |
+| `langsmith_scim_token` | SCIM provisioning tokens |
+| `langsmith_feedback_ingest_token` | Feedback ingest tokens for external submission (`POST /api/v1/feedback/tokens`) |
+| `langsmith_platform_feature` | Organization feature flags and model restrictions (`/v1/platform/features`) |
+| `langsmith_evaluator` | Hosted evaluators (`/v1/platform/evaluators`) |
 
 ## Data Sources
 
 | Data Source | Description |
 |-------------|-------------|
 | `langsmith_project` | Look up a project by name or ID |
+| `langsmith_project_agent_versions` | Agent deployment versions for a project (`/v1/platform/sessions/{id}/agent-versions`) |
 | `langsmith_dataset` | Look up a dataset by name or ID |
 | `langsmith_workspace` | Look up a workspace by name or ID |
+| `langsmith_tenants` | List tenants/workspaces (`GET /api/v1/tenants`; may 403 for workspace-scoped keys) |
 | `langsmith_info` | LangSmith server information |
 | `langsmith_organization` | Current organization details |
 | `langsmith_prompt_commit` | Read a specific prompt commit by hash, tag, or `latest` |
+| `langsmith_prompt` | Look up a prompt by name or ID |
+| `langsmith_annotation_queue` | Look up an annotation queue by name or ID |
+| `langsmith_org_role` | Look up an organization role |
+| `langsmith_run_rule` | Look up a run rule by ID |
+| `langsmith_tag_key` | Look up a tag key |
+| `langsmith_service_account` | Look up a service account |
 | `langsmith_settings` | Current workspace (`GET /api/v1/settings`, OpenAPI `Tenant`) |
+| `langsmith_user` | Look up a user by ID |
 | `langsmith_tool` | Look up a platform registry tool by stable `handle` or `id` |
 | `langsmith_sso_settings_by_slug` | Resolve SSO providers for a login slug (`GET /api/v1/sso/settings/{sso_login_slug}`) |
 | `langsmith_feedback_ingest_tokens` | List feedback ingest tokens for a run (`GET /api/v1/feedback/tokens`) |
+| `langsmith_audit_logs` | List organization audit log events (`GET /api/v1/audit-logs`) |
+| `langsmith_platform_features` | Read organization platform features in bulk |
+| `langsmith_evaluator` | Look up a hosted evaluator |
 
 ## Development
 
@@ -217,6 +245,8 @@ git add docs/
 ```
 
 CI will fail if generated docs are stale.
+
+The repository root [`API_COVERAGE_AUDIT.md`](API_COVERAGE_AUDIT.md) is maintained by hand (it is not produced by `make generate`): update it when OpenAPI coverage decisions change.
 
 ## License
 
