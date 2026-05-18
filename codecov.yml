@@ -1,5 +1,5 @@
 # https://docs.codecov.com/docs/codecov-yaml
-# Path-specific floors (TYTY-87): start low on provider (mostly TF_ACC-tested);
+# Path-specific floors: start low on provider (mostly TF_ACC-tested);
 # internal/client has unit tests with a higher pragmatic floor.
 coverage:
   precision: 2

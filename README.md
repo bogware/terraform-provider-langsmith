@@ -11,7 +11,7 @@ Manage your [LangSmith](https://smith.langchain.com/) infrastructure as code. Th
 
 ## API coverage audit
 
-The **2026-05** OpenAPI comparison and explicit **won’t do** decisions for operational surfaces are recorded in [`API_COVERAGE_AUDIT.md`](API_COVERAGE_AUDIT.md). That file maps Linear **[TYTY-79](https://linear.app/team-tyty/issue/TYTY-79/meta-langsmith-api-vs-terraform-provider-coverage-audit-2026-05)** child issues (TYTY-64–TYTY-78) to provider resources and data sources so the meta ticket can be closed with rationale in-repo.
+The **2026-05** OpenAPI comparison and explicit **won’t do** decisions for operational surfaces are recorded in [`API_COVERAGE_AUDIT.md`](API_COVERAGE_AUDIT.md). That file lists each audited API area and how it maps to provider resources and data sources, including rationale where Terraform is intentionally out of scope.
 
 ## Quick Start
 
