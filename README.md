@@ -11,7 +11,7 @@ Manage your [LangSmith](https://smith.langchain.com/) infrastructure as code. Th
 
 ## API coverage audit
 
-The **2026-05** OpenAPI comparison and explicit **won’t do** decisions for operational surfaces are recorded in [`API_COVERAGE_AUDIT.md`](API_COVERAGE_AUDIT.md). That file maps Linear **[TYTY-79](https://linear.app/team-tyty/issue/TYTY-79/meta-langsmith-api-vs-terraform-provider-coverage-audit-2026-05)** child issues (TYTY-64–TYTY-78) to provider resources and data sources so the meta ticket can be closed with rationale in-repo.
+The **2026-05-18** OpenAPI comparison and explicit **won’t do** decisions for operational surfaces are recorded in [`API_COVERAGE_AUDIT.md`](API_COVERAGE_AUDIT.md). That file reflects the current registry in `internal/provider/provider.go` (43 resources, 25 data sources) and how major API themes map to Terraform, including deliberate gaps.
 
 ## Quick Start
 
@@ -163,6 +163,7 @@ Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
 | `langsmith_feedback_ingest_token` | Feedback ingest tokens for external submission (`POST /api/v1/feedback/tokens`) |
 | `langsmith_platform_feature` | Organization feature flags and model restrictions (`/v1/platform/features`) |
 | `langsmith_evaluator` | Hosted evaluators (`/v1/platform/evaluators`) |
+| `langsmith_fleet_mcp_server` | Workspace MCP server registrations (`/v1/platform/fleet/mcp-servers`) |
 
 ## Data Sources
 
@@ -175,6 +176,9 @@ Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
 | `langsmith_tenants` | List tenants/workspaces (`GET /api/v1/tenants`; may 403 for workspace-scoped keys) |
 | `langsmith_info` | LangSmith server information |
 | `langsmith_organization` | Current organization details |
+| `langsmith_organizations` | Organizations visible to the caller (`GET /api/v1/orgs`) |
+| `langsmith_organization_permissions` | Organization permission catalog (`GET /api/v1/orgs/permissions`) |
+| `langsmith_organization_pending_invites` | Pending org invitations (`GET /api/v1/orgs/pending`; read-only) |
 | `langsmith_prompt_commit` | Read a specific prompt commit by hash, tag, or `latest` |
 | `langsmith_prompt` | Look up a prompt by name or ID |
 | `langsmith_annotation_queue` | Look up an annotation queue by name or ID |
