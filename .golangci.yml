@@ -1,11 +1,13 @@
 linters:
   enable:
+    - bodyclose
     - copyloopvar
     - depguard
     - durationcheck
     - errcheck
     - forcetypeassert
     - godot
+    - gosec
     - ineffassign
     - makezero
     - misspell
@@ -30,6 +32,10 @@ linters-settings:
             desc: "Use github.com/hashicorp/terraform-plugin-testing/terraform"
           - pkg: "github.com/hashicorp/terraform-plugin-sdk/v2"
             desc: "Use Terraform Plugin Framework"
+  gosec:
+    # Severity does not affect golangci exit code; included for clearer CI output.
+    severity: medium
+    confidence: medium
 
 issues:
   max-issues-per-linter: 0

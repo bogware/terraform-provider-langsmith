@@ -1,0 +1,35 @@
+# https://docs.codecov.com/docs/codecov-yaml
+# Path-specific floors: start low on provider (mostly TF_ACC-tested);
+# internal/client has unit tests with a higher pragmatic floor.
+coverage:
+  precision: 2
+  round: down
+  range: "50...100"
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+      provider:
+        name: codecov/floor-internal-provider
+        target: 0.5%
+        informational: false
+        paths:
+          - internal/provider/**
+      client:
+        name: codecov/floor-internal-client
+        target: 40%
+        informational: false
+        paths:
+          - internal/client/**
+    patch:
+      default:
+        target: auto
+
+github_checks:
+  annotations: true
+
+comment:
+  layout: "reach,diff,flags,files,footer"
+  behavior: default
+  require_changes: false
