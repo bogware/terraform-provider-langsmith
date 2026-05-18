@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"math/rand"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -164,7 +164,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, query url.V
 // retryDelay calculates exponential backoff with jitter: base * 2^(attempt-1) +/- 20%.
 func retryDelay(attempt int) time.Duration {
 	base := math.Pow(2, float64(attempt-1)) * float64(time.Second)
-	//nolint:gosec // G404: non-cryptographic jitter for HTTP retry backoff.
+	//nolint:gosec // G404: math/rand/v2 default source is auto-seeded; backoff jitter only.
 	jitter := base * 0.2 * (2*rand.Float64() - 1)
 	return time.Duration(base + jitter)
 }
