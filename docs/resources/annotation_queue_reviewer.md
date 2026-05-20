@@ -27,6 +27,10 @@ resource "langsmith_annotation_queue_reviewer" "alice" {
 - `identity_id` (String) UUID of the reviewer identity (user or service account).
 - `queue_id` (String) UUID of the annotation queue.
 
+### Optional
+
+- `tenant_id` (String) If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
+
 ### Read-Only
 
 - `id` (String) The ID of this resource.

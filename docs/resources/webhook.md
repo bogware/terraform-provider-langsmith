@@ -31,11 +31,11 @@ resource "langsmith_webhook" "example" {
 - `exclude_prompts` (List of String) Prompt names to exclude.
 - `headers` (Map of String) Custom headers to include in webhook requests.
 - `include_prompts` (List of String) Prompt names to include.
+- `tenant_id` (String) The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
 - `triggers` (List of String) Trigger events for the webhook.
 
 ### Read-Only
 
 - `created_at` (String) When the webhook was created.
 - `id` (String) The unique identifier of the webhook.
-- `tenant_id` (String) The tenant ID.
 - `updated_at` (String) When the webhook was last updated.

@@ -337,8 +337,10 @@ func (r *RunRuleResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Computed:            true,
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID.",
+				MarkdownDescription: "The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+				Optional:            true,
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "When the rule was created.",
@@ -463,7 +465,7 @@ func (r *RunRuleResource) Create(ctx context.Context, req resource.CreateRequest
 	planCreateAlignmentQueue := data.CreateAlignmentQueue
 
 	var result runRuleAPIResponse
-	err := r.client.Post(ctx, "/api/v1/runs/rules", body, &result)
+	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/runs/rules", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating run rule", err.Error())
 		return
@@ -488,7 +490,7 @@ func (r *RunRuleResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 
 	var rules []runRuleAPIResponse
-	err := r.client.Get(ctx, "/api/v1/runs/rules", nil, &rules)
+	err := effectiveClient(r.client, data.TenantID).Get(ctx, "/api/v1/runs/rules", nil, &rules)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading run rules", err.Error())
 		return
@@ -606,7 +608,7 @@ func (r *RunRuleResource) Update(ctx context.Context, req resource.UpdateRequest
 	planCreateAlignmentQueue := data.CreateAlignmentQueue
 
 	var result runRuleAPIResponse
-	err := r.client.Patch(ctx, fmt.Sprintf("/api/v1/runs/rules/%s", data.ID.ValueString()), body, &result)
+	err := effectiveClient(r.client, data.TenantID).Patch(ctx, fmt.Sprintf("/api/v1/runs/rules/%s", data.ID.ValueString()), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating run rule", err.Error())
 		return
@@ -628,7 +630,7 @@ func (r *RunRuleResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	err := r.client.Delete(ctx, fmt.Sprintf("/api/v1/runs/rules/%s", data.ID.ValueString()))
+	err := effectiveClient(r.client, data.TenantID).Delete(ctx, fmt.Sprintf("/api/v1/runs/rules/%s", data.ID.ValueString()))
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting run rule", err.Error())
 	}

@@ -167,7 +167,7 @@ func (r *TTLSettingsResource) Create(ctx context.Context, req resource.CreateReq
 	}
 
 	var result ttlSettingsAPIResponse
-	err := r.client.Put(ctx, "/api/v1/orgs/ttl-settings", body, &result)
+	err := effectiveClient(r.client, data.TenantID).Put(ctx, "/api/v1/orgs/ttl-settings", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating TTL settings", err.Error())
 		return
@@ -217,7 +217,7 @@ func (r *TTLSettingsResource) Update(ctx context.Context, req resource.UpdateReq
 	}
 
 	var result ttlSettingsAPIResponse
-	err := r.client.Put(ctx, "/api/v1/orgs/ttl-settings", body, &result)
+	err := effectiveClient(r.client, data.TenantID).Put(ctx, "/api/v1/orgs/ttl-settings", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating TTL settings", err.Error())
 		return
@@ -243,7 +243,7 @@ func (r *TTLSettingsResource) ImportState(ctx context.Context, req resource.Impo
 // endpoint returns a list, so we find the matching entry by ID.
 func (r *TTLSettingsResource) readTTLSettings(ctx context.Context, data *TTLSettingsResourceModel, diags *diag.Diagnostics) {
 	var results []ttlSettingsAPIResponse
-	err := r.client.Get(ctx, "/api/v1/orgs/ttl-settings", nil, &results)
+	err := effectiveClient(r.client, data.TenantID).Get(ctx, "/api/v1/orgs/ttl-settings", nil, &results)
 	if err != nil {
 		if client.IsNotFound(err) {
 			data.ID = types.StringNull()

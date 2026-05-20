@@ -99,7 +99,8 @@ func (d *ProjectDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 				Computed:            true,
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID of the project.",
+				MarkdownDescription: "The tenant ID. If set, overrides the provider-level `tenant_id` for all API calls made by this data source.",
+				Optional:            true,
 				Computed:            true,
 			},
 			"start_time": schema.StringAttribute{
@@ -152,7 +153,7 @@ func (d *ProjectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	var result projectDataSourceAPIResponse
 
 	if idSet {
-		err := d.client.Get(ctx, "/api/v1/sessions/"+data.ID.ValueString(), nil, &result)
+		err := effectiveClient(d.client, data.TenantID).Get(ctx, "/api/v1/sessions/"+data.ID.ValueString(), nil, &result)
 		if err != nil {
 			resp.Diagnostics.AddError("Error reading project", err.Error())
 			return
@@ -162,7 +163,7 @@ func (d *ProjectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		query.Set("name", data.Name.ValueString())
 
 		var results []projectDataSourceAPIResponse
-		err := d.client.Get(ctx, "/api/v1/sessions", query, &results)
+		err := effectiveClient(d.client, data.TenantID).Get(ctx, "/api/v1/sessions", query, &results)
 		if err != nil {
 			resp.Diagnostics.AddError("Error reading project", err.Error())
 			return

@@ -38,6 +38,7 @@ resource "langsmith_bulk_export" "example" {
 - `format` (String) The export format. Defaults to `Parquet`.
 - `format_version` (String) The format version. Valid values: `v1`, `v2_beta`.
 - `interval_hours` (Number) The interval in hours for recurring exports.
+- `tenant_id` (String) The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
 
 ### Read-Only
 
@@ -45,5 +46,4 @@ resource "langsmith_bulk_export" "example" {
 - `finished_at` (String) The timestamp when the export finished.
 - `id` (String) The unique identifier of the bulk export.
 - `status` (String) The status of the bulk export.
-- `tenant_id` (String) The tenant ID.
 - `updated_at` (String) The last update timestamp.

@@ -32,6 +32,10 @@ resource "langsmith_dataset_split" "train" {
 - `example_ids` (Set of String) Set of example UUIDs that belong to this split.
 - `name` (String) Split name (e.g. `train`, `test`).
 
+### Optional
+
+- `tenant_id` (String) If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
+
 ### Read-Only
 
 - `id` (String) The ID of this resource.

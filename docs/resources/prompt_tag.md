@@ -29,6 +29,10 @@ resource "langsmith_prompt_tag" "example" {
 - `repo_handle` (String) The handle of the prompt repo.
 - `tag_name` (String) The name of the tag (e.g., `production`, `staging`).
 
+### Optional
+
+- `tenant_id` (String) If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
+
 ### Read-Only
 
 - `created_at` (String) When the tag was created.

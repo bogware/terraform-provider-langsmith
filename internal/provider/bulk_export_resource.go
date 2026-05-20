@@ -179,7 +179,8 @@ func (r *BulkExportResource) Schema(ctx context.Context, req resource.SchemaRequ
 				Computed:            true,
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID.",
+				MarkdownDescription: "The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
@@ -277,7 +278,7 @@ func (r *BulkExportResource) Create(ctx context.Context, req resource.CreateRequ
 	}
 
 	var result bulkExportAPIResponse
-	err := r.client.Post(ctx, "/api/v1/bulk-exports", body, &result)
+	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/bulk-exports", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating bulk export", err.Error())
 		return
@@ -297,7 +298,7 @@ func (r *BulkExportResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 
 	var result bulkExportAPIResponse
-	err := r.client.Get(ctx, "/api/v1/bulk-exports/"+data.ID.ValueString(), nil, &result)
+	err := effectiveClient(r.client, data.TenantID).Get(ctx, "/api/v1/bulk-exports/"+data.ID.ValueString(), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -324,7 +325,7 @@ func (r *BulkExportResource) Update(ctx context.Context, req resource.UpdateRequ
 	}
 
 	var result bulkExportAPIResponse
-	err := r.client.Patch(ctx, "/api/v1/bulk-exports/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.TenantID).Patch(ctx, "/api/v1/bulk-exports/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating bulk export", err.Error())
 		return
@@ -349,7 +350,7 @@ func (r *BulkExportResource) Delete(ctx context.Context, req resource.DeleteRequ
 		Status: "Cancelled",
 	}
 
-	err := r.client.Patch(ctx, "/api/v1/bulk-exports/"+data.ID.ValueString(), body, nil)
+	err := effectiveClient(r.client, data.TenantID).Patch(ctx, "/api/v1/bulk-exports/"+data.ID.ValueString(), body, nil)
 	if err != nil {
 		if client.IsNotFound(err) {
 			return

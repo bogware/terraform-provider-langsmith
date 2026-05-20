@@ -33,6 +33,7 @@ data "langsmith_audit_log" "last_hour" {
 - `cursor` (String) Pagination cursor returned from a prior call.
 - `limit` (Number)
 - `operations` (List of String) Filter to specific operation names.
+- `tenant_id` (String) If set, overrides the provider-level `tenant_id` for all API calls made by this data source.
 - `workspace_id` (String) Filter to a single workspace UUID.
 
 ### Read-Only

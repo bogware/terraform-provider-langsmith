@@ -36,6 +36,7 @@ output "ingest_url" {
 ### Optional
 
 - `expires_at` (String) ISO 8601 expiration timestamp. If omitted, the server defaults are used.
+- `tenant_id` (String) If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
 
 ### Read-Only
 

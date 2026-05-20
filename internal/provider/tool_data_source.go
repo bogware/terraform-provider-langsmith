@@ -55,9 +55,13 @@ func (d *ToolDataSource) Schema(ctx context.Context, req datasource.SchemaReques
 			"returns":     schema.StringAttribute{Computed: true},
 			"metadata":    schema.StringAttribute{Computed: true},
 			"enabled":     schema.BoolAttribute{Computed: true},
-			"tenant_id":   schema.StringAttribute{Computed: true},
-			"created_at":  schema.StringAttribute{Computed: true},
-			"updated_at":  schema.StringAttribute{Computed: true},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "The tenant ID. If set, overrides the provider-level `tenant_id` for all API calls made by this data source.",
+				Optional:            true,
+				Computed:            true,
+			},
+			"created_at": schema.StringAttribute{Computed: true},
+			"updated_at": schema.StringAttribute{Computed: true},
 		},
 	}
 }
@@ -81,7 +85,7 @@ func (d *ToolDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 	var api toolAPI
-	if err := d.client.Get(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), nil, &api); err != nil {
+	if err := effectiveClient(d.client, data.TenantID).Get(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), nil, &api); err != nil {
 		resp.Diagnostics.AddError("Error reading tool", err.Error())
 		return
 	}

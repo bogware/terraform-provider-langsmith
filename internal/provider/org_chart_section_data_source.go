@@ -63,6 +63,11 @@ func (d *OrgChartSectionDataSource) Schema(ctx context.Context, req datasource.S
 				MarkdownDescription: "Last update timestamp.",
 				Computed:            true,
 			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this data source.",
+				Optional:            true,
+				Computed:            true,
+			},
 		},
 	}
 }
@@ -95,7 +100,7 @@ func (d *OrgChartSectionDataSource) Read(ctx context.Context, req datasource.Rea
 	}
 
 	var sections []chartSectionListAPIResponse
-	err := d.client.Get(ctx, "/api/v1/org-charts/section", nil, &sections)
+	err := effectiveClient(d.client, data.TenantID).Get(ctx, "/api/v1/org-charts/section", nil, &sections)
 	if err != nil {
 		resp.Diagnostics.AddError("Error listing org chart sections", err.Error())
 		return

@@ -25,6 +25,10 @@ data "langsmith_prompt" "example" {
 
 - `repo_handle` (String) The handle (name) of the prompt repo.
 
+### Optional
+
+- `tenant_id` (String) The tenant ID. If set, overrides the provider-level `tenant_id` for all API calls made by this data source.
+
 ### Read-Only
 
 - `created_at` (String) When the prompt was created.
@@ -33,5 +37,4 @@ data "langsmith_prompt" "example" {
 - `is_archived` (Boolean) Whether the prompt is archived.
 - `is_public` (Boolean) Whether the prompt is publicly visible.
 - `readme` (String) The readme content.
-- `tenant_id` (String) The tenant ID.
 - `updated_at` (String) When the prompt was last updated.

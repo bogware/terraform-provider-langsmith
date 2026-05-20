@@ -25,6 +25,10 @@ data "langsmith_org_chart" "example" {
 
 - `id` (String) The unique identifier of the org chart.
 
+### Optional
+
+- `tenant_id` (String) If set, overrides the provider-level `tenant_id` for all API calls made by this data source.
+
 ### Read-Only
 
 - `chart_type` (String) The chart type (`line` or `bar`).

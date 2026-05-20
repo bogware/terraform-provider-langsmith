@@ -27,9 +27,12 @@ resource "langsmith_usage_limit" "example" {
 - `limit_type` (String) The type of usage limit.
 - `limit_value` (Number) The limit value.
 
+### Optional
+
+- `tenant_id` (String) The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
+
 ### Read-Only
 
 - `created_at` (String) The creation timestamp.
 - `id` (String) The unique identifier of the usage limit.
-- `tenant_id` (String) The tenant ID.
 - `updated_at` (String) The last update timestamp.

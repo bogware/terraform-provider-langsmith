@@ -37,6 +37,7 @@ resource "langsmith_annotation_queue" "example" {
 - `reservation_minutes` (Number) The number of minutes a reservation is held.
 - `rubric_instructions` (String) Rubric instructions for reviewers.
 - `rubric_items` (String) JSON-encoded array of rubric items for the annotation queue.
+- `tenant_id` (String) The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
 
 ### Read-Only
 
@@ -45,5 +46,4 @@ resource "langsmith_annotation_queue" "example" {
 - `queue_type` (String) The type of annotation queue.
 - `run_rule_id` (String) The ID of the run rule associated with this queue.
 - `source_rule_id` (String) The ID of the source rule that created this queue.
-- `tenant_id` (String) The tenant ID of the annotation queue.
 - `updated_at` (String) The last update timestamp of the annotation queue.

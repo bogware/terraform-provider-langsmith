@@ -40,6 +40,7 @@ type TaggingResourceModel struct {
 	ResourceType types.String `tfsdk:"resource_type"`
 	ResourceID   types.String `tfsdk:"resource_id"`
 	CreatedAt    types.String `tfsdk:"created_at"`
+	TenantID     types.String `tfsdk:"tenant_id"`
 }
 
 type taggingCreateRequest struct {
@@ -116,6 +117,12 @@ func (r *TaggingResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
 	}
 }
@@ -146,7 +153,7 @@ func (r *TaggingResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	var result taggingAPIResponse
-	err := r.client.Post(ctx, "/api/v1/workspaces/current/taggings", body, &result)
+	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/workspaces/current/taggings", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating tagging", err.Error())
 		return
@@ -175,7 +182,7 @@ func (r *TaggingResource) Read(ctx context.Context, req resource.ReadRequest, re
 	query.Set("tag_value_id", data.TagValueID.ValueString())
 
 	var results []taggingListResponse
-	err := r.client.Get(ctx, "/api/v1/workspaces/current/taggings", query, &results)
+	err := effectiveClient(r.client, data.TenantID).Get(ctx, "/api/v1/workspaces/current/taggings", query, &results)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading taggings", err.Error())
 		return
@@ -230,7 +237,7 @@ func (r *TaggingResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v1/workspaces/current/taggings/"+data.ID.ValueString())
+	err := effectiveClient(r.client, data.TenantID).Delete(ctx, "/api/v1/workspaces/current/taggings/"+data.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting tagging", err.Error())
 		return

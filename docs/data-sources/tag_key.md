@@ -25,6 +25,7 @@ data "langsmith_tag_key" "example" {
 
 - `id` (String) The unique identifier. Either `id` or `key` must be specified.
 - `key` (String) The tag key name. Either `id` or `key` must be specified.
+- `tenant_id` (String) If set, overrides the provider-level `tenant_id` for all API calls made by this data source.
 
 ### Read-Only
 

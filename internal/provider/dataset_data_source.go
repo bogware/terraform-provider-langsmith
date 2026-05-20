@@ -117,7 +117,8 @@ func (d *DatasetDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 				Computed:            true,
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID of the dataset.",
+				MarkdownDescription: "The tenant ID. If set, overrides the provider-level `tenant_id` for all API calls made by this data source.",
+				Optional:            true,
 				Computed:            true,
 			},
 			"created_at": schema.StringAttribute{
@@ -182,7 +183,7 @@ func (d *DatasetDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	var result datasetDataSourceAPIResponse
 
 	if idSet {
-		err := d.client.Get(ctx, "/api/v1/datasets/"+data.ID.ValueString(), nil, &result)
+		err := effectiveClient(d.client, data.TenantID).Get(ctx, "/api/v1/datasets/"+data.ID.ValueString(), nil, &result)
 		if err != nil {
 			resp.Diagnostics.AddError("Error reading dataset", err.Error())
 			return
@@ -192,7 +193,7 @@ func (d *DatasetDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		query.Set("name", data.Name.ValueString())
 
 		var results []datasetDataSourceAPIResponse
-		err := d.client.Get(ctx, "/api/v1/datasets", query, &results)
+		err := effectiveClient(d.client, data.TenantID).Get(ctx, "/api/v1/datasets", query, &results)
 		if err != nil {
 			resp.Diagnostics.AddError("Error reading dataset", err.Error())
 			return

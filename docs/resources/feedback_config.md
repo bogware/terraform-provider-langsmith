@@ -35,9 +35,9 @@ resource "langsmith_feedback_config" "example" {
 - `is_lower_score_better` (Boolean) Whether a lower score is better.
 - `max` (Number) Maximum score value (for continuous type).
 - `min` (Number) Minimum score value (for continuous type).
+- `tenant_id` (String) The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
 
 ### Read-Only
 
 - `id` (String) The identifier (same as feedback_key).
 - `modified_at` (String) When the feedback config was last modified.
-- `tenant_id` (String) The tenant ID.

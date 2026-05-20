@@ -36,6 +36,7 @@ type AnnotationQueueReviewerResourceModel struct {
 	ID         types.String `tfsdk:"id"`
 	QueueID    types.String `tfsdk:"queue_id"`
 	IdentityID types.String `tfsdk:"identity_id"`
+	TenantID   types.String `tfsdk:"tenant_id"`
 }
 
 type addReviewerRequest struct {
@@ -64,6 +65,12 @@ func (r *AnnotationQueueReviewerResource) Schema(ctx context.Context, req resour
 				MarkdownDescription: "UUID of the reviewer identity (user or service account).",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
 	}
 }
@@ -90,7 +97,7 @@ func (r *AnnotationQueueReviewerResource) Create(ctx context.Context, req resour
 	var result struct {
 		IdentityID string `json:"identity_id"`
 	}
-	if err := r.client.Post(ctx, "/v1/platform/annotation-queues/"+data.QueueID.ValueString()+"/reviewers", body, &result); err != nil {
+	if err := effectiveClient(r.client, data.TenantID).Post(ctx, "/v1/platform/annotation-queues/"+data.QueueID.ValueString()+"/reviewers", body, &result); err != nil {
 		resp.Diagnostics.AddError("Error adding annotation queue reviewer", err.Error())
 		return
 	}
@@ -124,7 +131,7 @@ func (r *AnnotationQueueReviewerResource) Delete(ctx context.Context, req resour
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if err := r.client.Delete(ctx, "/v1/platform/annotation-queues/"+data.QueueID.ValueString()+"/reviewers/"+data.IdentityID.ValueString()); err != nil && !client.IsNotFound(err) {
+	if err := effectiveClient(r.client, data.TenantID).Delete(ctx, "/v1/platform/annotation-queues/"+data.QueueID.ValueString()+"/reviewers/"+data.IdentityID.ValueString()); err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error removing annotation queue reviewer", err.Error())
 		return
 	}

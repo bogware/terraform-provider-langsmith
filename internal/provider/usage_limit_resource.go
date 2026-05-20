@@ -90,7 +90,8 @@ func (r *UsageLimitResource) Schema(ctx context.Context, req resource.SchemaRequ
 				Required:            true,
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID.",
+				MarkdownDescription: "The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+				Optional:            true,
 				Computed:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
@@ -141,7 +142,7 @@ func (r *UsageLimitResource) Create(ctx context.Context, req resource.CreateRequ
 	}
 
 	var result usageLimitAPIResponse
-	err := r.client.Put(ctx, "/api/v1/usage-limits", body, &result)
+	err := effectiveClient(r.client, data.TenantID).Put(ctx, "/api/v1/usage-limits", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating usage limit", err.Error())
 		return
@@ -161,7 +162,7 @@ func (r *UsageLimitResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 
 	var results []usageLimitAPIResponse
-	err := r.client.Get(ctx, "/api/v1/usage-limits", nil, &results)
+	err := effectiveClient(r.client, data.TenantID).Get(ctx, "/api/v1/usage-limits", nil, &results)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -202,7 +203,7 @@ func (r *UsageLimitResource) Update(ctx context.Context, req resource.UpdateRequ
 	}
 
 	var result usageLimitAPIResponse
-	err := r.client.Put(ctx, "/api/v1/usage-limits", body, &result)
+	err := effectiveClient(r.client, data.TenantID).Put(ctx, "/api/v1/usage-limits", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating usage limit", err.Error())
 		return
@@ -221,7 +222,7 @@ func (r *UsageLimitResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v1/usage-limits/"+data.ID.ValueString())
+	err := effectiveClient(r.client, data.TenantID).Delete(ctx, "/api/v1/usage-limits/"+data.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting usage limit", err.Error())
 		return

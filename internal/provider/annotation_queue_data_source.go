@@ -85,7 +85,8 @@ func (d *AnnotationQueueDataSource) Schema(ctx context.Context, req datasource.S
 				Computed:            true,
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID.",
+				MarkdownDescription: "The tenant ID. If set, overrides the provider-level `tenant_id` for all API calls made by this data source.",
+				Optional:            true,
 				Computed:            true,
 			},
 			"created_at": schema.StringAttribute{
@@ -129,7 +130,7 @@ func (d *AnnotationQueueDataSource) Read(ctx context.Context, req datasource.Rea
 
 	if idSet {
 		var result annotationQueueDataSourceAPIResponse
-		err := d.client.Get(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), nil, &result)
+		err := effectiveClient(d.client, data.TenantID).Get(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), nil, &result)
 		if err != nil {
 			resp.Diagnostics.AddError("Error reading annotation queue", err.Error())
 			return
@@ -139,7 +140,7 @@ func (d *AnnotationQueueDataSource) Read(ctx context.Context, req datasource.Rea
 		query := url.Values{}
 		query.Set("name", data.Name.ValueString())
 		var results []annotationQueueDataSourceAPIResponse
-		err := d.client.Get(ctx, "/api/v1/annotation-queues", query, &results)
+		err := effectiveClient(d.client, data.TenantID).Get(ctx, "/api/v1/annotation-queues", query, &results)
 		if err != nil {
 			resp.Diagnostics.AddError("Error reading annotation queue", err.Error())
 			return

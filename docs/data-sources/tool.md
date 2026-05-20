@@ -25,6 +25,10 @@ data "langsmith_tool" "lookup_customer" {
 
 - `handle` (String)
 
+### Optional
+
+- `tenant_id` (String) The tenant ID. If set, overrides the provider-level `tenant_id` for all API calls made by this data source.
+
 ### Read-Only
 
 - `created_at` (String)
@@ -35,5 +39,4 @@ data "langsmith_tool" "lookup_customer" {
 - `name` (String)
 - `parameters` (String)
 - `returns` (String)
-- `tenant_id` (String)
 - `updated_at` (String)

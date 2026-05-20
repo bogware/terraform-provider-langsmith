@@ -36,6 +36,7 @@ type PromptCommitDataSourceModel struct {
 	Ref        types.String `tfsdk:"ref"`
 	CommitHash types.String `tfsdk:"commit_hash"`
 	Manifest   types.String `tfsdk:"manifest"`
+	TenantID   types.String `tfsdk:"tenant_id"`
 }
 
 // promptCommitDataSourceAPIResponse is the API shape for GET /commits/-/{repo}/{ref}.
@@ -66,6 +67,11 @@ func (d *PromptCommitDataSource) Schema(ctx context.Context, req datasource.Sche
 			},
 			"manifest": schema.StringAttribute{
 				MarkdownDescription: "JSON string of the prompt manifest (LangChain serialization format).",
+				Computed:            true,
+			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this data source.",
+				Optional:            true,
 				Computed:            true,
 			},
 		},
@@ -102,7 +108,7 @@ func (d *PromptCommitDataSource) Read(ctx context.Context, req datasource.ReadRe
 	}
 
 	var result promptCommitDataSourceAPIResponse
-	err := d.client.Get(ctx, fmt.Sprintf("/commits/-/%s/%s", data.RepoHandle.ValueString(), ref), nil, &result)
+	err := effectiveClient(d.client, data.TenantID).Get(ctx, fmt.Sprintf("/commits/-/%s/%s", data.RepoHandle.ValueString(), ref), nil, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading prompt commit", err.Error())
 		return

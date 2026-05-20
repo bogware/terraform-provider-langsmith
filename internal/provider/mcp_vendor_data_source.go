@@ -34,6 +34,7 @@ type MCPVendorDataSourceModel struct {
 	Icon         types.String `tfsdk:"icon"`
 	Status       types.String `tfsdk:"status"`
 	SettingsJSON types.String `tfsdk:"settings_json"`
+	TenantID     types.String `tfsdk:"tenant_id"`
 }
 
 type mcpVendorAPI struct {
@@ -62,6 +63,11 @@ func (d *MCPVendorDataSource) Schema(ctx context.Context, req datasource.SchemaR
 			"icon":          schema.StringAttribute{Computed: true},
 			"status":        schema.StringAttribute{Computed: true, MarkdownDescription: "`enabled` or `disabled`."},
 			"settings_json": schema.StringAttribute{Computed: true, MarkdownDescription: "JSON-encoded vendor-specific settings."},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this data source.",
+				Optional:            true,
+				Computed:            true,
+			},
 		},
 	}
 }
@@ -85,7 +91,7 @@ func (d *MCPVendorDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 	var api mcpVendorAPI
-	if err := d.client.Get(ctx, "/v1/platform/mcp-vendors/"+data.VendorSlug.ValueString(), nil, &api); err != nil {
+	if err := effectiveClient(d.client, data.TenantID).Get(ctx, "/v1/platform/mcp-vendors/"+data.VendorSlug.ValueString(), nil, &api); err != nil {
 		resp.Diagnostics.AddError("Error reading MCP vendor", err.Error())
 		return
 	}

@@ -32,6 +32,7 @@ type ServiceAccountDataSourceModel struct {
 	DefaultWorkspaceID types.String `tfsdk:"default_workspace_id"`
 	CreatedAt          types.String `tfsdk:"created_at"`
 	UpdatedAt          types.String `tfsdk:"updated_at"`
+	TenantID           types.String `tfsdk:"tenant_id"`
 }
 
 func (d *ServiceAccountDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -61,6 +62,11 @@ func (d *ServiceAccountDataSource) Schema(ctx context.Context, req datasource.Sc
 			},
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "Last update timestamp.", Computed: true,
+			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this data source.",
+				Optional:            true,
+				Computed:            true,
 			},
 		},
 	}
@@ -94,7 +100,7 @@ func (d *ServiceAccountDataSource) Read(ctx context.Context, req datasource.Read
 	}
 
 	var listResult serviceAccountListAPIResponse
-	err := d.client.Get(ctx, "/api/v1/service-accounts", nil, &listResult)
+	err := effectiveClient(d.client, data.TenantID).Get(ctx, "/api/v1/service-accounts", nil, &listResult)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading service accounts", err.Error())
 		return

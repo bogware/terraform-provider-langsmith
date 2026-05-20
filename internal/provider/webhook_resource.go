@@ -108,7 +108,8 @@ func (r *WebhookResource) Schema(ctx context.Context, req resource.SchemaRequest
 				ElementType:         types.StringType,
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID.",
+				MarkdownDescription: "The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+				Optional:            true,
 				Computed:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
@@ -186,7 +187,7 @@ func (r *WebhookResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	var result webhookAPIResponse
-	err := r.client.Post(ctx, "/api/v1/prompt-webhooks", body, &result)
+	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/prompt-webhooks", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating webhook", err.Error())
 		return
@@ -206,7 +207,7 @@ func (r *WebhookResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 
 	var result webhookAPIResponse
-	err := r.client.Get(ctx, fmt.Sprintf("/api/v1/prompt-webhooks/%s", data.ID.ValueString()), nil, &result)
+	err := effectiveClient(r.client, data.TenantID).Get(ctx, fmt.Sprintf("/api/v1/prompt-webhooks/%s", data.ID.ValueString()), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -264,7 +265,7 @@ func (r *WebhookResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	var result webhookAPIResponse
-	err := r.client.Patch(ctx, fmt.Sprintf("/api/v1/prompt-webhooks/%s", data.ID.ValueString()), body, &result)
+	err := effectiveClient(r.client, data.TenantID).Patch(ctx, fmt.Sprintf("/api/v1/prompt-webhooks/%s", data.ID.ValueString()), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating webhook", err.Error())
 		return
@@ -281,7 +282,7 @@ func (r *WebhookResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	err := r.client.Delete(ctx, fmt.Sprintf("/api/v1/prompt-webhooks/%s", data.ID.ValueString()))
+	err := effectiveClient(r.client, data.TenantID).Delete(ctx, fmt.Sprintf("/api/v1/prompt-webhooks/%s", data.ID.ValueString()))
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting webhook", err.Error())
 	}

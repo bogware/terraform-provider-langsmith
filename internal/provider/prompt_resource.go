@@ -192,7 +192,8 @@ func (r *PromptResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				Computed:            true,
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID that owns this prompt.",
+				MarkdownDescription: "The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
@@ -249,7 +250,7 @@ func (r *PromptResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	var result promptAPIResponse
-	err := r.client.Post(ctx, "/api/v1/repos", body, &result)
+	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/repos", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating prompt", err.Error())
 		return
@@ -271,7 +272,7 @@ func (r *PromptResource) Create(ctx context.Context, req resource.CreateRequest,
 			Manifest: json.RawMessage(data.Manifest.ValueString()),
 		}
 		var commitResult promptCommitResponse
-		err := r.client.Post(ctx, fmt.Sprintf("/commits/-/%s", data.RepoHandle.ValueString()), commitBody, &commitResult)
+		err := effectiveClient(r.client, data.TenantID).Post(ctx, fmt.Sprintf("/commits/-/%s", data.RepoHandle.ValueString()), commitBody, &commitResult)
 		if err != nil {
 			resp.Diagnostics.AddError("Error creating prompt commit", err.Error())
 			return
@@ -308,7 +309,7 @@ func (r *PromptResource) Read(ctx context.Context, req resource.ReadRequest, res
 	}
 
 	var result promptAPIResponse
-	err := r.client.Get(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", repoOwnerSegment(owner), repoHandle), nil, &result)
+	err := effectiveClient(r.client, data.TenantID).Get(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", repoOwnerSegment(owner), repoHandle), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -353,7 +354,7 @@ func (r *PromptResource) Read(ctx context.Context, req resource.ReadRequest, res
 	// Ride over to the commits corral and fetch the latest manifest.
 	if result.Repo.NumCommits > 0 {
 		var latestCommit promptLatestCommitResponse
-		commitErr := r.client.Get(ctx, fmt.Sprintf("/commits/-/%s/latest", repoHandle), nil, &latestCommit)
+		commitErr := effectiveClient(r.client, data.TenantID).Get(ctx, fmt.Sprintf("/commits/-/%s/latest", repoHandle), nil, &latestCommit)
 		if commitErr != nil {
 			resp.Diagnostics.AddWarning("Error reading prompt manifest", commitErr.Error())
 		} else {
@@ -412,7 +413,7 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 		body.IsArchived = &v
 	}
 
-	err := r.client.Patch(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", owner, repoHandle), body, nil)
+	err := effectiveClient(r.client, data.TenantID).Patch(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", owner, repoHandle), body, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating prompt", err.Error())
 		return
@@ -425,7 +426,7 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 			Manifest: json.RawMessage(data.Manifest.ValueString()),
 		}
 		var commitResult promptCommitResponse
-		commitErr := r.client.Post(ctx, fmt.Sprintf("/commits/-/%s", repoHandle), commitBody, &commitResult)
+		commitErr := effectiveClient(r.client, data.TenantID).Post(ctx, fmt.Sprintf("/commits/-/%s", repoHandle), commitBody, &commitResult)
 		if commitErr != nil {
 			resp.Diagnostics.AddError("Error creating prompt commit", commitErr.Error())
 			return
@@ -435,7 +436,7 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 
 	// PATCH doesn't return the full resource, so we ride back to the API for the latest state.
 	var result promptAPIResponse
-	err = r.client.Get(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", owner, data.RepoHandle.ValueString()), nil, &result)
+	err = effectiveClient(r.client, data.TenantID).Get(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", owner, data.RepoHandle.ValueString()), nil, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading prompt after update", err.Error())
 		return
@@ -457,7 +458,7 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 	if data.CommitHash.IsNull() || data.CommitHash.IsUnknown() {
 		if result.Repo.NumCommits > 0 {
 			var latestCommit promptLatestCommitResponse
-			commitErr := r.client.Get(ctx, fmt.Sprintf("/commits/-/%s/latest", repoHandle), nil, &latestCommit)
+			commitErr := effectiveClient(r.client, data.TenantID).Get(ctx, fmt.Sprintf("/commits/-/%s/latest", repoHandle), nil, &latestCommit)
 			if commitErr == nil {
 				data.CommitHash = types.StringValue(latestCommit.CommitHash)
 				data.Manifest = jsonStringValue(latestCommit.Manifest)
@@ -481,7 +482,7 @@ func (r *PromptResource) Delete(ctx context.Context, req resource.DeleteRequest,
 	owner := repoOwnerSegment(data.Owner.ValueString())
 	repoHandle := data.RepoHandle.ValueString()
 
-	err := r.client.Delete(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", owner, repoHandle))
+	err := effectiveClient(r.client, data.TenantID).Delete(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", owner, repoHandle))
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting prompt", err.Error())
 	}

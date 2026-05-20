@@ -110,8 +110,13 @@ func (r *ToolResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 				Optional:            true,
 				MarkdownDescription: "JSON-encoded free-form metadata.",
 			},
-			"enabled":    schema.BoolAttribute{Optional: true, Computed: true, MarkdownDescription: "Whether the tool is enabled."},
-			"tenant_id":  schema.StringAttribute{Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"enabled": schema.BoolAttribute{Optional: true, Computed: true, MarkdownDescription: "Whether the tool is enabled."},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"created_at": schema.StringAttribute{Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"updated_at": schema.StringAttribute{Computed: true},
 		},
@@ -169,7 +174,7 @@ func (r *ToolResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 
 	var api toolAPI
-	if err := r.client.Post(ctx, "/v1/platform/tools", body, &api); err != nil {
+	if err := effectiveClient(r.client, data.TenantID).Post(ctx, "/v1/platform/tools", body, &api); err != nil {
 		resp.Diagnostics.AddError("Error creating tool", err.Error())
 		return
 	}
@@ -185,7 +190,7 @@ func (r *ToolResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 	var api toolAPI
-	if err := r.client.Get(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), nil, &api); err != nil {
+	if err := effectiveClient(r.client, data.TenantID).Get(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), nil, &api); err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
 			return
@@ -227,7 +232,7 @@ func (r *ToolResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 
 	var api toolAPI
-	if err := r.client.Patch(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), body, &api); err != nil {
+	if err := effectiveClient(r.client, data.TenantID).Patch(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), body, &api); err != nil {
 		resp.Diagnostics.AddError("Error updating tool", err.Error())
 		return
 	}
@@ -241,7 +246,7 @@ func (r *ToolResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if err := r.client.Delete(ctx, "/v1/platform/tools/"+data.Handle.ValueString()); err != nil && !client.IsNotFound(err) {
+	if err := effectiveClient(r.client, data.TenantID).Delete(ctx, "/v1/platform/tools/"+data.Handle.ValueString()); err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting tool", err.Error())
 		return
 	}

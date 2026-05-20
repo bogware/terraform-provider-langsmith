@@ -29,6 +29,7 @@ resource "langsmith_tag_key" "example" {
 ### Optional
 
 - `description` (String) A description of the tag key.
+- `tenant_id` (String) If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
 
 ### Read-Only
 

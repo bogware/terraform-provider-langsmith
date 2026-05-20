@@ -25,6 +25,7 @@ data "langsmith_run_rule" "example" {
 
 - `display_name` (String) The display name. Either `id` or `display_name` must be specified.
 - `id` (String) The unique identifier. Either `id` or `display_name` must be specified.
+- `tenant_id` (String) If set, overrides the provider-level `tenant_id` for all API calls made by this data source.
 
 ### Read-Only
 

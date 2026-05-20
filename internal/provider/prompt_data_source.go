@@ -88,7 +88,8 @@ func (d *PromptDataSource) Schema(ctx context.Context, req datasource.SchemaRequ
 				Computed:            true,
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID.",
+				MarkdownDescription: "The tenant ID. If set, overrides the provider-level `tenant_id` for all API calls made by this data source.",
+				Optional:            true,
 				Computed:            true,
 			},
 			"created_at": schema.StringAttribute{
@@ -123,7 +124,7 @@ func (d *PromptDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 	}
 
 	var result promptDataSourceAPIResponse
-	err := d.client.Get(ctx, "/api/v1/repos/-/"+data.RepoHandle.ValueString(), nil, &result)
+	err := effectiveClient(d.client, data.TenantID).Get(ctx, "/api/v1/repos/-/"+data.RepoHandle.ValueString(), nil, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading prompt", err.Error())
 		return

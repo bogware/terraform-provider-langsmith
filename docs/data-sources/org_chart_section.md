@@ -24,6 +24,7 @@ data "langsmith_org_chart_section" "example" {
 ### Optional
 
 - `id` (String) The unique identifier of the section. Either `id` or `title` must be specified.
+- `tenant_id` (String) If set, overrides the provider-level `tenant_id` for all API calls made by this data source.
 - `title` (String) The title of the section. Either `id` or `title` must be specified.
 
 ### Read-Only

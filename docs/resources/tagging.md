@@ -29,6 +29,10 @@ resource "langsmith_tagging" "example" {
 - `resource_type` (String) The type of resource to tag. Valid values: `alert`, `dashboard`, `dataset`, `deployment`, `experiment`, `project`, `prompt`, `queue`.
 - `tag_value_id` (String) The ID of the tag value to apply.
 
+### Optional
+
+- `tenant_id` (String) If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
+
 ### Read-Only
 
 - `created_at` (String) Creation timestamp.

@@ -35,6 +35,7 @@ resource "langsmith_filter_view" "example" {
 - `end_time` (String) The end time filter (ISO 8601).
 - `filter_string` (String) The run filter expression.
 - `start_time` (String) The start time filter (ISO 8601).
+- `tenant_id` (String) If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
 - `trace_filter_string` (String) The trace filter expression.
 - `tree_filter_string` (String) The tree filter expression.
 - `type` (String) The type of filter view. Valid values: `runs`, `threads`.

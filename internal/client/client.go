@@ -230,6 +230,16 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("LangSmith API error (status %d): %s", e.StatusCode, e.Body)
 }
 
+// WithTenantID returns a shallow copy of the Client with the TenantID field
+// replaced by the given value. The underlying http.Client and all other
+// settings are shared with the original; only TenantID differs. This is safe
+// for concurrent use because http.Client is itself concurrency-safe.
+func (c *Client) WithTenantID(tenantID string) *Client {
+	copy := *c
+	copy.TenantID = tenantID
+	return &copy
+}
+
 // IsNotFound checks whether the error is a 404.
 func IsNotFound(err error) bool {
 	var apiErr *APIError

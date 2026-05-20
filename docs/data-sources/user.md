@@ -19,6 +19,10 @@ Lookup a LangSmith user by email and return the user ID.
 
 - `email` (String) The email address to look up. Required.
 
+### Optional
+
+- `tenant_id` (String) If set, overrides the provider-level `tenant_id` for all API calls made by this data source.
+
 ### Read-Only
 
 - `display_name` (String) The display name of the user (if available).

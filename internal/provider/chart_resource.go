@@ -47,6 +47,7 @@ type ChartResourceModel struct {
 	CommonFilters types.String `tfsdk:"common_filters"`
 	CreatedAt     types.String `tfsdk:"created_at"`
 	UpdatedAt     types.String `tfsdk:"updated_at"`
+	TenantID      types.String `tfsdk:"tenant_id"`
 }
 
 type chartCreateRequest struct {
@@ -140,6 +141,12 @@ func (r *ChartResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 				MarkdownDescription: "Last update timestamp.",
 				Computed:            true,
 			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
 	}
 }
@@ -188,7 +195,7 @@ func (r *ChartResource) Create(ctx context.Context, req resource.CreateRequest, 
 	planSeries := data.Series
 
 	var result chartAPIResponse
-	err := r.client.Post(ctx, "/api/v1/charts/create", body, &result)
+	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/charts/create", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating chart", err.Error())
 		return
@@ -224,7 +231,7 @@ func (r *ChartResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		EndTime   string `json:"end_time"`
 	}{OmitData: true, StartTime: "2020-01-01T00:00:00Z", EndTime: "2020-01-01T00:01:00Z"}
 	var result chartAPIResponse
-	err := r.client.Post(ctx, "/api/v1/charts/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/charts/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -274,7 +281,7 @@ func (r *ChartResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	planSeries := data.Series
 
 	var result chartAPIResponse
-	err := r.client.Patch(ctx, "/api/v1/charts/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.TenantID).Patch(ctx, "/api/v1/charts/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating chart", err.Error())
 		return
@@ -293,7 +300,7 @@ func (r *ChartResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v1/charts/"+data.ID.ValueString())
+	err := effectiveClient(r.client, data.TenantID).Delete(ctx, "/api/v1/charts/"+data.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting chart", err.Error())
 		return

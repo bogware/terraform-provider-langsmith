@@ -67,6 +67,12 @@ func (r *OrgChartSectionResource) Schema(ctx context.Context, req resource.Schem
 				MarkdownDescription: "Last update timestamp.",
 				Computed:            true,
 			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
 	}
 }
@@ -100,7 +106,7 @@ func (r *OrgChartSectionResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	var result chartSectionAPIResponse
-	err := r.client.Post(ctx, "/api/v1/org-charts/section", body, &result)
+	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/org-charts/section", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating org chart section", err.Error())
 		return
@@ -128,7 +134,7 @@ func (r *OrgChartSectionResource) Read(ctx context.Context, req resource.ReadReq
 		EndTime   string `json:"end_time"`
 	}{OmitData: true, StartTime: "2020-01-01T00:00:00Z", EndTime: "2020-01-01T00:01:00Z"}
 	var result chartSectionAPIResponse
-	err := r.client.Post(ctx, "/api/v1/org-charts/section/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/org-charts/section/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -162,7 +168,7 @@ func (r *OrgChartSectionResource) Update(ctx context.Context, req resource.Updat
 	}
 
 	var result chartSectionAPIResponse
-	err := r.client.Patch(ctx, "/api/v1/org-charts/section/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.TenantID).Patch(ctx, "/api/v1/org-charts/section/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating org chart section", err.Error())
 		return
@@ -181,7 +187,7 @@ func (r *OrgChartSectionResource) Delete(ctx context.Context, req resource.Delet
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v1/org-charts/section/"+data.ID.ValueString())
+	err := effectiveClient(r.client, data.TenantID).Delete(ctx, "/api/v1/org-charts/section/"+data.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting org chart section", err.Error())
 		return

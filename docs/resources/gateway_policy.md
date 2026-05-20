@@ -51,6 +51,7 @@ resource "langsmith_gateway_policy" "monthly_cap" {
 - `enabled` (Boolean) Whether the policy is active.
 - `priority` (Number) Evaluation priority — lower values are evaluated first.
 - `subject_matchers` (Attributes List) Predicates that select which API calls the policy applies to. (see [below for nested schema](#nestedatt--subject_matchers))
+- `tenant_id` (String) If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
 
 ### Read-Only
 

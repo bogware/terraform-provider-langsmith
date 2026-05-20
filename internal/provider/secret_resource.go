@@ -38,9 +38,10 @@ type SecretResource struct {
 
 // SecretResourceModel describes the Terraform state for a workspace secret.
 type SecretResourceModel struct {
-	ID    types.String `tfsdk:"id"`
-	Key   types.String `tfsdk:"key"`
-	Value types.String `tfsdk:"value"`
+	ID       types.String `tfsdk:"id"`
+	Key      types.String `tfsdk:"key"`
+	Value    types.String `tfsdk:"value"`
+	TenantID types.String `tfsdk:"tenant_id"`
 }
 
 // secretUpsertItem is a single entry in the upsert array. The API expects
@@ -91,6 +92,12 @@ func (r *SecretResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				Required:            true,
 				Sensitive:           true,
 			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
 	}
 }
@@ -126,7 +133,7 @@ func (r *SecretResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	// The API is upsert-based and returns no body worth reading --
 	// like sending a telegram to Dodge City and getting silence back.
-	err := r.client.Post(ctx, "/api/v1/workspaces/current/secrets", body, nil)
+	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/workspaces/current/secrets", body, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating secret", err.Error())
 		return
@@ -149,7 +156,7 @@ func (r *SecretResource) Read(ctx context.Context, req resource.ReadRequest, res
 	// lookups, and definitely no values. You have to round up the
 	// whole herd and find your steer by brand.
 	var results []secretKeyResponse
-	err := r.client.Get(ctx, "/api/v1/workspaces/current/secrets", nil, &results)
+	err := effectiveClient(r.client, data.TenantID).Get(ctx, "/api/v1/workspaces/current/secrets", nil, &results)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -195,7 +202,7 @@ func (r *SecretResource) Update(ctx context.Context, req resource.UpdateRequest,
 
 	// Same upsert trail as Create -- the API doesn't care whether
 	// you're a newcomer or an old hand, it treats you the same.
-	err := r.client.Post(ctx, "/api/v1/workspaces/current/secrets", body, nil)
+	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/workspaces/current/secrets", body, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating secret", err.Error())
 		return
@@ -221,7 +228,7 @@ func (r *SecretResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		Value: nil,
 	}}
 
-	err := r.client.Post(ctx, "/api/v1/workspaces/current/secrets", body, nil)
+	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/workspaces/current/secrets", body, nil)
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting secret", err.Error())
 		return

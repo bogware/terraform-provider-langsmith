@@ -179,7 +179,8 @@ func (r *BulkExportDestinationResource) Schema(ctx context.Context, req resource
 				Sensitive:           true,
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID.",
+				MarkdownDescription: "The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
@@ -266,7 +267,7 @@ func (r *BulkExportDestinationResource) Create(ctx context.Context, req resource
 	}
 
 	var result bulkExportDestinationAPIResponse
-	err := r.client.Post(ctx, "/api/v1/bulk-exports/destinations", body, &result)
+	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/bulk-exports/destinations", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating bulk export destination", err.Error())
 		return
@@ -286,7 +287,7 @@ func (r *BulkExportDestinationResource) Read(ctx context.Context, req resource.R
 	}
 
 	var result bulkExportDestinationAPIResponse
-	err := r.client.Get(ctx, "/api/v1/bulk-exports/destinations/"+data.ID.ValueString(), nil, &result)
+	err := effectiveClient(r.client, data.TenantID).Get(ctx, "/api/v1/bulk-exports/destinations/"+data.ID.ValueString(), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -328,7 +329,7 @@ func (r *BulkExportDestinationResource) Update(ctx context.Context, req resource
 	}
 
 	var result bulkExportDestinationAPIResponse
-	err := r.client.Patch(ctx, "/api/v1/bulk-exports/destinations/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.TenantID).Patch(ctx, "/api/v1/bulk-exports/destinations/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating bulk export destination", err.Error())
 		return

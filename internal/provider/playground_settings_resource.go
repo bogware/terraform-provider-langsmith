@@ -50,6 +50,7 @@ type PlaygroundSettingsResourceModel struct {
 	UpdatedAt    types.String `tfsdk:"updated_at"`
 	Options      types.String `tfsdk:"options"`
 	SettingsType types.String `tfsdk:"settings_type"`
+	TenantID     types.String `tfsdk:"tenant_id"`
 }
 
 // playgroundSettingsAPICreateRequest is the request body for creating playground settings.
@@ -133,6 +134,12 @@ func (r *PlaygroundSettingsResource) Schema(ctx context.Context, req resource.Sc
 				},
 				Validators: []validator.String{stringvalidator.OneOf("complex", "simple")},
 			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
 	}
 }
@@ -188,7 +195,7 @@ func (r *PlaygroundSettingsResource) Create(ctx context.Context, req resource.Cr
 	planOptions := data.Options
 
 	var result playgroundSettingsAPIResponse
-	err := r.client.Post(ctx, "/api/v1/playground-settings", body, &result)
+	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/playground-settings", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating playground settings", err.Error())
 		return
@@ -212,7 +219,7 @@ func (r *PlaygroundSettingsResource) Read(ctx context.Context, req resource.Read
 	}
 
 	var results []playgroundSettingsAPIResponse
-	err := r.client.Get(ctx, "/api/v1/playground-settings", nil, &results)
+	err := effectiveClient(r.client, data.TenantID).Get(ctx, "/api/v1/playground-settings", nil, &results)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -269,7 +276,7 @@ func (r *PlaygroundSettingsResource) Update(ctx context.Context, req resource.Up
 	planOptions := data.Options
 
 	var result playgroundSettingsAPIResponse
-	err := r.client.Patch(ctx, "/api/v1/playground-settings/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.TenantID).Patch(ctx, "/api/v1/playground-settings/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating playground settings", err.Error())
 		return
@@ -292,7 +299,7 @@ func (r *PlaygroundSettingsResource) Delete(ctx context.Context, req resource.De
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v1/playground-settings/"+data.ID.ValueString())
+	err := effectiveClient(r.client, data.TenantID).Delete(ctx, "/api/v1/playground-settings/"+data.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting playground settings", err.Error())
 		return

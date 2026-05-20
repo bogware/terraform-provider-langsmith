@@ -34,6 +34,7 @@ resource "langsmith_example" "example" {
 - `outputs` (String) JSON string containing the output data for the example.
 - `source_run_id` (String) The UUID of the source run for this example.
 - `split` (String) The split for the example (e.g., `base`, `train`, `test`).
+- `tenant_id` (String) If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
 
 ### Read-Only
 

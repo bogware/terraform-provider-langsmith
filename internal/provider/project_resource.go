@@ -120,7 +120,8 @@ func (r *ProjectResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Validators:          []validator.String{stringvalidator.OneOf("longlived", "shortlived")},
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID of the project.",
+				MarkdownDescription: "The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
@@ -183,7 +184,7 @@ func (r *ProjectResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	var result projectAPIResponse
-	err := r.client.Post(ctx, "/api/v1/sessions", body, &result)
+	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/sessions", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating project", err.Error())
 		return
@@ -203,7 +204,7 @@ func (r *ProjectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 
 	var result projectAPIResponse
-	err := r.client.Get(ctx, "/api/v1/sessions/"+data.ID.ValueString(), nil, &result)
+	err := effectiveClient(r.client, data.TenantID).Get(ctx, "/api/v1/sessions/"+data.ID.ValueString(), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -251,7 +252,7 @@ func (r *ProjectResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	var result projectAPIResponse
-	err := r.client.Patch(ctx, "/api/v1/sessions/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.TenantID).Patch(ctx, "/api/v1/sessions/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating project", err.Error())
 		return
@@ -270,7 +271,7 @@ func (r *ProjectResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v1/sessions/"+data.ID.ValueString())
+	err := effectiveClient(r.client, data.TenantID).Delete(ctx, "/api/v1/sessions/"+data.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting project", err.Error())
 		return

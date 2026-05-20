@@ -29,6 +29,7 @@ resource "langsmith_service_key" "example" {
 - `expires_at` (String) ISO 8601 timestamp when the service key expires.
 - `read_only` (Boolean) Whether the service key is read-only.
 - `role_id` (String) The role ID to assign to the service key.
+- `tenant_id` (String) If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
 
 ### Read-Only
 

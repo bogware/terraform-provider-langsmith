@@ -114,7 +114,8 @@ func (r *FeedbackConfigResource) Schema(ctx context.Context, req resource.Schema
 				Default:             booldefault.StaticBool(false),
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID.",
+				MarkdownDescription: "The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
@@ -176,7 +177,7 @@ func (r *FeedbackConfigResource) Create(ctx context.Context, req resource.Create
 		body.IsLowerScoreBetter = &v
 	}
 
-	err := r.client.Post(ctx, "/api/v1/feedback-configs", body, nil)
+	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/feedback-configs", body, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating feedback config", err.Error())
 		return
@@ -222,7 +223,7 @@ func (r *FeedbackConfigResource) Read(ctx context.Context, req resource.ReadRequ
 // The API doesn't offer a direct lookup, so we ride through the whole herd.
 func (r *FeedbackConfigResource) readFeedbackConfig(ctx context.Context, data *FeedbackConfigResourceModel, diags *diag.Diagnostics) bool {
 	var configs []feedbackConfigAPIResponse
-	err := r.client.Get(ctx, "/api/v1/feedback-configs", nil, &configs)
+	err := effectiveClient(r.client, data.TenantID).Get(ctx, "/api/v1/feedback-configs", nil, &configs)
 	if err != nil {
 		diags.AddError("Error reading feedback configs", err.Error())
 		return false
@@ -292,7 +293,7 @@ func (r *FeedbackConfigResource) Update(ctx context.Context, req resource.Update
 		body.IsLowerScoreBetter = &v
 	}
 
-	err := r.client.Patch(ctx, "/api/v1/feedback-configs", body, nil)
+	err := effectiveClient(r.client, data.TenantID).Patch(ctx, "/api/v1/feedback-configs", body, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating feedback config", err.Error())
 		return
@@ -319,7 +320,7 @@ func (r *FeedbackConfigResource) Delete(ctx context.Context, req resource.Delete
 
 	q := url.Values{}
 	q.Set("feedback_key", data.FeedbackKey.ValueString())
-	err := r.client.DeleteWithQuery(ctx, "/api/v1/feedback-configs", q)
+	err := effectiveClient(r.client, data.TenantID).DeleteWithQuery(ctx, "/api/v1/feedback-configs", q)
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting feedback config", err.Error())
 	}

@@ -37,6 +37,7 @@ type FeedbackIngestTokenResourceModel struct {
 	FeedbackKey types.String `tfsdk:"feedback_key"`
 	ExpiresAt   types.String `tfsdk:"expires_at"`
 	URL         types.String `tfsdk:"url"`
+	TenantID    types.String `tfsdk:"tenant_id"`
 }
 
 type feedbackTokenCreateRequest struct {
@@ -86,6 +87,12 @@ func (r *FeedbackIngestTokenResource) Schema(ctx context.Context, req resource.S
 				MarkdownDescription: "Signed feedback-submission URL.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
 	}
 }
@@ -118,7 +125,7 @@ func (r *FeedbackIngestTokenResource) Create(ctx context.Context, req resource.C
 	}
 
 	var api feedbackTokenAPI
-	if err := r.client.Post(ctx, "/api/v1/feedback/tokens", body, &api); err != nil {
+	if err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/feedback/tokens", body, &api); err != nil {
 		resp.Diagnostics.AddError("Error creating feedback ingest token", err.Error())
 		return
 	}
@@ -139,7 +146,7 @@ func (r *FeedbackIngestTokenResource) Read(ctx context.Context, req resource.Rea
 	q := url.Values{}
 	q.Set("run_id", data.RunID.ValueString())
 	var list []feedbackTokenAPI
-	if err := r.client.Get(ctx, "/api/v1/feedback/tokens", q, &list); err != nil {
+	if err := effectiveClient(r.client, data.TenantID).Get(ctx, "/api/v1/feedback/tokens", q, &list); err != nil {
 		resp.Diagnostics.AddError("Error reading feedback ingest tokens", err.Error())
 		return
 	}

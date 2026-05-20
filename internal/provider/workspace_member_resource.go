@@ -44,6 +44,7 @@ type WorkspaceMemberResourceModel struct {
 	Email     types.String `tfsdk:"email"`
 	FullName  types.String `tfsdk:"full_name"`
 	CreatedAt types.String `tfsdk:"created_at"`
+	TenantID  types.String `tfsdk:"tenant_id"`
 }
 
 // workspaceMemberCreateRequest is the summons to bring a new member into the
@@ -129,6 +130,12 @@ func (r *WorkspaceMemberResource) Schema(ctx context.Context, req resource.Schem
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
 	}
 }
@@ -163,7 +170,7 @@ func (r *WorkspaceMemberResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	var createResult workspaceMemberCreateResponse
-	err := r.client.Post(ctx, "/api/v1/workspaces/current/members", body, &createResult)
+	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/workspaces/current/members", body, &createResult)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating workspace member", err.Error())
 		return
@@ -174,7 +181,7 @@ func (r *WorkspaceMemberResource) Create(ctx context.Context, req resource.Creat
 	data.ID = types.StringValue(createResult.ID)
 
 	var listResult workspaceMemberListAPIResponse
-	err = r.client.Get(ctx, "/api/v1/workspaces/current/members", nil, &listResult)
+	err = effectiveClient(r.client, data.TenantID).Get(ctx, "/api/v1/workspaces/current/members", nil, &listResult)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading workspace member after create", err.Error())
 		return
@@ -211,7 +218,7 @@ func (r *WorkspaceMemberResource) Read(ctx context.Context, req resource.ReadReq
 
 	// No single-member endpoint -- we have to call roll on the whole bunkhouse.
 	var listResult workspaceMemberListAPIResponse
-	err := r.client.Get(ctx, "/api/v1/workspaces/current/members", nil, &listResult)
+	err := effectiveClient(r.client, data.TenantID).Get(ctx, "/api/v1/workspaces/current/members", nil, &listResult)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading workspace members", err.Error())
 		return
@@ -248,7 +255,7 @@ func (r *WorkspaceMemberResource) Update(ctx context.Context, req resource.Updat
 	}
 
 	var result workspaceMemberAPIResponse
-	err := r.client.Patch(ctx, "/api/v1/workspaces/current/members/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.TenantID).Patch(ctx, "/api/v1/workspaces/current/members/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating workspace member", err.Error())
 		return
@@ -267,7 +274,7 @@ func (r *WorkspaceMemberResource) Delete(ctx context.Context, req resource.Delet
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v1/workspaces/current/members/"+data.ID.ValueString())
+	err := effectiveClient(r.client, data.TenantID).Delete(ctx, "/api/v1/workspaces/current/members/"+data.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting workspace member", err.Error())
 		return

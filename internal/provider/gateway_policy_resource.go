@@ -54,6 +54,7 @@ type GatewayPolicyResourceModel struct {
 	CreatedAt         types.String  `tfsdk:"created_at"`
 	UpdatedAt         types.String  `tfsdk:"updated_at"`
 	CreatedBy         types.String  `tfsdk:"created_by"`
+	TenantID          types.String  `tfsdk:"tenant_id"`
 }
 
 type gatewayPolicySubjectMatcher struct {
@@ -177,6 +178,12 @@ func (r *GatewayPolicyResource) Schema(ctx context.Context, req resource.SchemaR
 			"created_at": schema.StringAttribute{Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"updated_at": schema.StringAttribute{Computed: true},
 			"created_by": schema.StringAttribute{Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
 	}
 }
@@ -253,7 +260,7 @@ func (r *GatewayPolicyResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 	var api gatewayPolicyAPI
-	if err := r.client.Post(ctx, "/v1/platform/gateway-policies", body, &api); err != nil {
+	if err := effectiveClient(r.client, data.TenantID).Post(ctx, "/v1/platform/gateway-policies", body, &api); err != nil {
 		resp.Diagnostics.AddError("Error creating gateway policy", err.Error())
 		return
 	}
@@ -272,7 +279,7 @@ func (r *GatewayPolicyResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 	var api gatewayPolicyAPI
-	if err := r.client.Get(ctx, "/v1/platform/gateway-policies/"+data.ID.ValueString(), nil, &api); err != nil {
+	if err := effectiveClient(r.client, data.TenantID).Get(ctx, "/v1/platform/gateway-policies/"+data.ID.ValueString(), nil, &api); err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
 			return
@@ -328,7 +335,7 @@ func (r *GatewayPolicyResource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	var api gatewayPolicyAPI
-	if err := r.client.Patch(ctx, "/v1/platform/gateway-policies/"+data.ID.ValueString(), body, &api); err != nil {
+	if err := effectiveClient(r.client, data.TenantID).Patch(ctx, "/v1/platform/gateway-policies/"+data.ID.ValueString(), body, &api); err != nil {
 		resp.Diagnostics.AddError("Error updating gateway policy", err.Error())
 		return
 	}
@@ -345,7 +352,7 @@ func (r *GatewayPolicyResource) Delete(ctx context.Context, req resource.DeleteR
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if err := r.client.Delete(ctx, "/v1/platform/gateway-policies/"+data.ID.ValueString()); err != nil && !client.IsNotFound(err) {
+	if err := effectiveClient(r.client, data.TenantID).Delete(ctx, "/v1/platform/gateway-policies/"+data.ID.ValueString()); err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting gateway policy", err.Error())
 		return
 	}

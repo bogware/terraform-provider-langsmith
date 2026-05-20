@@ -44,10 +44,14 @@ func (d *EvaluatorDataSource) Schema(ctx context.Context, req datasource.SchemaR
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Looks up a LangSmith evaluator by ID. The nested `code_evaluator` / `llm_evaluator` payloads are surfaced as JSON-encoded strings for downstream consumption.",
 		Attributes: map[string]schema.Attribute{
-			"id":                  schema.StringAttribute{Required: true},
-			"name":                schema.StringAttribute{Computed: true},
-			"type":                schema.StringAttribute{Computed: true},
-			"tenant_id":           schema.StringAttribute{Computed: true},
+			"id":   schema.StringAttribute{Required: true},
+			"name": schema.StringAttribute{Computed: true},
+			"type": schema.StringAttribute{Computed: true},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "The tenant ID. If set, overrides the provider-level `tenant_id` for all API calls made by this data source.",
+				Optional:            true,
+				Computed:            true,
+			},
 			"created_at":          schema.StringAttribute{Computed: true},
 			"updated_at":          schema.StringAttribute{Computed: true},
 			"code_evaluator_json": schema.StringAttribute{Computed: true},
@@ -75,7 +79,7 @@ func (d *EvaluatorDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 	var api evaluatorAPI
-	if err := d.client.Get(ctx, "/v1/platform/evaluators/"+data.ID.ValueString(), nil, &api); err != nil {
+	if err := effectiveClient(d.client, data.TenantID).Get(ctx, "/v1/platform/evaluators/"+data.ID.ValueString(), nil, &api); err != nil {
 		resp.Diagnostics.AddError("Error reading evaluator", err.Error())
 		return
 	}

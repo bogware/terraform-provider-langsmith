@@ -43,6 +43,7 @@ type PromptTagResourceModel struct {
 	CommitHash types.String `tfsdk:"commit_hash"`
 	CreatedAt  types.String `tfsdk:"created_at"`
 	UpdatedAt  types.String `tfsdk:"updated_at"`
+	TenantID   types.String `tfsdk:"tenant_id"`
 }
 
 // promptTagCreateRequest is sent to POST /api/v1/repos/-/{repo}/tags.
@@ -119,6 +120,12 @@ func (r *PromptTagResource) Schema(ctx context.Context, req resource.SchemaReque
 				MarkdownDescription: "When the tag was last updated.",
 				Computed:            true,
 			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
 	}
 }
@@ -137,9 +144,9 @@ func (r *PromptTagResource) Configure(ctx context.Context, req resource.Configur
 }
 
 // resolveCommitID looks up the commit UUID from a commit hash.
-func (r *PromptTagResource) resolveCommitID(ctx context.Context, repoHandle, commitHash string) (string, error) {
+func (r *PromptTagResource) resolveCommitID(ctx context.Context, repoHandle, commitHash string, tenantID types.String) (string, error) {
 	var listResp promptCommitListResponse
-	err := r.client.Get(ctx, fmt.Sprintf("/commits/-/%s", repoHandle), nil, &listResp)
+	err := effectiveClient(r.client, tenantID).Get(ctx, fmt.Sprintf("/commits/-/%s", repoHandle), nil, &listResp)
 	if err != nil {
 		return "", fmt.Errorf("listing commits: %w", err)
 	}
@@ -160,7 +167,7 @@ func (r *PromptTagResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	commitID, err := r.resolveCommitID(ctx, data.RepoHandle.ValueString(), data.CommitHash.ValueString())
+	commitID, err := r.resolveCommitID(ctx, data.RepoHandle.ValueString(), data.CommitHash.ValueString(), data.TenantID)
 	if err != nil {
 		resp.Diagnostics.AddError("Error resolving commit hash", err.Error())
 		return
@@ -172,7 +179,7 @@ func (r *PromptTagResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	var result promptTagAPIResponse
-	err = r.client.Post(ctx, fmt.Sprintf("/api/v1/repos/-/%s/tags", data.RepoHandle.ValueString()), body, &result)
+	err = effectiveClient(r.client, data.TenantID).Post(ctx, fmt.Sprintf("/api/v1/repos/-/%s/tags", data.RepoHandle.ValueString()), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating prompt tag", err.Error())
 		return
@@ -195,7 +202,7 @@ func (r *PromptTagResource) Read(ctx context.Context, req resource.ReadRequest, 
 	}
 
 	var result promptTagAPIResponse
-	err := r.client.Get(ctx, fmt.Sprintf("/api/v1/repos/-/%s/tags/%s", data.RepoHandle.ValueString(), data.TagName.ValueString()), nil, &result)
+	err := effectiveClient(r.client, data.TenantID).Get(ctx, fmt.Sprintf("/api/v1/repos/-/%s/tags/%s", data.RepoHandle.ValueString(), data.TagName.ValueString()), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -220,7 +227,7 @@ func (r *PromptTagResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	commitID, err := r.resolveCommitID(ctx, data.RepoHandle.ValueString(), data.CommitHash.ValueString())
+	commitID, err := r.resolveCommitID(ctx, data.RepoHandle.ValueString(), data.CommitHash.ValueString(), data.TenantID)
 	if err != nil {
 		resp.Diagnostics.AddError("Error resolving commit hash", err.Error())
 		return
@@ -231,7 +238,7 @@ func (r *PromptTagResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 
 	var result promptTagAPIResponse
-	err = r.client.Patch(ctx, fmt.Sprintf("/api/v1/repos/-/%s/tags/%s", data.RepoHandle.ValueString(), data.TagName.ValueString()), body, &result)
+	err = effectiveClient(r.client, data.TenantID).Patch(ctx, fmt.Sprintf("/api/v1/repos/-/%s/tags/%s", data.RepoHandle.ValueString(), data.TagName.ValueString()), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating prompt tag", err.Error())
 		return
@@ -252,7 +259,7 @@ func (r *PromptTagResource) Delete(ctx context.Context, req resource.DeleteReque
 		return
 	}
 
-	err := r.client.Delete(ctx, fmt.Sprintf("/api/v1/repos/-/%s/tags/%s", data.RepoHandle.ValueString(), data.TagName.ValueString()))
+	err := effectiveClient(r.client, data.TenantID).Delete(ctx, fmt.Sprintf("/api/v1/repos/-/%s/tags/%s", data.RepoHandle.ValueString(), data.TagName.ValueString()))
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting prompt tag", err.Error())
 	}

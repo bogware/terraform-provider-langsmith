@@ -35,6 +35,7 @@ resource "langsmith_dataset" "example" {
 - `inputs_schema_definition` (String) JSON string defining the inputs schema.
 - `metadata` (String) JSON-encoded metadata object for the dataset.
 - `outputs_schema_definition` (String) JSON string defining the outputs schema.
+- `tenant_id` (String) The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
 - `transformations` (String) JSON-encoded array of dataset transformations.
 
 ### Read-Only
@@ -45,4 +46,3 @@ resource "langsmith_dataset" "example" {
 - `last_session_start_time` (String) The start time of the last session.
 - `modified_at` (String) The timestamp when the dataset was last modified.
 - `session_count` (Number) The number of sessions associated with the dataset.
-- `tenant_id` (String) The tenant ID of the dataset.
