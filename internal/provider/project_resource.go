@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -190,7 +191,7 @@ func (r *ProjectResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	mapProjectResponseToState(&data, &result)
+	mapProjectResponseToState(&data, &result, &resp.Diagnostics)
 	tflog.Trace(ctx, "created project resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -214,7 +215,7 @@ func (r *ProjectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	mapProjectResponseToState(&data, &result)
+	mapProjectResponseToState(&data, &result, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -258,7 +259,7 @@ func (r *ProjectResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	mapProjectResponseToState(&data, &result)
+	mapProjectResponseToState(&data, &result, &resp.Diagnostics)
 	tflog.Trace(ctx, "updated project resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -286,7 +287,7 @@ func (r *ProjectResource) ImportState(ctx context.Context, req resource.ImportSt
 
 // mapProjectResponseToState translates the API response into Terraform state,
 // branding each field so Terraform can track it on the open range.
-func mapProjectResponseToState(data *ProjectResourceModel, result *projectAPIResponse) {
+func mapProjectResponseToState(data *ProjectResourceModel, result *projectAPIResponse, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.Name = types.StringValue(result.Name)
 
@@ -316,6 +317,6 @@ func mapProjectResponseToState(data *ProjectResourceModel, result *projectAPIRes
 		data.TraceTier = types.StringNull()
 	}
 
-	data.TenantID = types.StringValue(result.TenantID)
+	reconcileTenantID(&data.TenantID, result.TenantID, diags)
 	data.StartTime = types.StringValue(result.StartTime)
 }

@@ -247,7 +247,7 @@ func (r *FeedbackConfigResource) readFeedbackConfig(ctx context.Context, data *F
 
 	data.ID = types.StringValue(found.FeedbackKey)
 	data.FeedbackKey = types.StringValue(found.FeedbackKey)
-	data.TenantID = types.StringValue(found.TenantID)
+	reconcileTenantID(&data.TenantID, found.TenantID, diags)
 	data.ModifiedAt = types.StringValue(found.ModifiedAt)
 	data.IsLowerScoreBetter = types.BoolValue(found.IsLowerScoreBetter)
 

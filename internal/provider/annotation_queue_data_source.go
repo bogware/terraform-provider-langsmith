@@ -10,6 +10,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
@@ -135,7 +136,7 @@ func (d *AnnotationQueueDataSource) Read(ctx context.Context, req datasource.Rea
 			resp.Diagnostics.AddError("Error reading annotation queue", err.Error())
 			return
 		}
-		mapAnnotationQueueDSResponse(&data, &result)
+		mapAnnotationQueueDSResponse(&data, &result, &resp.Diagnostics)
 	} else {
 		query := url.Values{}
 		query.Set("name", data.Name.ValueString())
@@ -149,18 +150,18 @@ func (d *AnnotationQueueDataSource) Read(ctx context.Context, req datasource.Rea
 			resp.Diagnostics.AddError("Annotation Queue Not Found", fmt.Sprintf("No queue found with name %q.", data.Name.ValueString()))
 			return
 		}
-		mapAnnotationQueueDSResponse(&data, &results[0])
+		mapAnnotationQueueDSResponse(&data, &results[0], &resp.Diagnostics)
 	}
 
 	tflog.Trace(ctx, "read annotation queue data source", map[string]interface{}{"id": data.ID.ValueString()})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func mapAnnotationQueueDSResponse(data *AnnotationQueueDataSourceModel, r *annotationQueueDataSourceAPIResponse) {
+func mapAnnotationQueueDSResponse(data *AnnotationQueueDataSourceModel, r *annotationQueueDataSourceAPIResponse, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(r.ID)
 	data.Name = types.StringValue(r.Name)
 	data.EnableReservations = types.BoolValue(r.EnableReservations)
-	data.TenantID = types.StringValue(r.TenantID)
+	reconcileTenantID(&data.TenantID, r.TenantID, diags)
 	data.CreatedAt = types.StringValue(r.CreatedAt)
 	data.UpdatedAt = types.StringValue(r.UpdatedAt)
 

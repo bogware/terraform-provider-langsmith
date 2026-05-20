@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -256,7 +257,7 @@ func (r *AnnotationQueueResource) Create(ctx context.Context, req resource.Creat
 		return
 	}
 
-	mapAnnotationQueueResponseToState(&data, &result)
+	mapAnnotationQueueResponseToState(&data, &result, &resp.Diagnostics)
 	if !planRubricItems.IsUnknown() {
 		data.RubricItems = planRubricItems
 	}
@@ -286,7 +287,7 @@ func (r *AnnotationQueueResource) Read(ctx context.Context, req resource.ReadReq
 		return
 	}
 
-	mapAnnotationQueueResponseToState(&data, &result)
+	mapAnnotationQueueResponseToState(&data, &result, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -349,7 +350,7 @@ func (r *AnnotationQueueResource) Update(ctx context.Context, req resource.Updat
 		return
 	}
 
-	mapAnnotationQueueResponseToState(&data, &result)
+	mapAnnotationQueueResponseToState(&data, &result, &resp.Diagnostics)
 	tflog.Trace(ctx, "updated annotation queue resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -379,7 +380,7 @@ func (r *AnnotationQueueResource) ImportState(ctx context.Context, req resource.
 
 // mapAnnotationQueueResponseToState maps the API response onto the Terraform state,
 // setting null for any optional fields the API left unspoken.
-func mapAnnotationQueueResponseToState(data *AnnotationQueueResourceModel, result *annotationQueueAPIResponse) {
+func mapAnnotationQueueResponseToState(data *AnnotationQueueResourceModel, result *annotationQueueAPIResponse, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.Name = types.StringValue(result.Name)
 
@@ -436,7 +437,7 @@ func mapAnnotationQueueResponseToState(data *AnnotationQueueResourceModel, resul
 	}
 
 	data.QueueType = types.StringValue(result.QueueType)
-	data.TenantID = types.StringValue(result.TenantID)
+	reconcileTenantID(&data.TenantID, result.TenantID, diags)
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 }

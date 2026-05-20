@@ -85,7 +85,7 @@ func (d *EvaluatorDataSource) Read(ctx context.Context, req datasource.ReadReque
 	}
 	data.Name = types.StringValue(api.Name)
 	data.Type = types.StringValue(api.Type)
-	data.TenantID = types.StringValue(api.TenantID)
+	reconcileTenantID(&data.TenantID, api.TenantID, &resp.Diagnostics)
 	data.CreatedAt = types.StringValue(api.CreatedAt)
 	data.UpdatedAt = types.StringValue(api.UpdatedAt)
 	if api.CodeEvaluator != nil {

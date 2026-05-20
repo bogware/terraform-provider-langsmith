@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -471,7 +472,7 @@ func (r *RunRuleResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	r.mapResponseToModel(&result, &data)
+	r.mapResponseToModel(&result, &data, &resp.Diagnostics)
 	data.Evaluators = planEvaluators
 	data.CodeEvaluators = planCodeEvaluators
 	data.Alerts = planAlerts
@@ -508,7 +509,7 @@ func (r *RunRuleResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	r.mapResponseToModel(found, &data)
+	r.mapResponseToModel(found, &data, &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -614,7 +615,7 @@ func (r *RunRuleResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	r.mapResponseToModel(&result, &data)
+	r.mapResponseToModel(&result, &data, &resp.Diagnostics)
 	data.Evaluators = planEvaluators
 	data.CodeEvaluators = planCodeEvaluators
 	data.Alerts = planAlerts
@@ -642,12 +643,12 @@ func (r *RunRuleResource) ImportState(ctx context.Context, req resource.ImportSt
 
 // mapResponseToModel translates the API's response into Terraform state,
 // setting null for any optional fields that came back empty from the territory.
-func (r *RunRuleResource) mapResponseToModel(result *runRuleAPIResponse, data *RunRuleResourceModel) {
+func (r *RunRuleResource) mapResponseToModel(result *runRuleAPIResponse, data *RunRuleResourceModel, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.DisplayName = types.StringValue(result.DisplayName)
 	data.SamplingRate = types.Float64Value(result.SamplingRate)
 	data.IsEnabled = types.BoolValue(result.IsEnabled)
-	data.TenantID = types.StringValue(result.TenantID)
+	reconcileTenantID(&data.TenantID, result.TenantID, diags)
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 

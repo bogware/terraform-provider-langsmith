@@ -134,7 +134,7 @@ func (d *PromptDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 	data.RepoHandle = types.StringValue(result.Repo.RepoHandle)
 	data.IsPublic = types.BoolValue(result.Repo.IsPublic)
 	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
-	data.TenantID = types.StringValue(result.Repo.TenantID)
+	reconcileTenantID(&data.TenantID, result.Repo.TenantID, &resp.Diagnostics)
 	data.CreatedAt = types.StringValue(result.Repo.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.Repo.UpdatedAt)
 

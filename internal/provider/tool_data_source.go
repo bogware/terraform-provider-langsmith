@@ -110,7 +110,7 @@ func (d *ToolDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		data.Metadata = types.StringNull()
 	}
 	data.Enabled = types.BoolValue(api.Enabled)
-	data.TenantID = types.StringValue(api.TenantID)
+	reconcileTenantID(&data.TenantID, api.TenantID, &resp.Diagnostics)
 	data.CreatedAt = types.StringValue(api.CreatedAt)
 	data.UpdatedAt = types.StringValue(api.UpdatedAt)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

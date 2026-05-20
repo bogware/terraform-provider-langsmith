@@ -297,7 +297,7 @@ func (r *WebhookResource) ImportState(ctx context.Context, req resource.ImportSt
 func (r *WebhookResource) mapResponseToModel(ctx context.Context, result *webhookAPIResponse, data *WebhookResourceModel, diagnostics *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.URL = types.StringValue(result.URL)
-	data.TenantID = types.StringValue(result.TenantID)
+	reconcileTenantID(&data.TenantID, result.TenantID, diagnostics)
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 

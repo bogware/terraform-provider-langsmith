@@ -213,7 +213,7 @@ func (d *ProjectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		data.TraceTier = types.StringNull()
 	}
 
-	data.TenantID = types.StringValue(result.TenantID)
+	reconcileTenantID(&data.TenantID, result.TenantID, &resp.Diagnostics)
 	data.StartTime = types.StringValue(result.StartTime)
 	data.RunCount = types.Int64Value(result.RunCount)
 

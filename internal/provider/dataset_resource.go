@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -246,7 +247,7 @@ func (r *DatasetResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	mapDatasetResponseToState(&data, &result)
+	mapDatasetResponseToState(&data, &result, &resp.Diagnostics)
 	// Only preserve plan values that are actually known (not unknown from Computed fields).
 	if !planInputsSchema.IsUnknown() {
 		data.InputsSchemaDefinition = planInputsSchema
@@ -283,7 +284,7 @@ func (r *DatasetResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	mapDatasetResponseToState(&data, &result)
+	mapDatasetResponseToState(&data, &result, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -338,7 +339,7 @@ func (r *DatasetResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	mapDatasetResponseToState(&data, &result)
+	mapDatasetResponseToState(&data, &result, &resp.Diagnostics)
 	// Only preserve plan values that are actually known (not unknown from Computed fields).
 	if !planInputsSchema.IsUnknown() {
 		data.InputsSchemaDefinition = planInputsSchema
@@ -379,7 +380,7 @@ func (r *DatasetResource) ImportState(ctx context.Context, req resource.ImportSt
 
 // mapDatasetResponseToState translates the API response into Terraform state.
 // Mind the nulls — an absent field means nothing's there, not that it's empty.
-func mapDatasetResponseToState(data *DatasetResourceModel, result *datasetAPIResponse) {
+func mapDatasetResponseToState(data *DatasetResourceModel, result *datasetAPIResponse, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.Name = types.StringValue(result.Name)
 
@@ -416,6 +417,6 @@ func mapDatasetResponseToState(data *DatasetResourceModel, result *datasetAPIRes
 		data.LastSessionStartTime = types.StringNull()
 	}
 
-	data.TenantID = types.StringValue(result.TenantID)
+	reconcileTenantID(&data.TenantID, result.TenantID, diags)
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 }

@@ -251,7 +251,7 @@ func (d *DatasetDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		data.Metadata = types.StringNull()
 	}
 
-	data.TenantID = types.StringValue(result.TenantID)
+	reconcileTenantID(&data.TenantID, result.TenantID, &resp.Diagnostics)
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.ModifiedAt = types.StringValue(result.ModifiedAt)
 	data.ExampleCount = types.Int64Value(result.ExampleCount)

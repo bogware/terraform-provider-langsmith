@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -178,7 +179,7 @@ func (r *ToolResource) Create(ctx context.Context, req resource.CreateRequest, r
 		resp.Diagnostics.AddError("Error creating tool", err.Error())
 		return
 	}
-	r.mapResponse(&api, &data)
+	r.mapResponse(&api, &data, &resp.Diagnostics)
 	tflog.Trace(ctx, "created tool", map[string]interface{}{"handle": api.Handle})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -198,7 +199,7 @@ func (r *ToolResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		resp.Diagnostics.AddError("Error reading tool", err.Error())
 		return
 	}
-	r.mapResponse(&api, &data)
+	r.mapResponse(&api, &data, &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -236,7 +237,7 @@ func (r *ToolResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		resp.Diagnostics.AddError("Error updating tool", err.Error())
 		return
 	}
-	r.mapResponse(&api, &data)
+	r.mapResponse(&api, &data, &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -256,7 +257,7 @@ func (r *ToolResource) ImportState(ctx context.Context, req resource.ImportState
 	resource.ImportStatePassthroughID(ctx, path.Root("handle"), req, resp)
 }
 
-func (r *ToolResource) mapResponse(api *toolAPI, data *ToolResourceModel) {
+func (r *ToolResource) mapResponse(api *toolAPI, data *ToolResourceModel, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(api.ID)
 	data.Handle = types.StringValue(api.Handle)
 	data.Name = types.StringValue(api.Name)
@@ -280,7 +281,7 @@ func (r *ToolResource) mapResponse(api *toolAPI, data *ToolResourceModel) {
 		data.Metadata = types.StringNull()
 	}
 	data.Enabled = types.BoolValue(api.Enabled)
-	data.TenantID = types.StringValue(api.TenantID)
+	reconcileTenantID(&data.TenantID, api.TenantID, diags)
 	data.CreatedAt = types.StringValue(api.CreatedAt)
 	data.UpdatedAt = types.StringValue(api.UpdatedAt)
 }

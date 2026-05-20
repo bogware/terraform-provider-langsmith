@@ -285,7 +285,7 @@ func (r *PromptResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	// Set remaining computed fields that the create response may not populate.
 	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
-	data.TenantID = types.StringValue(result.Repo.TenantID)
+	reconcileTenantID(&data.TenantID, result.Repo.TenantID, &resp.Diagnostics)
 
 	tflog.Trace(ctx, "created prompt resource", map[string]interface{}{"id": result.Repo.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -329,7 +329,7 @@ func (r *PromptResource) Read(ctx context.Context, req resource.ReadRequest, res
 		data.Owner = types.StringValue("")
 	}
 	data.FullName = types.StringValue(result.Repo.FullName)
-	data.TenantID = types.StringValue(result.Repo.TenantID)
+	reconcileTenantID(&data.TenantID, result.Repo.TenantID, &resp.Diagnostics)
 	data.CreatedAt = types.StringValue(result.Repo.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.Repo.UpdatedAt)
 
@@ -450,7 +450,7 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 	data.FullName = types.StringValue(result.Repo.FullName)
 	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
-	data.TenantID = types.StringValue(result.Repo.TenantID)
+	reconcileTenantID(&data.TenantID, result.Repo.TenantID, &resp.Diagnostics)
 	data.CreatedAt = types.StringValue(result.Repo.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.Repo.UpdatedAt)
 

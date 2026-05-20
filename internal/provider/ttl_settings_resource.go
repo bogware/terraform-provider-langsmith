@@ -173,7 +173,7 @@ func (r *TTLSettingsResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	mapTTLSettingsResponseToState(&data, &result)
+	mapTTLSettingsResponseToState(&data, &result, &resp.Diagnostics)
 	tflog.Trace(ctx, "created TTL settings resource", map[string]interface{}{"id": data.ID.ValueString()})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -223,7 +223,7 @@ func (r *TTLSettingsResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	mapTTLSettingsResponseToState(&data, &result)
+	mapTTLSettingsResponseToState(&data, &result, &resp.Diagnostics)
 	tflog.Trace(ctx, "updated TTL settings resource", map[string]interface{}{"id": data.ID.ValueString()})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -271,12 +271,12 @@ func (r *TTLSettingsResource) readTTLSettings(ctx context.Context, data *TTLSett
 		found = &results[0]
 	}
 
-	mapTTLSettingsResponseToState(data, found)
+	mapTTLSettingsResponseToState(data, found, diags)
 }
 
 // mapTTLSettingsResponseToState brands the Terraform state with values from the
 // API response -- straightforward enough that even Festus could follow along.
-func mapTTLSettingsResponseToState(data *TTLSettingsResourceModel, result *ttlSettingsAPIResponse) {
+func mapTTLSettingsResponseToState(data *TTLSettingsResourceModel, result *ttlSettingsAPIResponse, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.DefaultTraceTier = types.StringValue(result.DefaultTraceTier)
 	data.ApplyToAllProjects = types.BoolValue(result.ApplyToAllProjects)
@@ -285,10 +285,12 @@ func mapTTLSettingsResponseToState(data *TTLSettingsResourceModel, result *ttlSe
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 
+	apiTenantID := ""
 	if result.TenantID != nil {
-		data.TenantID = types.StringValue(*result.TenantID)
-	} else {
-		data.TenantID = types.StringNull()
+		apiTenantID = *result.TenantID
+	}
+	if apiTenantID != "" {
+		reconcileTenantID(&data.TenantID, apiTenantID, diags)
 	}
 
 	if result.LonglivedTTLDays != nil {

@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -284,7 +285,7 @@ func (r *BulkExportResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	mapBulkExportResponseToState(&data, &result)
+	mapBulkExportResponseToState(&data, &result, &resp.Diagnostics)
 	tflog.Trace(ctx, "created bulk export resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -308,7 +309,7 @@ func (r *BulkExportResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	mapBulkExportResponseToState(&data, &result)
+	mapBulkExportResponseToState(&data, &result, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -331,7 +332,7 @@ func (r *BulkExportResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	mapBulkExportResponseToState(&data, &result)
+	mapBulkExportResponseToState(&data, &result, &resp.Diagnostics)
 	tflog.Trace(ctx, "updated bulk export resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -368,7 +369,7 @@ func (r *BulkExportResource) ImportState(ctx context.Context, req resource.Impor
 
 // mapBulkExportResponseToState transfers the API response into Terraform state,
 // carefully setting null for any optional fields the API left empty on the prairie.
-func mapBulkExportResponseToState(data *BulkExportResourceModel, result *bulkExportAPIResponse) {
+func mapBulkExportResponseToState(data *BulkExportResourceModel, result *bulkExportAPIResponse, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.BulkExportDestinationID = types.StringValue(result.BulkExportDestinationID)
 	data.SessionID = types.StringValue(result.SessionID)
@@ -396,7 +397,7 @@ func mapBulkExportResponseToState(data *BulkExportResourceModel, result *bulkExp
 	}
 
 	data.Status = types.StringValue(result.Status)
-	data.TenantID = types.StringValue(result.TenantID)
+	reconcileTenantID(&data.TenantID, result.TenantID, diags)
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 

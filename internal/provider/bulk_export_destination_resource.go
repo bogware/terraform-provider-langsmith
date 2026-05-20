@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -273,7 +274,7 @@ func (r *BulkExportDestinationResource) Create(ctx context.Context, req resource
 		return
 	}
 
-	mapBulkExportDestinationResponseToState(&data, &result)
+	mapBulkExportDestinationResponseToState(&data, &result, &resp.Diagnostics)
 	tflog.Trace(ctx, "created bulk export destination resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -297,7 +298,7 @@ func (r *BulkExportDestinationResource) Read(ctx context.Context, req resource.R
 		return
 	}
 
-	mapBulkExportDestinationResponseToState(&data, &result)
+	mapBulkExportDestinationResponseToState(&data, &result, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -335,7 +336,7 @@ func (r *BulkExportDestinationResource) Update(ctx context.Context, req resource
 		return
 	}
 
-	mapBulkExportDestinationResponseToState(&data, &result)
+	mapBulkExportDestinationResponseToState(&data, &result, &resp.Diagnostics)
 	tflog.Trace(ctx, "updated bulk export destination resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -354,7 +355,7 @@ func (r *BulkExportDestinationResource) ImportState(ctx context.Context, req res
 // mapBulkExportDestinationResponseToState rounds up the API response fields and
 // brands them onto the Terraform state model. Absent optional fields get null values
 // to keep Terraform from reporting phantom drift.
-func mapBulkExportDestinationResponseToState(data *BulkExportDestinationResourceModel, result *bulkExportDestinationAPIResponse) {
+func mapBulkExportDestinationResponseToState(data *BulkExportDestinationResourceModel, result *bulkExportDestinationAPIResponse, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.DisplayName = types.StringValue(result.DisplayName)
 	data.DestinationType = types.StringValue(result.DestinationType)
@@ -382,7 +383,7 @@ func mapBulkExportDestinationResponseToState(data *BulkExportDestinationResource
 		data.IncludeBucketInPrefix = types.BoolNull()
 	}
 
-	data.TenantID = types.StringValue(result.TenantID)
+	reconcileTenantID(&data.TenantID, result.TenantID, diags)
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 

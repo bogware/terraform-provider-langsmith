@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -148,7 +149,7 @@ func (r *UsageLimitResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	mapUsageLimitResponseToState(&data, &result)
+	mapUsageLimitResponseToState(&data, &result, &resp.Diagnostics)
 	tflog.Trace(ctx, "created usage limit resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -185,7 +186,7 @@ func (r *UsageLimitResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	mapUsageLimitResponseToState(&data, found)
+	mapUsageLimitResponseToState(&data, found, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -209,7 +210,7 @@ func (r *UsageLimitResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	mapUsageLimitResponseToState(&data, &result)
+	mapUsageLimitResponseToState(&data, &result, &resp.Diagnostics)
 	tflog.Trace(ctx, "updated usage limit resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -237,11 +238,11 @@ func (r *UsageLimitResource) ImportState(ctx context.Context, req resource.Impor
 
 // mapUsageLimitResponseToState maps the API response fields into Terraform state --
 // a straightforward transfer with no surprises, which is how Doc Adams prefers things.
-func mapUsageLimitResponseToState(data *UsageLimitResourceModel, result *usageLimitAPIResponse) {
+func mapUsageLimitResponseToState(data *UsageLimitResourceModel, result *usageLimitAPIResponse, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.LimitType = types.StringValue(result.LimitType)
 	data.LimitValue = types.Int64Value(result.LimitValue)
-	data.TenantID = types.StringValue(result.TenantID)
+	reconcileTenantID(&data.TenantID, result.TenantID, diags)
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 }

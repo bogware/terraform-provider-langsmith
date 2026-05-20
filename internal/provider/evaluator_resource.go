@@ -418,7 +418,7 @@ func (r *EvaluatorResource) mapResponseToModel(ctx context.Context, api *evaluat
 	data.ID = types.StringValue(api.ID)
 	data.Name = types.StringValue(api.Name)
 	data.Type = types.StringValue(api.Type)
-	data.TenantID = types.StringValue(api.TenantID)
+	reconcileTenantID(&data.TenantID, api.TenantID, diags)
 	data.CreatedAt = types.StringValue(api.CreatedAt)
 	data.UpdatedAt = types.StringValue(api.UpdatedAt)
 	data.CreatedBy = types.StringValue(api.CreatedBy)
