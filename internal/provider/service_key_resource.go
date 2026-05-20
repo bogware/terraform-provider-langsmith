@@ -51,7 +51,7 @@ type ServiceKeyResourceModel struct {
 	ExpiresAt          types.String `tfsdk:"expires_at"`
 	DefaultWorkspaceID types.String `tfsdk:"default_workspace_id"`
 	RoleID             types.String `tfsdk:"role_id"`
-	TenantID           types.String `tfsdk:"tenant_id"`
+	WorkspaceID        types.String `tfsdk:"workspace_id"`
 }
 
 // serviceKeyAPICreateRequest is the wire format for minting a new service key.
@@ -166,8 +166,8 @@ func (r *ServiceKeyResource) Schema(ctx context.Context, req resource.SchemaRequ
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -220,7 +220,7 @@ func (r *ServiceKeyResource) Create(ctx context.Context, req resource.CreateRequ
 	}
 
 	var result serviceKeyAPICreateResponse
-	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/orgs/current/service-keys", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/orgs/current/service-keys", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating service key", err.Error())
 		return
@@ -246,7 +246,7 @@ func (r *ServiceKeyResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 
 	var listResult serviceKeyAPIListResponse
-	err := effectiveClient(r.client, data.TenantID).Get(ctx, "/api/v1/orgs/current/service-keys", nil, &listResult)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/orgs/current/service-keys", nil, &listResult)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading service keys", err.Error())
 		return
@@ -290,7 +290,7 @@ func (r *ServiceKeyResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	err := effectiveClient(r.client, data.TenantID).Delete(ctx, "/api/v1/orgs/current/service-keys/"+data.ID.ValueString())
+	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/api/v1/orgs/current/service-keys/"+data.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting service key", err.Error())
 		return

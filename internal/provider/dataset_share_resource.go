@@ -36,7 +36,7 @@ type DatasetShareResourceModel struct {
 	DatasetID     types.String `tfsdk:"dataset_id"`
 	ShareToken    types.String `tfsdk:"share_token"`
 	ShareProjects types.Bool   `tfsdk:"share_projects"`
-	TenantID      types.String `tfsdk:"tenant_id"`
+	WorkspaceID   types.String `tfsdk:"workspace_id"`
 }
 
 type datasetShareAPI struct {
@@ -67,8 +67,8 @@ func (r *DatasetShareResource) Schema(ctx context.Context, req resource.SchemaRe
 				MarkdownDescription: "The generated share token (used as the path segment in shared URLs).",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -104,7 +104,7 @@ func (r *DatasetShareResource) Create(ctx context.Context, req resource.CreateRe
 		}
 	}
 	var api datasetShareAPI
-	if err := effectiveClient(r.client, data.TenantID).PutWithQuery(ctx, "/api/v1/datasets/"+data.DatasetID.ValueString()+"/share", q, nil, &api); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).PutWithQuery(ctx, "/api/v1/datasets/"+data.DatasetID.ValueString()+"/share", q, nil, &api); err != nil {
 		resp.Diagnostics.AddError("Error sharing dataset", err.Error())
 		return
 	}
@@ -120,7 +120,7 @@ func (r *DatasetShareResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 	var api *datasetShareAPI
-	if err := effectiveClient(r.client, data.TenantID).Get(ctx, "/api/v1/datasets/"+data.DatasetID.ValueString()+"/share", nil, &api); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/datasets/"+data.DatasetID.ValueString()+"/share", nil, &api); err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
 			return
@@ -152,7 +152,7 @@ func (r *DatasetShareResource) Update(ctx context.Context, req resource.UpdateRe
 		}
 	}
 	var api datasetShareAPI
-	if err := effectiveClient(r.client, data.TenantID).PutWithQuery(ctx, "/api/v1/datasets/"+data.DatasetID.ValueString()+"/share", q, nil, &api); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).PutWithQuery(ctx, "/api/v1/datasets/"+data.DatasetID.ValueString()+"/share", q, nil, &api); err != nil {
 		resp.Diagnostics.AddError("Error updating dataset share state", err.Error())
 		return
 	}
@@ -166,7 +166,7 @@ func (r *DatasetShareResource) Delete(ctx context.Context, req resource.DeleteRe
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if err := effectiveClient(r.client, data.TenantID).Delete(ctx, "/api/v1/datasets/"+data.DatasetID.ValueString()+"/share"); err != nil && !client.IsNotFound(err) {
+	if err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/api/v1/datasets/"+data.DatasetID.ValueString()+"/share"); err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error unsharing dataset", err.Error())
 		return
 	}

@@ -25,7 +25,7 @@ data "langsmith_service_account" "example" {
 
 - `id` (String) The unique identifier. Either `id` or `name` must be specified.
 - `name` (String) The service account name. Either `id` or `name` must be specified.
-- `tenant_id` (String) If set, overrides the provider-level `tenant_id` for all API calls made by this data source.
+- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this data source.
 
 ### Read-Only
 

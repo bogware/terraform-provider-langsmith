@@ -27,7 +27,7 @@ resource "langsmith_service_account" "example" {
 
 ### Optional
 
-- `tenant_id` (String) If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
+- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 - `workspaces` (String) JSON-encoded array of workspace assignments, e.g. `[{"workspace_id": "uuid", "role_id": "uuid"}]`.
 
 ### Read-Only

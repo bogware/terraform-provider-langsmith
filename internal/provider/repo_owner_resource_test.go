@@ -13,14 +13,14 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
-// TestAccRepoOwnerResource_basic adds another existing-tenant user as a repo
-// owner. Set LANGSMITH_TEST_OWNER_EMAIL + LANGSMITH_TEST_TENANT_HANDLE to a
-// second user's email + the workspace's tenant handle to enable.
+// TestAccRepoOwnerResource_basic adds another existing-workspace user as a repo
+// owner. Set LANGSMITH_TEST_OWNER_EMAIL + LANGSMITH_TEST_WORKSPACE_HANDLE to a
+// second user's email + the workspace's workspace handle to enable.
 func TestAccRepoOwnerResource_basic(t *testing.T) {
 	email := os.Getenv("LANGSMITH_TEST_OWNER_EMAIL")
-	owner := os.Getenv("LANGSMITH_TEST_TENANT_HANDLE")
+	owner := os.Getenv("LANGSMITH_TEST_WORKSPACE_HANDLE")
 	if email == "" || owner == "" {
-		t.Skip("Set LANGSMITH_TEST_OWNER_EMAIL and LANGSMITH_TEST_TENANT_HANDLE to enable this acceptance test")
+		t.Skip("Set LANGSMITH_TEST_OWNER_EMAIL and LANGSMITH_TEST_WORKSPACE_HANDLE to enable this acceptance test")
 	}
 
 	repoName := strings.ToLower(fmt.Sprintf("tf-repo-%s", acctest.RandStringFromCharSet(8, acctest.CharSetAlpha)))

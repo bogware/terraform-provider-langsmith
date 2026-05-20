@@ -32,7 +32,7 @@ type PromptDataSourceModel struct {
 	Readme      types.String `tfsdk:"readme"`
 	IsPublic    types.Bool   `tfsdk:"is_public"`
 	IsArchived  types.Bool   `tfsdk:"is_archived"`
-	TenantID    types.String `tfsdk:"tenant_id"`
+	WorkspaceID types.String `tfsdk:"workspace_id"`
 	CreatedAt   types.String `tfsdk:"created_at"`
 	UpdatedAt   types.String `tfsdk:"updated_at"`
 }
@@ -49,7 +49,7 @@ type promptDataSourceAPIResponse struct {
 		Readme      *string `json:"readme"`
 		IsPublic    bool    `json:"is_public"`
 		IsArchived  bool    `json:"is_archived"`
-		TenantID    string  `json:"tenant_id"`
+		WorkspaceID string  `json:"workspace_id"`
 		CreatedAt   string  `json:"created_at"`
 		UpdatedAt   string  `json:"updated_at"`
 	} `json:"repo"`
@@ -87,8 +87,8 @@ func (d *PromptDataSource) Schema(ctx context.Context, req datasource.SchemaRequ
 				MarkdownDescription: "Whether the prompt is archived.",
 				Computed:            true,
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID. If set, overrides the provider-level `tenant_id` for all API calls made by this data source.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID. If set, overrides the provider-level `workspace_id` for all API calls made by this data source.",
 				Optional:            true,
 				Computed:            true,
 			},
@@ -124,7 +124,7 @@ func (d *PromptDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 	}
 
 	var result promptDataSourceAPIResponse
-	err := effectiveClient(d.client, data.TenantID).Get(ctx, "/api/v1/repos/-/"+data.RepoHandle.ValueString(), nil, &result)
+	err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/repos/-/"+data.RepoHandle.ValueString(), nil, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading prompt", err.Error())
 		return
@@ -134,7 +134,7 @@ func (d *PromptDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 	data.RepoHandle = types.StringValue(result.Repo.RepoHandle)
 	data.IsPublic = types.BoolValue(result.Repo.IsPublic)
 	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
-	reconcileTenantID(&data.TenantID, result.Repo.TenantID, &resp.Diagnostics)
+	reconcileWorkspaceID(&data.WorkspaceID, result.Repo.WorkspaceID, &resp.Diagnostics)
 	data.CreatedAt = types.StringValue(result.Repo.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.Repo.UpdatedAt)
 

@@ -43,7 +43,7 @@ type DatasetDataSourceModel struct {
 	ExternallyManaged       types.Bool   `tfsdk:"externally_managed"`
 	Transformations         types.String `tfsdk:"transformations"`
 	Metadata                types.String `tfsdk:"metadata"`
-	TenantID                types.String `tfsdk:"tenant_id"`
+	WorkspaceID             types.String `tfsdk:"workspace_id"`
 	CreatedAt               types.String `tfsdk:"created_at"`
 	ModifiedAt              types.String `tfsdk:"modified_at"`
 	ExampleCount            types.Int64  `tfsdk:"example_count"`
@@ -62,7 +62,7 @@ type datasetDataSourceAPIResponse struct {
 	ExternallyManaged       *bool           `json:"externally_managed"`
 	Transformations         json.RawMessage `json:"transformations"`
 	Metadata                json.RawMessage `json:"metadata"`
-	TenantID                string          `json:"tenant_id"`
+	WorkspaceID             string          `json:"workspace_id"`
 	CreatedAt               string          `json:"created_at"`
 	ModifiedAt              string          `json:"modified_at"`
 	ExampleCount            int64           `json:"example_count"`
@@ -116,8 +116,8 @@ func (d *DatasetDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 				MarkdownDescription: "JSON string of the dataset metadata.",
 				Computed:            true,
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID. If set, overrides the provider-level `tenant_id` for all API calls made by this data source.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID. If set, overrides the provider-level `workspace_id` for all API calls made by this data source.",
 				Optional:            true,
 				Computed:            true,
 			},
@@ -183,7 +183,7 @@ func (d *DatasetDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	var result datasetDataSourceAPIResponse
 
 	if idSet {
-		err := effectiveClient(d.client, data.TenantID).Get(ctx, "/api/v1/datasets/"+data.ID.ValueString(), nil, &result)
+		err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/datasets/"+data.ID.ValueString(), nil, &result)
 		if err != nil {
 			resp.Diagnostics.AddError("Error reading dataset", err.Error())
 			return
@@ -193,7 +193,7 @@ func (d *DatasetDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		query.Set("name", data.Name.ValueString())
 
 		var results []datasetDataSourceAPIResponse
-		err := effectiveClient(d.client, data.TenantID).Get(ctx, "/api/v1/datasets", query, &results)
+		err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/datasets", query, &results)
 		if err != nil {
 			resp.Diagnostics.AddError("Error reading dataset", err.Error())
 			return
@@ -251,7 +251,7 @@ func (d *DatasetDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		data.Metadata = types.StringNull()
 	}
 
-	reconcileTenantID(&data.TenantID, result.TenantID, &resp.Diagnostics)
+	reconcileWorkspaceID(&data.WorkspaceID, result.WorkspaceID, &resp.Diagnostics)
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.ModifiedAt = types.StringValue(result.ModifiedAt)
 	data.ExampleCount = types.Int64Value(result.ExampleCount)

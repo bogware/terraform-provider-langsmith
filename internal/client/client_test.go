@@ -15,7 +15,7 @@ import (
 )
 
 func newTestClient(srv *httptest.Server) *Client {
-	c := NewClient(srv.URL, "test-key", "tenant-123", "test-ua/1.0")
+	c := NewClient(srv.URL, "test-key", "workspace-123", "test-ua/1.0")
 	// Keep tests fast: cap retries and shorten the HTTP timeout.
 	c.MaxRetries = 3
 	c.HTTPClient.Timeout = 5 * time.Second
@@ -53,10 +53,10 @@ func TestIsNotFound(t *testing.T) {
 }
 
 func TestClient_SetsHeaders(t *testing.T) {
-	var seenAuth, seenTenant, seenUA, seenAccept string
+	var seenAuth, seenWorkspace, seenUA, seenAccept string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seenAuth = r.Header.Get("X-API-Key")
-		seenTenant = r.Header.Get("X-Tenant-Id")
+		seenWorkspace = r.Header.Get("X-Tenant-Id")
 		seenUA = r.Header.Get("User-Agent")
 		seenAccept = r.Header.Get("Accept")
 		w.WriteHeader(200)
@@ -71,8 +71,8 @@ func TestClient_SetsHeaders(t *testing.T) {
 	if seenAuth != "test-key" {
 		t.Errorf("X-API-Key = %q", seenAuth)
 	}
-	if seenTenant != "tenant-123" {
-		t.Errorf("X-Tenant-Id = %q", seenTenant)
+	if seenWorkspace != "workspace-123" {
+		t.Errorf("X-Tenant-Id = %q", seenWorkspace)
 	}
 	if seenUA != "test-ua/1.0" {
 		t.Errorf("User-Agent = %q", seenUA)

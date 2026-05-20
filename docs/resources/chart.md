@@ -42,7 +42,7 @@ resource "langsmith_chart" "example" {
 - `index` (Number) The display order index (0-100).
 - `metadata` (String) JSON-encoded metadata object.
 - `section_id` (String) The ID of the chart section this chart belongs to.
-- `tenant_id` (String) If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
+- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 

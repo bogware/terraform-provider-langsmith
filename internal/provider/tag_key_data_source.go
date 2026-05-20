@@ -31,7 +31,7 @@ type TagKeyDataSourceModel struct {
 	Description types.String `tfsdk:"description"`
 	CreatedAt   types.String `tfsdk:"created_at"`
 	UpdatedAt   types.String `tfsdk:"updated_at"`
-	TenantID    types.String `tfsdk:"tenant_id"`
+	WorkspaceID types.String `tfsdk:"workspace_id"`
 }
 
 func (d *TagKeyDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -60,8 +60,8 @@ func (d *TagKeyDataSource) Schema(ctx context.Context, req datasource.SchemaRequ
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "Last update timestamp.", Computed: true,
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this data source.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this data source.",
 				Optional:            true,
 			},
 		},
@@ -97,7 +97,7 @@ func (d *TagKeyDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 
 	if idSet {
 		var result tagKeyAPIResponse
-		err := effectiveClient(d.client, data.TenantID).Get(ctx, "/api/v1/workspaces/current/tag-keys/"+data.ID.ValueString(), nil, &result)
+		err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/workspaces/current/tag-keys/"+data.ID.ValueString(), nil, &result)
 		if err != nil {
 			resp.Diagnostics.AddError("Error reading tag key", err.Error())
 			return
@@ -105,7 +105,7 @@ func (d *TagKeyDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		mapTagKeyDataSourceResponse(&data, &result)
 	} else {
 		var results []tagKeyAPIResponse
-		err := effectiveClient(d.client, data.TenantID).Get(ctx, "/api/v1/workspaces/current/tag-keys", nil, &results)
+		err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/workspaces/current/tag-keys", nil, &results)
 		if err != nil {
 			resp.Diagnostics.AddError("Error reading tag keys", err.Error())
 			return

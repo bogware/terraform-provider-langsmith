@@ -53,7 +53,7 @@ type BulkExportResourceModel struct {
 	IntervalHours           types.Int64  `tfsdk:"interval_hours"`
 	Filter                  types.String `tfsdk:"filter"`
 	Status                  types.String `tfsdk:"status"`
-	TenantID                types.String `tfsdk:"tenant_id"`
+	WorkspaceID             types.String `tfsdk:"workspace_id"`
 	CreatedAt               types.String `tfsdk:"created_at"`
 	UpdatedAt               types.String `tfsdk:"updated_at"`
 	FormatVersion           types.String `tfsdk:"format_version"`
@@ -92,7 +92,7 @@ type bulkExportAPIResponse struct {
 	IntervalHours           *int64   `json:"interval_hours"`
 	Filter                  *string  `json:"filter"`
 	Status                  string   `json:"status"`
-	TenantID                string   `json:"tenant_id"`
+	WorkspaceID             string   `json:"workspace_id"`
 	CreatedAt               string   `json:"created_at"`
 	UpdatedAt               string   `json:"updated_at"`
 	FormatVersion           string   `json:"format_version"`
@@ -179,8 +179,8 @@ func (r *BulkExportResource) Schema(ctx context.Context, req resource.SchemaRequ
 				MarkdownDescription: "The status of the bulk export.",
 				Computed:            true,
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -279,7 +279,7 @@ func (r *BulkExportResource) Create(ctx context.Context, req resource.CreateRequ
 	}
 
 	var result bulkExportAPIResponse
-	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/bulk-exports", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/bulk-exports", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating bulk export", err.Error())
 		return
@@ -299,7 +299,7 @@ func (r *BulkExportResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 
 	var result bulkExportAPIResponse
-	err := effectiveClient(r.client, data.TenantID).Get(ctx, "/api/v1/bulk-exports/"+data.ID.ValueString(), nil, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/bulk-exports/"+data.ID.ValueString(), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -326,7 +326,7 @@ func (r *BulkExportResource) Update(ctx context.Context, req resource.UpdateRequ
 	}
 
 	var result bulkExportAPIResponse
-	err := effectiveClient(r.client, data.TenantID).Patch(ctx, "/api/v1/bulk-exports/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/bulk-exports/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating bulk export", err.Error())
 		return
@@ -351,7 +351,7 @@ func (r *BulkExportResource) Delete(ctx context.Context, req resource.DeleteRequ
 		Status: "Cancelled",
 	}
 
-	err := effectiveClient(r.client, data.TenantID).Patch(ctx, "/api/v1/bulk-exports/"+data.ID.ValueString(), body, nil)
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/bulk-exports/"+data.ID.ValueString(), body, nil)
 	if err != nil {
 		if client.IsNotFound(err) {
 			return
@@ -397,7 +397,7 @@ func mapBulkExportResponseToState(data *BulkExportResourceModel, result *bulkExp
 	}
 
 	data.Status = types.StringValue(result.Status)
-	reconcileTenantID(&data.TenantID, result.TenantID, diags)
+	reconcileWorkspaceID(&data.WorkspaceID, result.WorkspaceID, diags)
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 

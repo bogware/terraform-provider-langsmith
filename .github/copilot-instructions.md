@@ -21,14 +21,14 @@ Purpose: give AI coding agents the minimal, repository-specific knowledge needed
 - Developer workflows (explicit commands)
   - Build: `make build`
   - Unit tests: `make test`
-  - Acceptance tests (live API): set `LANGSMITH_API_KEY` and `LANGSMITH_TENANT_ID`, then `make testacc`.
+  - Acceptance tests (live API): set `LANGSMITH_API_KEY` and `LANGSMITH_WORKSPACE_ID`, then `make testacc`.
   - Lint: `make lint` (golangci-lint)
   - Regenerate docs/examples: `make generate` and commit changes in `docs/`.
   - Local provider testing: `make install` + add dev override to `~/.terraformrc` (see README).
 
 - Environment & secrets
   - API key: `LANGSMITH_API_KEY` (or `api_key` provider attribute)
-  - Tenant/workspace id: `LANGSMITH_TENANT_ID` (required for org-scoped keys)
+  - Tenant/workspace id: `LANGSMITH_WORKSPACE_ID` (required for org-scoped keys)
   - Custom API URL: `LANGSMITH_API_URL` or `api_url` provider attribute for self-hosting
 
 - Project-specific conventions
@@ -54,7 +54,7 @@ Purpose: give AI coding agents the minimal, repository-specific knowledge needed
 - 4. Tests: add unit tests `internal/provider/<name>_resource_test.go` exercising schema and CRUD logic. Run `go test ./internal/provider -run TestYourName`.
 - 5. Examples: add an example HCL under `examples/resources/langsmith_<name>/` demonstrating usage (required for docs generation).
 - 6. Docs: run `make generate` to regenerate `docs/` from schemas + examples and commit the generated files; CI will fail if docs are stale.
-- 7. Acceptance tests: add acceptance tests if the resource interacts with live API; run them with `make testacc` (requires `LANGSMITH_API_KEY` and `LANGSMITH_TENANT_ID`).
+- 7. Acceptance tests: add acceptance tests if the resource interacts with live API; run them with `make testacc` (requires `LANGSMITH_API_KEY` and `LANGSMITH_WORKSPACE_ID`).
 - 8. Conventions to follow: use `json_helpers.go` for consistent JSON serialization, keep resource functions thin (delegate HTTP to `internal/client`), and mark sensitive attributes as `Sensitive: true` when appropriate.
 
 If anything here is unclear or you want more detail (example locations, test patterns, or how a particular resource maps to an API endpoint), tell me which area to expand and I will iterate.

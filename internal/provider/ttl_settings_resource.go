@@ -46,7 +46,7 @@ type TTLSettingsResourceModel struct {
 	ID                 types.String `tfsdk:"id"`
 	DefaultTraceTier   types.String `tfsdk:"default_trace_tier"`
 	ApplyToAllProjects types.Bool   `tfsdk:"apply_to_all_projects"`
-	TenantID           types.String `tfsdk:"tenant_id"`
+	WorkspaceID        types.String `tfsdk:"workspace_id"`
 	OrganizationID     types.String `tfsdk:"organization_id"`
 	ConfiguredBy       types.String `tfsdk:"configured_by"`
 	LonglivedTTLDays   types.Int64  `tfsdk:"longlived_ttl_days"`
@@ -57,14 +57,14 @@ type TTLSettingsResourceModel struct {
 // ttlSettingsUpsertRequest is the request body for upserting TTL settings.
 type ttlSettingsUpsertRequest struct {
 	DefaultTraceTier   string  `json:"default_trace_tier"`
-	TenantID           *string `json:"tenant_id,omitempty"`
+	WorkspaceID        *string `json:"workspace_id,omitempty"`
 	ApplyToAllProjects bool    `json:"apply_to_all_projects"`
 }
 
 // ttlSettingsAPIResponse is what the API returns when you ask about TTL settings.
 type ttlSettingsAPIResponse struct {
 	ID                 string  `json:"id"`
-	TenantID           *string `json:"tenant_id"`
+	WorkspaceID        *string `json:"workspace_id"`
 	DefaultTraceTier   string  `json:"default_trace_tier"`
 	ApplyToAllProjects bool    `json:"apply_to_all_projects"`
 	OrganizationID     string  `json:"organization_id"`
@@ -100,8 +100,8 @@ func (r *TTLSettingsResource) Schema(ctx context.Context, req resource.SchemaReq
 				Computed:            true,
 				Default:             booldefault.StaticBool(false),
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant (workspace) ID to scope the TTL settings to. If omitted, applies at the org level.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace (workspace) ID to scope the TTL settings to. If omitted, applies at the org level.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -161,13 +161,13 @@ func (r *TTLSettingsResource) Create(ctx context.Context, req resource.CreateReq
 		ApplyToAllProjects: data.ApplyToAllProjects.ValueBool(),
 	}
 
-	if !data.TenantID.IsNull() && !data.TenantID.IsUnknown() {
-		v := data.TenantID.ValueString()
-		body.TenantID = &v
+	if !data.WorkspaceID.IsNull() && !data.WorkspaceID.IsUnknown() {
+		v := data.WorkspaceID.ValueString()
+		body.WorkspaceID = &v
 	}
 
 	var result ttlSettingsAPIResponse
-	err := effectiveClient(r.client, data.TenantID).Put(ctx, "/api/v1/orgs/ttl-settings", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Put(ctx, "/api/v1/orgs/ttl-settings", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating TTL settings", err.Error())
 		return
@@ -211,13 +211,13 @@ func (r *TTLSettingsResource) Update(ctx context.Context, req resource.UpdateReq
 		ApplyToAllProjects: data.ApplyToAllProjects.ValueBool(),
 	}
 
-	if !data.TenantID.IsNull() && !data.TenantID.IsUnknown() {
-		v := data.TenantID.ValueString()
-		body.TenantID = &v
+	if !data.WorkspaceID.IsNull() && !data.WorkspaceID.IsUnknown() {
+		v := data.WorkspaceID.ValueString()
+		body.WorkspaceID = &v
 	}
 
 	var result ttlSettingsAPIResponse
-	err := effectiveClient(r.client, data.TenantID).Put(ctx, "/api/v1/orgs/ttl-settings", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Put(ctx, "/api/v1/orgs/ttl-settings", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating TTL settings", err.Error())
 		return
@@ -243,7 +243,7 @@ func (r *TTLSettingsResource) ImportState(ctx context.Context, req resource.Impo
 // endpoint returns a list, so we find the matching entry by ID.
 func (r *TTLSettingsResource) readTTLSettings(ctx context.Context, data *TTLSettingsResourceModel, diags *diag.Diagnostics) {
 	var results []ttlSettingsAPIResponse
-	err := effectiveClient(r.client, data.TenantID).Get(ctx, "/api/v1/orgs/ttl-settings", nil, &results)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/orgs/ttl-settings", nil, &results)
 	if err != nil {
 		if client.IsNotFound(err) {
 			data.ID = types.StringNull()
@@ -285,12 +285,12 @@ func mapTTLSettingsResponseToState(data *TTLSettingsResourceModel, result *ttlSe
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 
-	apiTenantID := ""
-	if result.TenantID != nil {
-		apiTenantID = *result.TenantID
+	apiWorkspaceID := ""
+	if result.WorkspaceID != nil {
+		apiWorkspaceID = *result.WorkspaceID
 	}
-	if apiTenantID != "" {
-		reconcileTenantID(&data.TenantID, apiTenantID, diags)
+	if apiWorkspaceID != "" {
+		reconcileWorkspaceID(&data.WorkspaceID, apiWorkspaceID, diags)
 	}
 
 	if result.LonglivedTTLDays != nil {

@@ -34,7 +34,7 @@ type ToolDataSourceModel struct {
 	Returns     types.String `tfsdk:"returns"`
 	Metadata    types.String `tfsdk:"metadata"`
 	Enabled     types.Bool   `tfsdk:"enabled"`
-	TenantID    types.String `tfsdk:"tenant_id"`
+	WorkspaceID types.String `tfsdk:"workspace_id"`
 	CreatedAt   types.String `tfsdk:"created_at"`
 	UpdatedAt   types.String `tfsdk:"updated_at"`
 }
@@ -55,8 +55,8 @@ func (d *ToolDataSource) Schema(ctx context.Context, req datasource.SchemaReques
 			"returns":     schema.StringAttribute{Computed: true},
 			"metadata":    schema.StringAttribute{Computed: true},
 			"enabled":     schema.BoolAttribute{Computed: true},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID. If set, overrides the provider-level `tenant_id` for all API calls made by this data source.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID. If set, overrides the provider-level `workspace_id` for all API calls made by this data source.",
 				Optional:            true,
 				Computed:            true,
 			},
@@ -85,7 +85,7 @@ func (d *ToolDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 	var api toolAPI
-	if err := effectiveClient(d.client, data.TenantID).Get(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), nil, &api); err != nil {
+	if err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), nil, &api); err != nil {
 		resp.Diagnostics.AddError("Error reading tool", err.Error())
 		return
 	}
@@ -110,7 +110,7 @@ func (d *ToolDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		data.Metadata = types.StringNull()
 	}
 	data.Enabled = types.BoolValue(api.Enabled)
-	reconcileTenantID(&data.TenantID, api.TenantID, &resp.Diagnostics)
+	reconcileWorkspaceID(&data.WorkspaceID, api.WorkspaceID, &resp.Diagnostics)
 	data.CreatedAt = types.StringValue(api.CreatedAt)
 	data.UpdatedAt = types.StringValue(api.UpdatedAt)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

@@ -42,7 +42,7 @@ type ToolResourceModel struct {
 	Returns     types.String `tfsdk:"returns"`
 	Metadata    types.String `tfsdk:"metadata"`
 	Enabled     types.Bool   `tfsdk:"enabled"`
-	TenantID    types.String `tfsdk:"tenant_id"`
+	WorkspaceID types.String `tfsdk:"workspace_id"`
 	CreatedAt   types.String `tfsdk:"created_at"`
 	UpdatedAt   types.String `tfsdk:"updated_at"`
 }
@@ -75,7 +75,7 @@ type toolAPI struct {
 	Returns     map[string]interface{} `json:"returns"`
 	Metadata    map[string]interface{} `json:"metadata"`
 	Enabled     bool                   `json:"enabled"`
-	TenantID    string                 `json:"tenant_id"`
+	WorkspaceID string                 `json:"workspace_id"`
 	CreatedAt   string                 `json:"created_at"`
 	UpdatedAt   string                 `json:"updated_at"`
 }
@@ -112,8 +112,8 @@ func (r *ToolResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 				MarkdownDescription: "JSON-encoded free-form metadata.",
 			},
 			"enabled": schema.BoolAttribute{Optional: true, Computed: true, MarkdownDescription: "Whether the tool is enabled."},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -175,7 +175,7 @@ func (r *ToolResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 
 	var api toolAPI
-	if err := effectiveClient(r.client, data.TenantID).Post(ctx, "/v1/platform/tools", body, &api); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/v1/platform/tools", body, &api); err != nil {
 		resp.Diagnostics.AddError("Error creating tool", err.Error())
 		return
 	}
@@ -191,7 +191,7 @@ func (r *ToolResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 	var api toolAPI
-	if err := effectiveClient(r.client, data.TenantID).Get(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), nil, &api); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), nil, &api); err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
 			return
@@ -233,7 +233,7 @@ func (r *ToolResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 
 	var api toolAPI
-	if err := effectiveClient(r.client, data.TenantID).Patch(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), body, &api); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), body, &api); err != nil {
 		resp.Diagnostics.AddError("Error updating tool", err.Error())
 		return
 	}
@@ -247,7 +247,7 @@ func (r *ToolResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if err := effectiveClient(r.client, data.TenantID).Delete(ctx, "/v1/platform/tools/"+data.Handle.ValueString()); err != nil && !client.IsNotFound(err) {
+	if err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/v1/platform/tools/"+data.Handle.ValueString()); err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting tool", err.Error())
 		return
 	}
@@ -281,7 +281,7 @@ func (r *ToolResource) mapResponse(api *toolAPI, data *ToolResourceModel, diags 
 		data.Metadata = types.StringNull()
 	}
 	data.Enabled = types.BoolValue(api.Enabled)
-	reconcileTenantID(&data.TenantID, api.TenantID, diags)
+	reconcileWorkspaceID(&data.WorkspaceID, api.WorkspaceID, diags)
 	data.CreatedAt = types.StringValue(api.CreatedAt)
 	data.UpdatedAt = types.StringValue(api.UpdatedAt)
 }

@@ -48,7 +48,7 @@ type FilterViewResourceModel struct {
 	Duration          types.String `tfsdk:"duration"`
 	CreatedAt         types.String `tfsdk:"created_at"`
 	UpdatedAt         types.String `tfsdk:"updated_at"`
-	TenantID          types.String `tfsdk:"tenant_id"`
+	WorkspaceID       types.String `tfsdk:"workspace_id"`
 }
 
 type filterViewCreateRequest struct {
@@ -156,8 +156,8 @@ func (r *FilterViewResource) Schema(ctx context.Context, req resource.SchemaRequ
 				MarkdownDescription: "Last update timestamp.",
 				Computed:            true,
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -199,7 +199,7 @@ func (r *FilterViewResource) Create(ctx context.Context, req resource.CreateRequ
 
 	var result filterViewAPIResponse
 	apiPath := fmt.Sprintf("/api/v1/sessions/%s/views", data.SessionID.ValueString())
-	err := effectiveClient(r.client, data.TenantID).Post(ctx, apiPath, body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, apiPath, body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating filter view", err.Error())
 		return
@@ -219,7 +219,7 @@ func (r *FilterViewResource) Read(ctx context.Context, req resource.ReadRequest,
 
 	var result filterViewAPIResponse
 	apiPath := fmt.Sprintf("/api/v1/sessions/%s/views/%s", data.SessionID.ValueString(), data.ID.ValueString())
-	err := effectiveClient(r.client, data.TenantID).Get(ctx, apiPath, nil, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, apiPath, nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -253,7 +253,7 @@ func (r *FilterViewResource) Update(ctx context.Context, req resource.UpdateRequ
 
 	var result filterViewAPIResponse
 	apiPath := fmt.Sprintf("/api/v1/sessions/%s/views/%s", data.SessionID.ValueString(), data.ID.ValueString())
-	err := effectiveClient(r.client, data.TenantID).Patch(ctx, apiPath, body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, apiPath, body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating filter view", err.Error())
 		return
@@ -272,7 +272,7 @@ func (r *FilterViewResource) Delete(ctx context.Context, req resource.DeleteRequ
 	}
 
 	apiPath := fmt.Sprintf("/api/v1/sessions/%s/views/%s", data.SessionID.ValueString(), data.ID.ValueString())
-	err := effectiveClient(r.client, data.TenantID).Delete(ctx, apiPath)
+	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, apiPath)
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting filter view", err.Error())
 		return

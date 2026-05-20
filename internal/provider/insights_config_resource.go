@@ -40,7 +40,7 @@ type InsightsConfigResourceModel struct {
 	Description  types.String `tfsdk:"description"`
 	Config       types.String `tfsdk:"config"`
 	ScheduleCron types.String `tfsdk:"schedule_cron"`
-	TenantID     types.String `tfsdk:"tenant_id"`
+	WorkspaceID  types.String `tfsdk:"workspace_id"`
 }
 
 type insightsConfigCreateRequest struct {
@@ -89,8 +89,8 @@ func (r *InsightsConfigResource) Schema(ctx context.Context, req resource.Schema
 				MarkdownDescription: "JSON-encoded clustering job configuration (`CreateRunClusteringJobRequest` body).",
 			},
 			"schedule_cron": schema.StringAttribute{Optional: true, MarkdownDescription: "Cron expression to schedule the job."},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -137,7 +137,7 @@ func (r *InsightsConfigResource) Create(ctx context.Context, req resource.Create
 	}
 	planConfig := data.Config
 	var api insightsConfigAPI
-	if err := effectiveClient(r.client, data.TenantID).Post(ctx, r.basePath(data.SessionID.ValueString()), body, &api); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, r.basePath(data.SessionID.ValueString()), body, &api); err != nil {
 		resp.Diagnostics.AddError("Error creating insights config", err.Error())
 		return
 	}
@@ -161,7 +161,7 @@ func (r *InsightsConfigResource) Read(ctx context.Context, req resource.ReadRequ
 		return
 	}
 	var list getInsightsConfigsResponse
-	if err := effectiveClient(r.client, data.TenantID).Get(ctx, r.basePath(data.SessionID.ValueString()), nil, &list); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, r.basePath(data.SessionID.ValueString()), nil, &list); err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
 			return
@@ -212,7 +212,7 @@ func (r *InsightsConfigResource) Update(ctx context.Context, req resource.Update
 	}
 	planConfig := data.Config
 	var api insightsConfigAPI
-	if err := effectiveClient(r.client, data.TenantID).Patch(ctx, r.basePath(data.SessionID.ValueString())+"/"+data.ID.ValueString(), body, &api); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, r.basePath(data.SessionID.ValueString())+"/"+data.ID.ValueString(), body, &api); err != nil {
 		resp.Diagnostics.AddError("Error updating insights config", err.Error())
 		return
 	}
@@ -227,7 +227,7 @@ func (r *InsightsConfigResource) Delete(ctx context.Context, req resource.Delete
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if err := effectiveClient(r.client, data.TenantID).Delete(ctx, r.basePath(data.SessionID.ValueString())+"/"+data.ID.ValueString()); err != nil && !client.IsNotFound(err) {
+	if err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, r.basePath(data.SessionID.ValueString())+"/"+data.ID.ValueString()); err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting insights config", err.Error())
 		return
 	}

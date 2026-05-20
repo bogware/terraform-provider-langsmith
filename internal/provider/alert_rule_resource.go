@@ -61,7 +61,7 @@ type AlertRuleResourceModel struct {
 	Actions                types.String  `tfsdk:"actions"`
 	CreatedAt              types.String  `tfsdk:"created_at"`
 	UpdatedAt              types.String  `tfsdk:"updated_at"`
-	TenantID               types.String  `tfsdk:"tenant_id"`
+	WorkspaceID            types.String  `tfsdk:"workspace_id"`
 }
 
 // alertRuleRequest is the payload we send to the API when staking a new alert
@@ -202,8 +202,8 @@ func (r *AlertRuleResource) Schema(ctx context.Context, req resource.SchemaReque
 				MarkdownDescription: "The timestamp when the alert rule was last updated.",
 				Computed:            true,
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -245,7 +245,7 @@ func (r *AlertRuleResource) Create(ctx context.Context, req resource.CreateReque
 	apiPath := fmt.Sprintf("/v1/platform/alerts/%s", data.SessionID.ValueString())
 
 	var result alertRuleResponse
-	err := effectiveClient(r.client, data.TenantID).Post(ctx, apiPath, body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, apiPath, body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating alert rule", err.Error())
 		return
@@ -272,7 +272,7 @@ func (r *AlertRuleResource) Read(ctx context.Context, req resource.ReadRequest, 
 		data.SessionID.ValueString(), data.ID.ValueString())
 
 	var result alertRuleResponse
-	err := effectiveClient(r.client, data.TenantID).Get(ctx, apiPath, nil, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, apiPath, nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -304,7 +304,7 @@ func (r *AlertRuleResource) Update(ctx context.Context, req resource.UpdateReque
 		data.SessionID.ValueString(), data.ID.ValueString())
 
 	var result alertRuleResponse
-	err := effectiveClient(r.client, data.TenantID).Patch(ctx, apiPath, body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, apiPath, body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating alert rule", err.Error())
 		return
@@ -326,7 +326,7 @@ func (r *AlertRuleResource) Delete(ctx context.Context, req resource.DeleteReque
 	apiPath := fmt.Sprintf("/v1/platform/alerts/%s/%s",
 		data.SessionID.ValueString(), data.ID.ValueString())
 
-	err := effectiveClient(r.client, data.TenantID).Delete(ctx, apiPath)
+	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, apiPath)
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting alert rule", err.Error())
 		return

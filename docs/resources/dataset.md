@@ -35,8 +35,8 @@ resource "langsmith_dataset" "example" {
 - `inputs_schema_definition` (String) JSON string defining the inputs schema.
 - `metadata` (String) JSON-encoded metadata object for the dataset.
 - `outputs_schema_definition` (String) JSON string defining the outputs schema.
-- `tenant_id` (String) The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
 - `transformations` (String) JSON-encoded array of dataset transformations.
+- `workspace_id` (String) The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 

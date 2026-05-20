@@ -33,15 +33,15 @@ type RepoOwnerResource struct {
 }
 
 type RepoOwnerResourceModel struct {
-	ID         types.String `tfsdk:"id"`
-	Owner      types.String `tfsdk:"owner"`
-	Repo       types.String `tfsdk:"repo"`
-	Email      types.String `tfsdk:"email"`
-	IdentityID types.String `tfsdk:"identity_id"`
-	LSUserID   types.String `tfsdk:"ls_user_id"`
-	FullName   types.String `tfsdk:"full_name"`
-	CreatedAt  types.String `tfsdk:"created_at"`
-	TenantID   types.String `tfsdk:"tenant_id"`
+	ID          types.String `tfsdk:"id"`
+	Owner       types.String `tfsdk:"owner"`
+	Repo        types.String `tfsdk:"repo"`
+	Email       types.String `tfsdk:"email"`
+	IdentityID  types.String `tfsdk:"identity_id"`
+	LSUserID    types.String `tfsdk:"ls_user_id"`
+	FullName    types.String `tfsdk:"full_name"`
+	CreatedAt   types.String `tfsdk:"created_at"`
+	WorkspaceID types.String `tfsdk:"workspace_id"`
 }
 
 type repoOwnerAPI struct {
@@ -99,8 +99,8 @@ func (r *RepoOwnerResource) Schema(ctx context.Context, req resource.SchemaReque
 			"ls_user_id": schema.StringAttribute{Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"full_name":  schema.StringAttribute{Computed: true},
 			"created_at": schema.StringAttribute{Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -132,7 +132,7 @@ func (r *RepoOwnerResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 	var api repoOwnerAPI
-	if err := effectiveClient(r.client, data.TenantID).Post(ctx, r.repoPath(data.Owner.ValueString(), data.Repo.ValueString()),
+	if err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, r.repoPath(data.Owner.ValueString(), data.Repo.ValueString()),
 		addRepoOwnerRequest{Email: data.Email.ValueString()}, &api); err != nil {
 		resp.Diagnostics.AddError("Error adding repo owner", err.Error())
 		return
@@ -149,7 +149,7 @@ func (r *RepoOwnerResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 	var list listRepoOwnersResponse
-	if err := effectiveClient(r.client, data.TenantID).Get(ctx, r.repoPath(data.Owner.ValueString(), data.Repo.ValueString()), nil, &list); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, r.repoPath(data.Owner.ValueString(), data.Repo.ValueString()), nil, &list); err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
 			return
@@ -189,7 +189,7 @@ func (r *RepoOwnerResource) Delete(ctx context.Context, req resource.DeleteReque
 			"identity_id is not set in state, so the owner cannot be removed via the API. Remove the resource from state only.")
 		return
 	}
-	if err := effectiveClient(r.client, data.TenantID).DeleteWithBody(ctx, r.repoPath(data.Owner.ValueString(), data.Repo.ValueString()),
+	if err := effectiveClient(r.client, data.WorkspaceID).DeleteWithBody(ctx, r.repoPath(data.Owner.ValueString(), data.Repo.ValueString()),
 		removeRepoOwnerRequest{IdentityID: data.IdentityID.ValueString()}); err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error removing repo owner", err.Error())
 		return

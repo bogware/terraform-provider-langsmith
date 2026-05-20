@@ -33,7 +33,7 @@ output "share_token" {
 ### Optional
 
 - `share_projects` (Boolean) Whether to also expose linked projects in the share.
-- `tenant_id` (String) If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
+- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 

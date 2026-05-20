@@ -53,7 +53,7 @@ type PromptResourceModel struct {
 	Owner       types.String `tfsdk:"owner"`
 	FullName    types.String `tfsdk:"full_name"`
 	CommitHash  types.String `tfsdk:"commit_hash"`
-	TenantID    types.String `tfsdk:"tenant_id"`
+	WorkspaceID types.String `tfsdk:"workspace_id"`
 	CreatedAt   types.String `tfsdk:"created_at"`
 	UpdatedAt   types.String `tfsdk:"updated_at"`
 }
@@ -110,7 +110,7 @@ type promptAPIResponse struct {
 		IsPublic    bool     `json:"is_public"`
 		IsArchived  bool     `json:"is_archived"`
 		Tags        []string `json:"tags"`
-		TenantID    string   `json:"tenant_id"`
+		WorkspaceID string   `json:"workspace_id"`
 		NumCommits  int64    `json:"num_commits"`
 		Owner       *string  `json:"owner"`
 		FullName    string   `json:"full_name"`
@@ -121,7 +121,7 @@ type promptAPIResponse struct {
 
 // repoOwnerSegment returns the URL segment to use for the {owner} portion of
 // /api/v1/repos/{owner}/{repo}. Falls back to "-" (wildcard for current
-// tenant) when no concrete owner is known — e.g. for prompts created by a
+// workspace) when no concrete owner is known — e.g. for prompts created by a
 // service account, where owner is null.
 func repoOwnerSegment(owner string) string {
 	if owner == "" {
@@ -191,8 +191,8 @@ func (r *PromptResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				MarkdownDescription: "The hash of the current commit — the latest brand on the cattle.",
 				Computed:            true,
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -250,7 +250,7 @@ func (r *PromptResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	var result promptAPIResponse
-	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/repos", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/repos", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating prompt", err.Error())
 		return
@@ -272,7 +272,7 @@ func (r *PromptResource) Create(ctx context.Context, req resource.CreateRequest,
 			Manifest: json.RawMessage(data.Manifest.ValueString()),
 		}
 		var commitResult promptCommitResponse
-		err := effectiveClient(r.client, data.TenantID).Post(ctx, fmt.Sprintf("/commits/-/%s", data.RepoHandle.ValueString()), commitBody, &commitResult)
+		err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, fmt.Sprintf("/commits/-/%s", data.RepoHandle.ValueString()), commitBody, &commitResult)
 		if err != nil {
 			resp.Diagnostics.AddError("Error creating prompt commit", err.Error())
 			return
@@ -285,7 +285,7 @@ func (r *PromptResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	// Set remaining computed fields that the create response may not populate.
 	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
-	reconcileTenantID(&data.TenantID, result.Repo.TenantID, &resp.Diagnostics)
+	reconcileWorkspaceID(&data.WorkspaceID, result.Repo.WorkspaceID, &resp.Diagnostics)
 
 	tflog.Trace(ctx, "created prompt resource", map[string]interface{}{"id": result.Repo.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -309,7 +309,7 @@ func (r *PromptResource) Read(ctx context.Context, req resource.ReadRequest, res
 	}
 
 	var result promptAPIResponse
-	err := effectiveClient(r.client, data.TenantID).Get(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", repoOwnerSegment(owner), repoHandle), nil, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", repoOwnerSegment(owner), repoHandle), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -329,7 +329,7 @@ func (r *PromptResource) Read(ctx context.Context, req resource.ReadRequest, res
 		data.Owner = types.StringValue("")
 	}
 	data.FullName = types.StringValue(result.Repo.FullName)
-	reconcileTenantID(&data.TenantID, result.Repo.TenantID, &resp.Diagnostics)
+	reconcileWorkspaceID(&data.WorkspaceID, result.Repo.WorkspaceID, &resp.Diagnostics)
 	data.CreatedAt = types.StringValue(result.Repo.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.Repo.UpdatedAt)
 
@@ -354,7 +354,7 @@ func (r *PromptResource) Read(ctx context.Context, req resource.ReadRequest, res
 	// Ride over to the commits corral and fetch the latest manifest.
 	if result.Repo.NumCommits > 0 {
 		var latestCommit promptLatestCommitResponse
-		commitErr := effectiveClient(r.client, data.TenantID).Get(ctx, fmt.Sprintf("/commits/-/%s/latest", repoHandle), nil, &latestCommit)
+		commitErr := effectiveClient(r.client, data.WorkspaceID).Get(ctx, fmt.Sprintf("/commits/-/%s/latest", repoHandle), nil, &latestCommit)
 		if commitErr != nil {
 			resp.Diagnostics.AddWarning("Error reading prompt manifest", commitErr.Error())
 		} else {
@@ -413,7 +413,7 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 		body.IsArchived = &v
 	}
 
-	err := effectiveClient(r.client, data.TenantID).Patch(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", owner, repoHandle), body, nil)
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", owner, repoHandle), body, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating prompt", err.Error())
 		return
@@ -426,7 +426,7 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 			Manifest: json.RawMessage(data.Manifest.ValueString()),
 		}
 		var commitResult promptCommitResponse
-		commitErr := effectiveClient(r.client, data.TenantID).Post(ctx, fmt.Sprintf("/commits/-/%s", repoHandle), commitBody, &commitResult)
+		commitErr := effectiveClient(r.client, data.WorkspaceID).Post(ctx, fmt.Sprintf("/commits/-/%s", repoHandle), commitBody, &commitResult)
 		if commitErr != nil {
 			resp.Diagnostics.AddError("Error creating prompt commit", commitErr.Error())
 			return
@@ -436,7 +436,7 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 
 	// PATCH doesn't return the full resource, so we ride back to the API for the latest state.
 	var result promptAPIResponse
-	err = effectiveClient(r.client, data.TenantID).Get(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", owner, data.RepoHandle.ValueString()), nil, &result)
+	err = effectiveClient(r.client, data.WorkspaceID).Get(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", owner, data.RepoHandle.ValueString()), nil, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading prompt after update", err.Error())
 		return
@@ -450,7 +450,7 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 	data.FullName = types.StringValue(result.Repo.FullName)
 	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
-	reconcileTenantID(&data.TenantID, result.Repo.TenantID, &resp.Diagnostics)
+	reconcileWorkspaceID(&data.WorkspaceID, result.Repo.WorkspaceID, &resp.Diagnostics)
 	data.CreatedAt = types.StringValue(result.Repo.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.Repo.UpdatedAt)
 
@@ -458,7 +458,7 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 	if data.CommitHash.IsNull() || data.CommitHash.IsUnknown() {
 		if result.Repo.NumCommits > 0 {
 			var latestCommit promptLatestCommitResponse
-			commitErr := effectiveClient(r.client, data.TenantID).Get(ctx, fmt.Sprintf("/commits/-/%s/latest", repoHandle), nil, &latestCommit)
+			commitErr := effectiveClient(r.client, data.WorkspaceID).Get(ctx, fmt.Sprintf("/commits/-/%s/latest", repoHandle), nil, &latestCommit)
 			if commitErr == nil {
 				data.CommitHash = types.StringValue(latestCommit.CommitHash)
 				data.Manifest = jsonStringValue(latestCommit.Manifest)
@@ -482,7 +482,7 @@ func (r *PromptResource) Delete(ctx context.Context, req resource.DeleteRequest,
 	owner := repoOwnerSegment(data.Owner.ValueString())
 	repoHandle := data.RepoHandle.ValueString()
 
-	err := effectiveClient(r.client, data.TenantID).Delete(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", owner, repoHandle))
+	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", owner, repoHandle))
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting prompt", err.Error())
 	}

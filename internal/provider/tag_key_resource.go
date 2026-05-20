@@ -41,7 +41,7 @@ type TagKeyResourceModel struct {
 	Description types.String `tfsdk:"description"`
 	CreatedAt   types.String `tfsdk:"created_at"`
 	UpdatedAt   types.String `tfsdk:"updated_at"`
-	TenantID    types.String `tfsdk:"tenant_id"`
+	WorkspaceID types.String `tfsdk:"workspace_id"`
 }
 
 // tagKeyCreateRequest is the order form for forging a new tag key.
@@ -99,8 +99,8 @@ func (r *TagKeyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				MarkdownDescription: "The timestamp when the tag key was last updated.",
 				Computed:            true,
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -143,7 +143,7 @@ func (r *TagKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	var result tagKeyAPIResponse
-	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/workspaces/current/tag-keys", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/workspaces/current/tag-keys", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating tag key", err.Error())
 		return
@@ -163,7 +163,7 @@ func (r *TagKeyResource) Read(ctx context.Context, req resource.ReadRequest, res
 	}
 
 	var result tagKeyAPIResponse
-	err := effectiveClient(r.client, data.TenantID).Get(ctx, "/api/v1/workspaces/current/tag-keys/"+data.ID.ValueString(), nil, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/workspaces/current/tag-keys/"+data.ID.ValueString(), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -195,7 +195,7 @@ func (r *TagKeyResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 
 	var result tagKeyAPIResponse
-	err := effectiveClient(r.client, data.TenantID).Patch(ctx, "/api/v1/workspaces/current/tag-keys/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/workspaces/current/tag-keys/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating tag key", err.Error())
 		return
@@ -214,7 +214,7 @@ func (r *TagKeyResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		return
 	}
 
-	err := effectiveClient(r.client, data.TenantID).Delete(ctx, "/api/v1/workspaces/current/tag-keys/"+data.ID.ValueString())
+	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/api/v1/workspaces/current/tag-keys/"+data.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting tag key", err.Error())
 		return

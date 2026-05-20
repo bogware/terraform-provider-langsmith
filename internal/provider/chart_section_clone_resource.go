@@ -41,7 +41,7 @@ type ChartSectionCloneResourceModel struct {
 	Index           types.Int64  `tfsdk:"index"`
 	CreatedAt       types.String `tfsdk:"created_at"`
 	UpdatedAt       types.String `tfsdk:"updated_at"`
-	TenantID        types.String `tfsdk:"tenant_id"`
+	WorkspaceID     types.String `tfsdk:"workspace_id"`
 }
 
 type chartSectionCloneRequest struct {
@@ -99,8 +99,8 @@ func (r *ChartSectionCloneResource) Schema(ctx context.Context, req resource.Sch
 				MarkdownDescription: "Last update timestamp.",
 				Computed:            true,
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -133,7 +133,7 @@ func (r *ChartSectionCloneResource) Create(ctx context.Context, req resource.Cre
 	setOptionalString(&cloneBody.SessionID, data.SessionID)
 
 	var cloned chartSectionAPIResponse
-	if err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/charts/section/clone", cloneBody, &cloned); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/charts/section/clone", cloneBody, &cloned); err != nil {
 		resp.Diagnostics.AddError("Error cloning chart section", err.Error())
 		return
 	}
@@ -173,7 +173,7 @@ func (r *ChartSectionCloneResource) Create(ctx context.Context, req resource.Cre
 	final := cloned
 	if needsPatch {
 		var patched chartSectionAPIResponse
-		if err := effectiveClient(r.client, data.TenantID).Patch(ctx, "/api/v1/charts/section/"+cloned.ID, patchBody, &patched); err != nil {
+		if err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/charts/section/"+cloned.ID, patchBody, &patched); err != nil {
 			resp.Diagnostics.AddError("Error applying post-clone updates", err.Error())
 			return
 		}
@@ -219,7 +219,7 @@ func (r *ChartSectionCloneResource) Read(ctx context.Context, req resource.ReadR
 		EndTime   string `json:"end_time"`
 	}{OmitData: true, StartTime: "2020-01-01T00:00:00Z", EndTime: "2020-01-01T00:01:00Z"}
 	var result chartSectionAPIResponse
-	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/charts/section/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/charts/section/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -265,7 +265,7 @@ func (r *ChartSectionCloneResource) Update(ctx context.Context, req resource.Upd
 	}
 
 	var result chartSectionAPIResponse
-	err := effectiveClient(r.client, data.TenantID).Patch(ctx, "/api/v1/charts/section/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/charts/section/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating cloned chart section", err.Error())
 		return
@@ -295,7 +295,7 @@ func (r *ChartSectionCloneResource) Delete(ctx context.Context, req resource.Del
 		return
 	}
 
-	err := effectiveClient(r.client, data.TenantID).Delete(ctx, "/api/v1/charts/section/"+data.ID.ValueString())
+	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/api/v1/charts/section/"+data.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting cloned chart section", err.Error())
 		return

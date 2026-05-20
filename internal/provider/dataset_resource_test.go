@@ -34,7 +34,7 @@ func TestAccDatasetResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttrSet("langsmith_dataset.test", "id"),
 					resource.TestCheckResourceAttr("langsmith_dataset.test", "name", rName),
 					resource.TestCheckResourceAttr("langsmith_dataset.test", "data_type", "kv"),
-					resource.TestCheckResourceAttrSet("langsmith_dataset.test", "tenant_id"),
+					resource.TestCheckResourceAttrSet("langsmith_dataset.test", "workspace_id"),
 					resource.TestCheckResourceAttrSet("langsmith_dataset.test", "created_at"),
 				),
 			},

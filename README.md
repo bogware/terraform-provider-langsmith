@@ -26,8 +26,8 @@ provider "langsmith" {
   # api_key = "lsv2_..."
 
   # Workspace ID: required for org-scoped keys
-  # Set here or via LANGSMITH_TENANT_ID env var
-  # tenant_id = "your-workspace-uuid"
+  # Set here or via LANGSMITH_WORKSPACE_ID env var
+  # workspace_id = "your-workspace-uuid"
 }
 
 # Create a tracing project
@@ -73,8 +73,8 @@ If you're using an organization-scoped service key, you **must** also provide yo
 
 | Method | Details |
 |--------|---------|
-| **Environment variable** | `export LANGSMITH_TENANT_ID="your-workspace-uuid"` |
-| **Provider attribute** | `tenant_id = "your-workspace-uuid"` |
+| **Environment variable** | `export LANGSMITH_WORKSPACE_ID="your-workspace-uuid"` |
+| **Provider attribute** | `workspace_id = "your-workspace-uuid"` |
 
 To find your workspace ID: **LangSmith Settings > Workspaces**, or:
 
@@ -89,17 +89,17 @@ Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
 
 ### Managing multiple workspaces
 
-`tenant_id` is configured at the provider level, so to manage resources across several workspaces from one Terraform configuration today, declare a provider alias per workspace:
+`workspace_id` is configured at the provider level, but you can use multiple provider instances with aliases to manage resources across different workspaces. For example:
 
 ```hcl
 provider "langsmith" {
-  alias     = "prod"
-  tenant_id = "00000000-0000-0000-0000-prod"
+  alias        = "prod"
+  workspace_id = "00000000-0000-0000-0000-prod"
 }
 
 provider "langsmith" {
-  alias     = "staging"
-  tenant_id = "00000000-0000-0000-0000-stg"
+  alias        = "staging"
+  workspace_id = "00000000-0000-0000-0000-stg"
 }
 
 resource "langsmith_project" "prod_traces" {
@@ -114,6 +114,20 @@ resource "langsmith_project" "staging_traces" {
 ```
 
 This pattern works well for a known, static set of workspaces. Dynamic `for_each` over a list of workspaces is not currently supported — see [issue #21](https://github.com/bogware/terraform-provider-langsmith/issues/21).
+
+You can also specify the workspace at the resource level for most resources, which allows you to manage multiple workspaces without multiple provider instances. For example:
+
+```hcl
+resource "langsmith_project" "prod_traces" {
+  name       = "production"
+  workspace_id = "00000000-0000-0000-0000-prod"
+}
+
+resource "langsmith_project" "staging_traces" {
+  name       = "staging"
+  workspace_id = "00000000-0000-0000-0000-stg"
+}
+```
 
 ## Resources
 
@@ -238,7 +252,7 @@ This pattern works well for a known, static set of workspaces. Dynamic `for_each
 ```bash
 make build        # Build the provider
 make test         # Run unit tests
-make testacc      # Run acceptance tests (needs LANGSMITH_API_KEY + LANGSMITH_TENANT_ID)
+make testacc      # Run acceptance tests (needs LANGSMITH_API_KEY + LANGSMITH_WORKSPACE_ID)
 make lint         # Run golangci-lint
 make generate     # Regenerate docs from schemas + examples
 ```
@@ -264,7 +278,7 @@ Acceptance tests create real resources against the LangSmith API:
 
 ```bash
 export LANGSMITH_API_KEY="lsv2_..."
-export LANGSMITH_TENANT_ID="your-workspace-uuid"
+export LANGSMITH_WORKSPACE_ID="your-workspace-uuid"
 make testacc
 ```
 

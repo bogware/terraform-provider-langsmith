@@ -36,7 +36,7 @@ func TestAccAnnotationQueueResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttr("langsmith_annotation_queue.test", "enable_reservations", "true"),
 					resource.TestCheckResourceAttr("langsmith_annotation_queue.test", "num_reviewers_per_item", "1"),
 					resource.TestCheckResourceAttr("langsmith_annotation_queue.test", "reservation_minutes", "1"),
-					resource.TestCheckResourceAttrSet("langsmith_annotation_queue.test", "tenant_id"),
+					resource.TestCheckResourceAttrSet("langsmith_annotation_queue.test", "workspace_id"),
 					resource.TestCheckResourceAttrSet("langsmith_annotation_queue.test", "created_at"),
 					resource.TestCheckResourceAttrSet("langsmith_annotation_queue.test", "updated_at"),
 				),

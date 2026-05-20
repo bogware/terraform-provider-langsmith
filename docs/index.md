@@ -13,9 +13,9 @@ The LangSmith provider allows you to manage LangSmith resources such as projects
 
 ```terraform
 provider "langsmith" {
-  api_key   = var.langsmith_api_key
-  api_url   = "https://api.smith.langchain.com"
-  tenant_id = var.langsmith_tenant_id # Required for org-scoped API keys
+  api_key      = var.langsmith_api_key
+  api_url      = "https://api.smith.langchain.com"
+  workspace_id = var.LANGSMITH_WORKSPACE_ID # Required for org-scoped API keys
 }
 ```
 
@@ -26,4 +26,4 @@ provider "langsmith" {
 
 - `api_key` (String, Sensitive) The LangSmith API key. Can also be set with the `LANGSMITH_API_KEY` environment variable.
 - `api_url` (String) The LangSmith API base URL. Defaults to `https://api.smith.langchain.com`. Can also be set with the `LANGSMITH_API_URL` environment variable.
-- `tenant_id` (String) The LangSmith workspace/tenant ID. Required for org-scoped API keys. Can also be set with the `LANGSMITH_TENANT_ID` environment variable.
+- `workspace_id` (String) The LangSmith workspace/workspace ID. Required for org-scoped API keys. Can also be set with the `LANGSMITH_WORKSPACE_ID` environment variable.

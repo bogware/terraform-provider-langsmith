@@ -81,7 +81,7 @@ type RunRuleResourceModel struct {
 	BackfillProgress             types.Float64 `tfsdk:"backfill_progress"`
 	BackfillCompletedAt          types.String  `tfsdk:"backfill_completed_at"`
 	BackfillError                types.String  `tfsdk:"backfill_error"`
-	TenantID                     types.String  `tfsdk:"tenant_id"`
+	WorkspaceID                  types.String  `tfsdk:"workspace_id"`
 	CreatedAt                    types.String  `tfsdk:"created_at"`
 	UpdatedAt                    types.String  `tfsdk:"updated_at"`
 }
@@ -155,7 +155,7 @@ type runRuleAPIResponse struct {
 	BackfillProgress             *float64        `json:"backfill_progress"`
 	BackfillCompletedAt          *string         `json:"backfill_completed_at"`
 	BackfillError                *string         `json:"backfill_error"`
-	TenantID                     string          `json:"tenant_id"`
+	WorkspaceID                  string          `json:"workspace_id"`
 	CreatedAt                    string          `json:"created_at"`
 	UpdatedAt                    string          `json:"updated_at"`
 }
@@ -337,8 +337,8 @@ func (r *RunRuleResource) Schema(ctx context.Context, req resource.SchemaRequest
 				MarkdownDescription: "The error message from a failed backfill operation, if any.",
 				Computed:            true,
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -466,7 +466,7 @@ func (r *RunRuleResource) Create(ctx context.Context, req resource.CreateRequest
 	planCreateAlignmentQueue := data.CreateAlignmentQueue
 
 	var result runRuleAPIResponse
-	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/runs/rules", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/runs/rules", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating run rule", err.Error())
 		return
@@ -491,7 +491,7 @@ func (r *RunRuleResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 
 	var rules []runRuleAPIResponse
-	err := effectiveClient(r.client, data.TenantID).Get(ctx, "/api/v1/runs/rules", nil, &rules)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/runs/rules", nil, &rules)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading run rules", err.Error())
 		return
@@ -609,7 +609,7 @@ func (r *RunRuleResource) Update(ctx context.Context, req resource.UpdateRequest
 	planCreateAlignmentQueue := data.CreateAlignmentQueue
 
 	var result runRuleAPIResponse
-	err := effectiveClient(r.client, data.TenantID).Patch(ctx, fmt.Sprintf("/api/v1/runs/rules/%s", data.ID.ValueString()), body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, fmt.Sprintf("/api/v1/runs/rules/%s", data.ID.ValueString()), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating run rule", err.Error())
 		return
@@ -631,7 +631,7 @@ func (r *RunRuleResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	err := effectiveClient(r.client, data.TenantID).Delete(ctx, fmt.Sprintf("/api/v1/runs/rules/%s", data.ID.ValueString()))
+	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, fmt.Sprintf("/api/v1/runs/rules/%s", data.ID.ValueString()))
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting run rule", err.Error())
 	}
@@ -648,7 +648,7 @@ func (r *RunRuleResource) mapResponseToModel(result *runRuleAPIResponse, data *R
 	data.DisplayName = types.StringValue(result.DisplayName)
 	data.SamplingRate = types.Float64Value(result.SamplingRate)
 	data.IsEnabled = types.BoolValue(result.IsEnabled)
-	reconcileTenantID(&data.TenantID, result.TenantID, diags)
+	reconcileWorkspaceID(&data.WorkspaceID, result.WorkspaceID, diags)
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 

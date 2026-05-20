@@ -33,11 +33,11 @@ type DatasetSplitResource struct {
 }
 
 type DatasetSplitResourceModel struct {
-	ID         types.String `tfsdk:"id"`
-	DatasetID  types.String `tfsdk:"dataset_id"`
-	Name       types.String `tfsdk:"name"`
-	ExampleIDs types.Set    `tfsdk:"example_ids"`
-	TenantID   types.String `tfsdk:"tenant_id"`
+	ID          types.String `tfsdk:"id"`
+	DatasetID   types.String `tfsdk:"dataset_id"`
+	Name        types.String `tfsdk:"name"`
+	ExampleIDs  types.Set    `tfsdk:"example_ids"`
+	WorkspaceID types.String `tfsdk:"workspace_id"`
 }
 
 type splitMutation struct {
@@ -73,8 +73,8 @@ func (r *DatasetSplitResource) Schema(ctx context.Context, req resource.SchemaRe
 				ElementType:         types.StringType,
 				MarkdownDescription: "Set of example UUIDs that belong to this split.",
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -120,7 +120,7 @@ func (r *DatasetSplitResource) Create(ctx context.Context, req resource.CreateRe
 	}
 	body := splitMutation{SplitName: data.Name.ValueString(), Examples: ids, Remove: false}
 	var result []string
-	if err := effectiveClient(r.client, data.TenantID).Put(ctx, "/api/v1/datasets/"+data.DatasetID.ValueString()+"/splits", body, &result); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Put(ctx, "/api/v1/datasets/"+data.DatasetID.ValueString()+"/splits", body, &result); err != nil {
 		resp.Diagnostics.AddError("Error creating dataset split", err.Error())
 		return
 	}
@@ -136,7 +136,7 @@ func (r *DatasetSplitResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 	var names []string
-	if err := effectiveClient(r.client, data.TenantID).Get(ctx, "/api/v1/datasets/"+data.DatasetID.ValueString()+"/splits", nil, &names); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/datasets/"+data.DatasetID.ValueString()+"/splits", nil, &names); err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
 			return
@@ -186,14 +186,14 @@ func (r *DatasetSplitResource) Update(ctx context.Context, req resource.UpdateRe
 	path := "/api/v1/datasets/" + plan.DatasetID.ValueString() + "/splits"
 	if len(toAdd) > 0 {
 		var ignore []string
-		if err := effectiveClient(r.client, plan.TenantID).Put(ctx, path, splitMutation{SplitName: plan.Name.ValueString(), Examples: toAdd, Remove: false}, &ignore); err != nil {
+		if err := effectiveClient(r.client, plan.WorkspaceID).Put(ctx, path, splitMutation{SplitName: plan.Name.ValueString(), Examples: toAdd, Remove: false}, &ignore); err != nil {
 			resp.Diagnostics.AddError("Error adding examples to split", err.Error())
 			return
 		}
 	}
 	if len(toRemove) > 0 {
 		var ignore []string
-		if err := effectiveClient(r.client, plan.TenantID).Put(ctx, path, splitMutation{SplitName: plan.Name.ValueString(), Examples: toRemove, Remove: true}, &ignore); err != nil {
+		if err := effectiveClient(r.client, plan.WorkspaceID).Put(ctx, path, splitMutation{SplitName: plan.Name.ValueString(), Examples: toRemove, Remove: true}, &ignore); err != nil {
 			resp.Diagnostics.AddError("Error removing examples from split", err.Error())
 			return
 		}
@@ -213,7 +213,7 @@ func (r *DatasetSplitResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 	var ignore []string
-	if err := effectiveClient(r.client, data.TenantID).Put(ctx, "/api/v1/datasets/"+data.DatasetID.ValueString()+"/splits",
+	if err := effectiveClient(r.client, data.WorkspaceID).Put(ctx, "/api/v1/datasets/"+data.DatasetID.ValueString()+"/splits",
 		splitMutation{SplitName: data.Name.ValueString(), Examples: ids, Remove: true}, &ignore); err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting dataset split", err.Error())
 		return

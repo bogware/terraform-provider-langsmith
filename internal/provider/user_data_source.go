@@ -31,7 +31,7 @@ type UserDataSourceModel struct {
 	ID          types.String `tfsdk:"id"`
 	Email       types.String `tfsdk:"email"`
 	DisplayName types.String `tfsdk:"display_name"`
-	TenantID    types.String `tfsdk:"tenant_id"`
+	WorkspaceID types.String `tfsdk:"workspace_id"`
 }
 
 func (d *UserDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -54,8 +54,8 @@ func (d *UserDataSource) Schema(ctx context.Context, req datasource.SchemaReques
 				MarkdownDescription: "The display name of the user (if available).",
 				Computed:            true,
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this data source.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this data source.",
 				Optional:            true,
 			},
 		},
@@ -101,7 +101,7 @@ func (d *UserDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		} `json:"members"`
 	}
 
-	if err := effectiveClient(d.client, data.TenantID).Get(ctx, "/api/v1/orgs/current/members", nil, &orgResp); err == nil {
+	if err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/orgs/current/members", nil, &orgResp); err == nil {
 		for i := range orgResp.Members {
 			m := orgResp.Members[i]
 			if m.Email != nil && *m.Email == data.Email.ValueString() {
@@ -129,7 +129,7 @@ func (d *UserDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		} `json:"members"`
 	}
 
-	if err := effectiveClient(d.client, data.TenantID).Get(ctx, "/api/v1/workspaces/current/members", nil, &wsResp); err == nil {
+	if err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/workspaces/current/members", nil, &wsResp); err == nil {
 		for i := range wsResp.Members {
 			m := wsResp.Members[i]
 			if m.Email == data.Email.ValueString() {

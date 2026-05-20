@@ -23,7 +23,7 @@ data "langsmith_evaluator" "existing" {
 
 ### Optional
 
-- `tenant_id` (String) The tenant ID. If set, overrides the provider-level `tenant_id` for all API calls made by this data source.
+- `workspace_id` (String) The workspace ID. If set, overrides the provider-level `workspace_id` for all API calls made by this data source.
 
 ### Read-Only
 

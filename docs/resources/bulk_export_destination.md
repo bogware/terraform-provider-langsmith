@@ -42,7 +42,7 @@ resource "langsmith_bulk_export_destination" "example" {
 - `region` (String) The AWS region of the S3 bucket.
 - `secret_access_key` (String, Sensitive) The AWS secret access key for the destination.
 - `session_token` (String, Sensitive) The AWS session token for temporary credentials (e.g., from STS AssumeRole).
-- `tenant_id` (String) The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
+- `workspace_id` (String) The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 

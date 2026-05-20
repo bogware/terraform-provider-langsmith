@@ -29,7 +29,7 @@ type EvaluatorDataSourceModel struct {
 	ID                types.String `tfsdk:"id"`
 	Name              types.String `tfsdk:"name"`
 	Type              types.String `tfsdk:"type"`
-	TenantID          types.String `tfsdk:"tenant_id"`
+	WorkspaceID       types.String `tfsdk:"workspace_id"`
 	CreatedAt         types.String `tfsdk:"created_at"`
 	UpdatedAt         types.String `tfsdk:"updated_at"`
 	CodeEvaluatorJSON types.String `tfsdk:"code_evaluator_json"`
@@ -47,8 +47,8 @@ func (d *EvaluatorDataSource) Schema(ctx context.Context, req datasource.SchemaR
 			"id":   schema.StringAttribute{Required: true},
 			"name": schema.StringAttribute{Computed: true},
 			"type": schema.StringAttribute{Computed: true},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID. If set, overrides the provider-level `tenant_id` for all API calls made by this data source.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID. If set, overrides the provider-level `workspace_id` for all API calls made by this data source.",
 				Optional:            true,
 				Computed:            true,
 			},
@@ -79,13 +79,13 @@ func (d *EvaluatorDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 	var api evaluatorAPI
-	if err := effectiveClient(d.client, data.TenantID).Get(ctx, "/v1/platform/evaluators/"+data.ID.ValueString(), nil, &api); err != nil {
+	if err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/v1/platform/evaluators/"+data.ID.ValueString(), nil, &api); err != nil {
 		resp.Diagnostics.AddError("Error reading evaluator", err.Error())
 		return
 	}
 	data.Name = types.StringValue(api.Name)
 	data.Type = types.StringValue(api.Type)
-	reconcileTenantID(&data.TenantID, api.TenantID, &resp.Diagnostics)
+	reconcileWorkspaceID(&data.WorkspaceID, api.WorkspaceID, &resp.Diagnostics)
 	data.CreatedAt = types.StringValue(api.CreatedAt)
 	data.UpdatedAt = types.StringValue(api.UpdatedAt)
 	if api.CodeEvaluator != nil {

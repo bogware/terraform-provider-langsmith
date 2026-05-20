@@ -21,7 +21,7 @@ Lookup a LangSmith user by email and return the user ID.
 
 ### Optional
 
-- `tenant_id` (String) If set, overrides the provider-level `tenant_id` for all API calls made by this data source.
+- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this data source.
 
 ### Read-Only
 

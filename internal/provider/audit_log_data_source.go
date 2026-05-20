@@ -36,7 +36,6 @@ type AuditLogDataSourceModel struct {
 	Cursor      types.String `tfsdk:"cursor"`
 	NextCursor  types.String `tfsdk:"next_cursor"`
 	Items       types.List   `tfsdk:"items"`
-	TenantID    types.String `tfsdk:"tenant_id"`
 }
 
 type auditLogResponse struct {
@@ -67,10 +66,6 @@ func (d *AuditLogDataSource) Schema(ctx context.Context, req datasource.SchemaRe
 				Computed:            true,
 				ElementType:         types.StringType,
 				MarkdownDescription: "JSON-encoded audit log entries (one OCSF activity per element).",
-			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this data source.",
-				Optional:            true,
 			},
 		},
 	}
@@ -118,7 +113,7 @@ func (d *AuditLogDataSource) Read(ctx context.Context, req datasource.ReadReques
 	}
 
 	var api auditLogResponse
-	if err := effectiveClient(d.client, data.TenantID).Get(ctx, "/api/v1/audit-logs", q, &api); err != nil {
+	if err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/audit-logs", q, &api); err != nil {
 		resp.Diagnostics.AddError("Error reading audit logs", err.Error())
 		return
 	}

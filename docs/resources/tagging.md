@@ -31,7 +31,7 @@ resource "langsmith_tagging" "example" {
 
 ### Optional
 
-- `tenant_id` (String) If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
+- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 

@@ -3,12 +3,12 @@
 page_title: "langsmith_annotation_queue_reviewer Resource - langsmith"
 subcategory: ""
 description: |-
-  Assigns an identity as a reviewer on a LangSmith annotation queue. The LangSmith API does not expose a per-pair read endpoint; Read for this resource is a no-op (the membership is taken to exist as long as it is in state).
+  Assigns an identity as a reviewer on a LangSmith annotation queue. The LangSmith API does not expose a per-pair read endpoint; Read for this resource is a no-op (the membership is taken to exist as long as it is in state). Import ID format: <queue_id>:<identity_id> or <queue_id>:<identity_id>:<workspace_id>.
 ---
 
 # langsmith_annotation_queue_reviewer (Resource)
 
-Assigns an identity as a reviewer on a LangSmith annotation queue. The LangSmith API does not expose a per-pair read endpoint; Read for this resource is a no-op (the membership is taken to exist as long as it is in state).
+Assigns an identity as a reviewer on a LangSmith annotation queue. The LangSmith API does not expose a per-pair read endpoint; Read for this resource is a no-op (the membership is taken to exist as long as it is in state). Import ID format: `<queue_id>:<identity_id>` or `<queue_id>:<identity_id>:<workspace_id>`.
 
 ## Example Usage
 
@@ -29,7 +29,7 @@ resource "langsmith_annotation_queue_reviewer" "alice" {
 
 ### Optional
 
-- `tenant_id` (String) If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
+- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 

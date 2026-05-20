@@ -57,7 +57,7 @@ type AnnotationQueueResourceModel struct {
 	SourceRuleID        types.String `tfsdk:"source_rule_id"`
 	RunRuleID           types.String `tfsdk:"run_rule_id"`
 	QueueType           types.String `tfsdk:"queue_type"`
-	TenantID            types.String `tfsdk:"tenant_id"`
+	WorkspaceID         types.String `tfsdk:"workspace_id"`
 	CreatedAt           types.String `tfsdk:"created_at"`
 	UpdatedAt           types.String `tfsdk:"updated_at"`
 }
@@ -90,7 +90,7 @@ type annotationQueueAPIResponse struct {
 	SourceRuleID        *string         `json:"source_rule_id"`
 	RunRuleID           *string         `json:"run_rule_id"`
 	QueueType           string          `json:"queue_type"`
-	TenantID            string          `json:"tenant_id"`
+	WorkspaceID         string          `json:"workspace_id"`
 	CreatedAt           string          `json:"created_at"`
 	UpdatedAt           string          `json:"updated_at"`
 }
@@ -167,8 +167,8 @@ func (r *AnnotationQueueResource) Schema(ctx context.Context, req resource.Schem
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -251,7 +251,7 @@ func (r *AnnotationQueueResource) Create(ctx context.Context, req resource.Creat
 	planMetadata := data.Metadata
 
 	var result annotationQueueAPIResponse
-	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/annotation-queues", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/annotation-queues", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating annotation queue", err.Error())
 		return
@@ -277,7 +277,7 @@ func (r *AnnotationQueueResource) Read(ctx context.Context, req resource.ReadReq
 	}
 
 	var result annotationQueueAPIResponse
-	err := effectiveClient(r.client, data.TenantID).Get(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), nil, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -335,7 +335,7 @@ func (r *AnnotationQueueResource) Update(ctx context.Context, req resource.Updat
 		body.Metadata = json.RawMessage(data.Metadata.ValueString())
 	}
 
-	err := effectiveClient(r.client, data.TenantID).Patch(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), body, nil)
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), body, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating annotation queue", err.Error())
 		return
@@ -344,7 +344,7 @@ func (r *AnnotationQueueResource) Update(ctx context.Context, req resource.Updat
 	// The PATCH response only returns {"message": "..."}, not the full resource.
 	// Like Festus reporting back with half the story, we need to go get the rest ourselves.
 	var result annotationQueueAPIResponse
-	err = effectiveClient(r.client, data.TenantID).Get(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), nil, &result)
+	err = effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), nil, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading annotation queue after update", err.Error())
 		return
@@ -365,7 +365,7 @@ func (r *AnnotationQueueResource) Delete(ctx context.Context, req resource.Delet
 
 	q := url.Values{}
 	q.Set("queue_ids", data.ID.ValueString())
-	err := effectiveClient(r.client, data.TenantID).DeleteWithQuery(ctx, "/api/v1/annotation-queues", q)
+	err := effectiveClient(r.client, data.WorkspaceID).DeleteWithQuery(ctx, "/api/v1/annotation-queues", q)
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting annotation queue", err.Error())
 		return
@@ -437,7 +437,7 @@ func mapAnnotationQueueResponseToState(data *AnnotationQueueResourceModel, resul
 	}
 
 	data.QueueType = types.StringValue(result.QueueType)
-	reconcileTenantID(&data.TenantID, result.TenantID, diags)
+	reconcileWorkspaceID(&data.WorkspaceID, result.WorkspaceID, diags)
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 }

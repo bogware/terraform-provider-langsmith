@@ -59,7 +59,7 @@ resource "langsmith_evaluator" "code_check" {
 
 - `code_evaluator` (Attributes) Configuration for a code evaluator. Required when `type = "code"`. (see [below for nested schema](#nestedatt--code_evaluator))
 - `llm_evaluator` (Attributes) Configuration for an LLM-as-judge evaluator. Required when `type = "llm"`. (see [below for nested schema](#nestedatt--llm_evaluator))
-- `tenant_id` (String) The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
+- `workspace_id` (String) The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 

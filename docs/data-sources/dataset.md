@@ -25,7 +25,7 @@ data "langsmith_dataset" "example" {
 
 - `id` (String) The unique identifier of the dataset. Either `id` or `name` must be specified.
 - `name` (String) The name of the dataset. Either `id` or `name` must be specified.
-- `tenant_id` (String) The tenant ID. If set, overrides the provider-level `tenant_id` for all API calls made by this data source.
+- `workspace_id` (String) The workspace ID. If set, overrides the provider-level `workspace_id` for all API calls made by this data source.
 
 ### Read-Only
 

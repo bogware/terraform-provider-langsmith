@@ -9,7 +9,7 @@ BREAKING CHANGES:
 
 BUG FIXES:
 
-* `langsmith_prompt` (resource): `owner` and `full_name` were never populated on Create/Read because the API nests them inside `repo` while the wire struct expected them at the top level. Fixed; `owner` may now be empty (the API returns `null` for service-account-created prompts), so all path construction falls back to `-` (current-tenant wildcard) when `owner` is unset.
+* `langsmith_prompt` (resource): `owner` and `full_name` were never populated on Create/Read because the API nests them inside `repo` while the wire struct expected them at the top level. Fixed; `owner` may now be empty (the API returns `null` for service-account-created prompts), so all path construction falls back to `-` (current-workspace wildcard) when `owner` is unset.
 * `langsmith_prompt` (resource): Update path could leave `manifest` as unknown after apply when the repo had no commits; now explicitly nulled.
 * `langsmith_prompt` (data source): same nested-`repo` decoding bug as the resource — every read returned all-zero values. Fixed.
 * `langsmith_insights_config`: server-injected nulls + default `filter` field in the `config` JSON caused "Provider produced inconsistent result after apply" errors. The plan's `config` value is now preserved across Create/Update/Read so server-side normalization is invisible to Terraform.
@@ -85,7 +85,7 @@ FEATURES:
 
 ENHANCEMENTS:
 
-* Provider supports `tenant_id` for org-scoped API key authentication
+* Provider supports `workspace_id` for org-scoped API key authentication
 * Immutable fields marked with `RequiresReplace` plan modifiers across all resources
 * Proper null handling in all response-to-state mappers to prevent drift
 * Feedback config resource gracefully handles external deletion via `RemoveResource`

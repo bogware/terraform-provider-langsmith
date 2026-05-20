@@ -49,12 +49,12 @@ resource "langsmith_run_rule" "example" {
 - `is_enabled` (Boolean) Whether the rule is enabled.
 - `num_few_shot_examples` (Number) Number of few-shot examples.
 - `session_id` (String) The project/session UUID to scope this rule to.
-- `tenant_id` (String) The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
 - `trace_filter` (String) Trace filter expression.
 - `transient` (Boolean) Whether the rule is transient.
 - `tree_filter` (String) Tree filter expression.
 - `use_corrections_dataset` (Boolean) Whether to use a corrections dataset.
 - `webhooks` (String) JSON-encoded array of webhook configurations.
+- `workspace_id` (String) The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 

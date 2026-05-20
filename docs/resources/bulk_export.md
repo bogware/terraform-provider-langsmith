@@ -38,7 +38,7 @@ resource "langsmith_bulk_export" "example" {
 - `format` (String) The export format. Defaults to `Parquet`.
 - `format_version` (String) The format version. Valid values: `v1`, `v2_beta`.
 - `interval_hours` (Number) The interval in hours for recurring exports.
-- `tenant_id` (String) The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
+- `workspace_id` (String) The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 

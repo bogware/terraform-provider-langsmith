@@ -37,7 +37,7 @@ resource "langsmith_annotation_queue" "example" {
 - `reservation_minutes` (Number) The number of minutes a reservation is held.
 - `rubric_instructions` (String) Rubric instructions for reviewers.
 - `rubric_items` (String) JSON-encoded array of rubric items for the annotation queue.
-- `tenant_id` (String) The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.
+- `workspace_id` (String) The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 

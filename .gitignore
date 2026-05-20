@@ -21,3 +21,5 @@ dist/
 
 # Keep windows files with windows line endings
 *.winfile eol=crlf
+
+terraform-provider-langsmith

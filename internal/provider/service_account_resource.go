@@ -47,7 +47,7 @@ type ServiceAccountResourceModel struct {
 	CreatedAt          types.String `tfsdk:"created_at"`
 	UpdatedAt          types.String `tfsdk:"updated_at"`
 	Workspaces         types.String `tfsdk:"workspaces"`
-	TenantID           types.String `tfsdk:"tenant_id"`
+	WorkspaceID        types.String `tfsdk:"workspace_id"`
 }
 
 // serviceAccountAPICreateRequest is the wire format for deputizing a new
@@ -121,8 +121,8 @@ func (r *ServiceAccountResource) Schema(ctx context.Context, req resource.Schema
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -165,7 +165,7 @@ func (r *ServiceAccountResource) Create(ctx context.Context, req resource.Create
 	}
 
 	var result serviceAccountAPIResponse
-	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/service-accounts", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/service-accounts", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating service account", err.Error())
 		return
@@ -185,7 +185,7 @@ func (r *ServiceAccountResource) Read(ctx context.Context, req resource.ReadRequ
 	}
 
 	var listResult serviceAccountListAPIResponse
-	err := effectiveClient(r.client, data.TenantID).Get(ctx, "/api/v1/service-accounts", nil, &listResult)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/service-accounts", nil, &listResult)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading service accounts", err.Error())
 		return
@@ -223,7 +223,7 @@ func (r *ServiceAccountResource) Delete(ctx context.Context, req resource.Delete
 		return
 	}
 
-	err := effectiveClient(r.client, data.TenantID).Delete(ctx, "/api/v1/service-accounts/"+data.ID.ValueString())
+	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/api/v1/service-accounts/"+data.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting service account", err.Error())
 		return

@@ -50,7 +50,7 @@ type FeedbackConfigResourceModel struct {
 	Max                types.Float64 `tfsdk:"max"`
 	Categories         types.String  `tfsdk:"categories"`
 	IsLowerScoreBetter types.Bool    `tfsdk:"is_lower_score_better"`
-	TenantID           types.String  `tfsdk:"tenant_id"`
+	WorkspaceID        types.String  `tfsdk:"workspace_id"`
 	ModifiedAt         types.String  `tfsdk:"modified_at"`
 }
 
@@ -66,7 +66,7 @@ type feedbackConfigAPIResponse struct {
 	FeedbackKey        string                 `json:"feedback_key"`
 	FeedbackConfig     map[string]interface{} `json:"feedback_config"`
 	IsLowerScoreBetter bool                   `json:"is_lower_score_better"`
-	TenantID           string                 `json:"tenant_id"`
+	WorkspaceID        string                 `json:"workspace_id"`
 	ModifiedAt         string                 `json:"modified_at"`
 }
 
@@ -113,8 +113,8 @@ func (r *FeedbackConfigResource) Schema(ctx context.Context, req resource.Schema
 				Computed:            true,
 				Default:             booldefault.StaticBool(false),
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID of the resource. If set, overrides the provider-level `tenant_id` for all API calls made by this resource.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -177,7 +177,7 @@ func (r *FeedbackConfigResource) Create(ctx context.Context, req resource.Create
 		body.IsLowerScoreBetter = &v
 	}
 
-	err := effectiveClient(r.client, data.TenantID).Post(ctx, "/api/v1/feedback-configs", body, nil)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/feedback-configs", body, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating feedback config", err.Error())
 		return
@@ -223,7 +223,7 @@ func (r *FeedbackConfigResource) Read(ctx context.Context, req resource.ReadRequ
 // The API doesn't offer a direct lookup, so we ride through the whole herd.
 func (r *FeedbackConfigResource) readFeedbackConfig(ctx context.Context, data *FeedbackConfigResourceModel, diags *diag.Diagnostics) bool {
 	var configs []feedbackConfigAPIResponse
-	err := effectiveClient(r.client, data.TenantID).Get(ctx, "/api/v1/feedback-configs", nil, &configs)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/feedback-configs", nil, &configs)
 	if err != nil {
 		diags.AddError("Error reading feedback configs", err.Error())
 		return false
@@ -247,7 +247,7 @@ func (r *FeedbackConfigResource) readFeedbackConfig(ctx context.Context, data *F
 
 	data.ID = types.StringValue(found.FeedbackKey)
 	data.FeedbackKey = types.StringValue(found.FeedbackKey)
-	reconcileTenantID(&data.TenantID, found.TenantID, diags)
+	reconcileWorkspaceID(&data.WorkspaceID, found.WorkspaceID, diags)
 	data.ModifiedAt = types.StringValue(found.ModifiedAt)
 	data.IsLowerScoreBetter = types.BoolValue(found.IsLowerScoreBetter)
 
@@ -293,7 +293,7 @@ func (r *FeedbackConfigResource) Update(ctx context.Context, req resource.Update
 		body.IsLowerScoreBetter = &v
 	}
 
-	err := effectiveClient(r.client, data.TenantID).Patch(ctx, "/api/v1/feedback-configs", body, nil)
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/feedback-configs", body, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating feedback config", err.Error())
 		return
@@ -320,7 +320,7 @@ func (r *FeedbackConfigResource) Delete(ctx context.Context, req resource.Delete
 
 	q := url.Values{}
 	q.Set("feedback_key", data.FeedbackKey.ValueString())
-	err := effectiveClient(r.client, data.TenantID).DeleteWithQuery(ctx, "/api/v1/feedback-configs", q)
+	err := effectiveClient(r.client, data.WorkspaceID).DeleteWithQuery(ctx, "/api/v1/feedback-configs", q)
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting feedback config", err.Error())
 	}

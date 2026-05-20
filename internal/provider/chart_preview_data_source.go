@@ -34,7 +34,7 @@ type ChartPreviewDataSourceModel struct {
 	Stride        types.String `tfsdk:"stride"`
 	Timezone      types.String `tfsdk:"timezone"`
 	Data          types.String `tfsdk:"data"`
-	TenantID      types.String `tfsdk:"tenant_id"`
+	WorkspaceID   types.String `tfsdk:"workspace_id"`
 }
 
 type chartPreviewBucketInfo struct {
@@ -104,8 +104,8 @@ func chartPreviewSchema(orgScope bool) schema.Schema {
 				MarkdownDescription: "JSON-encoded array of preview data points, each shaped as `{series_id, timestamp, value, group}`.",
 				Computed:            true,
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this data source.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this data source.",
 				Optional:            true,
 			},
 		},
@@ -142,7 +142,7 @@ func readChartPreview(ctx context.Context, c *client.Client, endpoint, label str
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	c = effectiveClient(c, data.TenantID)
+	c = effectiveClient(c, data.WorkspaceID)
 
 	body := chartPreviewRequest{
 		BucketInfo: chartPreviewBucketInfo{OmitData: false},

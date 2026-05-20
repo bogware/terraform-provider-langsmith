@@ -27,9 +27,9 @@ type LangSmithProvider struct {
 
 // LangSmithProviderModel describes the provider configuration.
 type LangSmithProviderModel struct {
-	APIKey   types.String `tfsdk:"api_key"`
-	APIURL   types.String `tfsdk:"api_url"`
-	TenantID types.String `tfsdk:"tenant_id"`
+	APIKey      types.String `tfsdk:"api_key"`
+	APIURL      types.String `tfsdk:"api_url"`
+	WorkspaceID types.String `tfsdk:"workspace_id"`
 }
 
 func (p *LangSmithProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -50,8 +50,8 @@ func (p *LangSmithProvider) Schema(ctx context.Context, req provider.SchemaReque
 				MarkdownDescription: "The LangSmith API base URL. Defaults to `https://api.smith.langchain.com`. Can also be set with the `LANGSMITH_API_URL` environment variable.",
 				Optional:            true,
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The LangSmith workspace/tenant ID. Required for org-scoped API keys. Can also be set with the `LANGSMITH_TENANT_ID` environment variable.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The LangSmith workspace/workspace ID. Required for org-scoped API keys. Can also be set with the `LANGSMITH_WORKSPACE_ID` environment variable.",
 				Optional:            true,
 			},
 		},
@@ -88,14 +88,14 @@ func (p *LangSmithProvider) Configure(ctx context.Context, req provider.Configur
 	}
 	apiURL = strings.TrimRight(apiURL, "/")
 
-	tenantID := os.Getenv("LANGSMITH_TENANT_ID")
-	if !data.TenantID.IsNull() {
-		tenantID = data.TenantID.ValueString()
+	workspaceID := os.Getenv("LANGSMITH_WORKSPACE_ID")
+	if !data.WorkspaceID.IsNull() {
+		workspaceID = data.WorkspaceID.ValueString()
 	}
 
 	userAgent := fmt.Sprintf("terraform-provider-langsmith/%s", p.version)
 
-	c := client.NewClient(apiURL, apiKey, tenantID, userAgent)
+	c := client.NewClient(apiURL, apiKey, workspaceID, userAgent)
 
 	// Validate the API key by making a lightweight request.
 	var info struct {
