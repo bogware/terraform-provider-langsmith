@@ -63,7 +63,6 @@ func (d *TagKeyDataSource) Schema(ctx context.Context, req datasource.SchemaRequ
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this data source.",
 				Optional:            true,
-				Computed:            true,
 			},
 		},
 	}

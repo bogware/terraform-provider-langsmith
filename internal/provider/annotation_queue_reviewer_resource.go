@@ -49,7 +49,7 @@ func (r *AnnotationQueueReviewerResource) Metadata(ctx context.Context, req reso
 
 func (r *AnnotationQueueReviewerResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Assigns an identity as a reviewer on a LangSmith annotation queue. The LangSmith API does not expose a per-pair read endpoint; Read for this resource is a no-op (the membership is taken to exist as long as it is in state).",
+		MarkdownDescription: "Assigns an identity as a reviewer on a LangSmith annotation queue. The LangSmith API does not expose a per-pair read endpoint; Read for this resource is a no-op (the membership is taken to exist as long as it is in state). Import ID format: `<queue_id>:<identity_id>` or `<queue_id>:<identity_id>:<tenant_id>`.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:      true,
@@ -115,14 +115,18 @@ func (r *AnnotationQueueReviewerResource) Update(ctx context.Context, req resour
 }
 
 func (r *AnnotationQueueReviewerResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	parts := strings.SplitN(req.ID, ":", 2)
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-		resp.Diagnostics.AddError("Invalid import ID", "Expected \"<queue_id>:<identity_id>\".")
+	parts := strings.SplitN(req.ID, ":", 3)
+	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
+		resp.Diagnostics.AddError("Invalid import ID", "Expected \"<queue_id>:<identity_id>\" or \"<queue_id>:<identity_id>:<tenant_id>\".")
 		return
 	}
+	compositeID := parts[0] + ":" + parts[1]
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("queue_id"), parts[0])...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("identity_id"), parts[1])...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), compositeID)...)
+	if len(parts) == 3 && parts[2] != "" {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("tenant_id"), parts[2])...)
+	}
 }
 
 func (r *AnnotationQueueReviewerResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

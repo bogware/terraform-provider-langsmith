@@ -95,7 +95,6 @@ func (d *ChartDataSource) Schema(ctx context.Context, req datasource.SchemaReque
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "If set, overrides the provider-level `tenant_id` for all API calls made by this data source.",
 				Optional:            true,
-				Computed:            true,
 			},
 		},
 	}
