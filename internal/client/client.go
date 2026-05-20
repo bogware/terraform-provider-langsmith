@@ -235,9 +235,9 @@ func (e *APIError) Error() string {
 // settings are shared with the original; only WorkspaceID differs. This is safe
 // for concurrent use because http.Client is itself concurrency-safe.
 func (c *Client) WithWorkspaceID(workspaceID string) *Client {
-	copy := *c
-	copy.WorkspaceID = workspaceID
-	return &copy
+	clientCopy := *c
+	clientCopy.WorkspaceID = workspaceID
+	return &clientCopy
 }
 
 // IsNotFound checks whether the error is a 404.
