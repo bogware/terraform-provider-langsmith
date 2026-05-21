@@ -28,12 +28,23 @@ func effectiveClient(c *client.Client, workspaceID types.String) *client.Client 
 
 // reconcileWorkspaceID reconciles the Terraform state value of workspace_id with the
 // value returned by the API:
-//   - If the state value is null or unknown it is populated from the API response.
-//   - If the state value was explicitly set by the user and matches the API
-//     response, nothing happens.
-//   - If the state value was explicitly set but differs from the API response, a
-//     warning is added and the user-provided value is kept in state.
+//   - If apiValue is empty (the API did not return a workspace_id), the state is
+//     set to null when it is currently null or unknown, and left unchanged otherwise.
+//     No mismatch warning is emitted because the API simply has nothing to compare.
+//   - If apiValue is non-empty and the state value is null or unknown, it is
+//     populated from the API response.
+//   - If apiValue is non-empty and the state value was explicitly set by the user
+//     but differs from the API response, a warning is added and the user-provided
+//     value is kept in state.
 func reconcileWorkspaceID(state *types.String, apiValue string, diags *diag.Diagnostics) {
+	if apiValue == "" {
+		// The API did not provide a workspace_id.  Normalise null/unknown to
+		// null so we never leave an unknown value in state.
+		if state.IsNull() || state.IsUnknown() {
+			*state = types.StringNull()
+		}
+		return
+	}
 	if state.IsNull() || state.IsUnknown() {
 		*state = types.StringValue(apiValue)
 		return

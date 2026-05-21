@@ -106,7 +106,7 @@ func getWorkspaceId(data LangSmithProviderModel, resp *provider.ConfigureRespons
 		)
 		if workspaceID == "" {
 			workspaceID = tenantId
-		} else {
+		} else if workspaceID != tenantId {
 			resp.Diagnostics.AddError(
 				"Conflicting workspace_id and tenant_id",
 				"Both 'workspace_id' and 'tenant_id' are set to different values. Remove 'tenant_id' (deprecated) and use 'workspace_id' only.",
@@ -127,7 +127,7 @@ func (p *LangSmithProvider) Configure(ctx context.Context, req provider.Configur
 	apiKey := getApiKey(data, resp)
 	apiURL := getApiUrl(data, resp)
 	workspaceId := getWorkspaceId(data, resp)
-	if apiURL == "" || apiKey == "" || workspaceId == "" {
+	if apiURL == "" || apiKey == "" {
 		return
 	}
 

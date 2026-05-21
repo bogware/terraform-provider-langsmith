@@ -102,7 +102,7 @@ func (r *TTLSettingsResource) Schema(ctx context.Context, req resource.SchemaReq
 				Default:             booldefault.StaticBool(false),
 			},
 			"workspace_id": schema.StringAttribute{
-				MarkdownDescription: "The workspace (workspace) ID to scope the TTL settings to. If omitted, applies at the org level.",
+				MarkdownDescription: "The workspace ID to scope the TTL settings to. If omitted, applies at the org level.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -327,9 +327,7 @@ func mapTTLSettingsResponseToState(data *TTLSettingsResourceModel, result *ttlSe
 	if result.WorkspaceID != nil {
 		apiWorkspaceID = *result.WorkspaceID
 	}
-	if apiWorkspaceID != "" {
-		reconcileWorkspaceID(&data.WorkspaceID, apiWorkspaceID, diags)
-	}
+	reconcileWorkspaceID(&data.WorkspaceID, apiWorkspaceID, diags)
 	data.TenantID = data.WorkspaceID
 
 	if result.LonglivedTTLDays != nil {

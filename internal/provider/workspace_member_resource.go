@@ -204,6 +204,16 @@ func (r *WorkspaceMemberResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	mapWorkspaceMemberResponseToState(&data, found)
+	// workspace_id is not returned by the API; preserve the explicitly
+	// supplied plan value when set, otherwise fall back to the effective
+	// client workspace or null.
+	if data.WorkspaceID.IsNull() || data.WorkspaceID.IsUnknown() {
+		if ws := effectiveClient(r.client, data.WorkspaceID).WorkspaceID; ws != "" {
+			data.WorkspaceID = types.StringValue(ws)
+		} else {
+			data.WorkspaceID = types.StringNull()
+		}
+	}
 	tflog.Trace(ctx, "created workspace member resource", map[string]interface{}{"id": createResult.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -239,6 +249,15 @@ func (r *WorkspaceMemberResource) Read(ctx context.Context, req resource.ReadReq
 	}
 
 	mapWorkspaceMemberResponseToState(&data, found)
+	// workspace_id is not returned by the API; preserve the state value
+	// when set, otherwise fall back to the effective client workspace or null.
+	if data.WorkspaceID.IsNull() || data.WorkspaceID.IsUnknown() {
+		if ws := effectiveClient(r.client, data.WorkspaceID).WorkspaceID; ws != "" {
+			data.WorkspaceID = types.StringValue(ws)
+		} else {
+			data.WorkspaceID = types.StringNull()
+		}
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

@@ -29,7 +29,7 @@ resource "langsmith_ttl_settings" "example" {
 
 - `apply_to_all_projects` (Boolean) Whether to apply TTL settings to all projects.
 - `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead.
-- `workspace_id` (String) The workspace (workspace) ID to scope the TTL settings to. If omitted, applies at the org level.
+- `workspace_id` (String) The workspace ID to scope the TTL settings to. If omitted, applies at the org level.
 
 ### Read-Only
 
