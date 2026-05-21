@@ -38,4 +38,5 @@ resource "langsmith_webhook" "example" {
 
 - `created_at` (String) When the webhook was created.
 - `id` (String) The unique identifier of the webhook.
+- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead.
 - `updated_at` (String) When the webhook was last updated.

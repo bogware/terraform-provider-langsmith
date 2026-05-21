@@ -71,4 +71,5 @@ resource "langsmith_run_rule" "example" {
 - `dataset_name` (String) The name of the associated dataset.
 - `id` (String) The unique identifier of the run rule.
 - `session_name` (String) The name of the associated session/project.
+- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead.
 - `updated_at` (String) When the rule was last updated.

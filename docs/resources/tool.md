@@ -62,4 +62,5 @@ resource "langsmith_tool" "lookup_customer" {
 
 - `created_at` (String)
 - `id` (String) The ID of this resource.
+- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead.
 - `updated_at` (String)

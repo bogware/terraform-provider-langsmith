@@ -41,3 +41,4 @@ resource "langsmith_feedback_config" "example" {
 
 - `id` (String) The identifier (same as feedback_key).
 - `modified_at` (String) When the feedback config was last modified.
+- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead.

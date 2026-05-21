@@ -39,3 +39,4 @@ resource "langsmith_project" "example" {
 
 - `id` (String) The unique identifier of the project.
 - `start_time` (String) The start time of the project.
+- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead.

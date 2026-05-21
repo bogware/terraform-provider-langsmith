@@ -44,4 +44,5 @@ resource "langsmith_prompt" "example" {
 - `full_name` (String) The full name of the prompt (owner/repo_handle).
 - `id` (String) The unique identifier of the prompt repo.
 - `owner` (String) The owner of the prompt repo.
+- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead.
 - `updated_at` (String) When the prompt was last updated.

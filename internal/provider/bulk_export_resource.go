@@ -54,6 +54,7 @@ type BulkExportResourceModel struct {
 	Filter                  types.String `tfsdk:"filter"`
 	Status                  types.String `tfsdk:"status"`
 	WorkspaceID             types.String `tfsdk:"workspace_id"`
+	TenantID                types.String `tfsdk:"tenant_id"`
 	CreatedAt               types.String `tfsdk:"created_at"`
 	UpdatedAt               types.String `tfsdk:"updated_at"`
 	FormatVersion           types.String `tfsdk:"format_version"`
@@ -182,6 +183,12 @@ func (r *BulkExportResource) Schema(ctx context.Context, req resource.SchemaRequ
 			"workspace_id": schema.StringAttribute{
 				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
+				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
@@ -398,6 +405,7 @@ func mapBulkExportResponseToState(data *BulkExportResourceModel, result *bulkExp
 
 	data.Status = types.StringValue(result.Status)
 	reconcileWorkspaceID(&data.WorkspaceID, result.WorkspaceID, diags)
+	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 

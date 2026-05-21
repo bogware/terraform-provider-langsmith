@@ -51,6 +51,7 @@ type FeedbackConfigResourceModel struct {
 	Categories         types.String  `tfsdk:"categories"`
 	IsLowerScoreBetter types.Bool    `tfsdk:"is_lower_score_better"`
 	WorkspaceID        types.String  `tfsdk:"workspace_id"`
+	TenantID           types.String  `tfsdk:"tenant_id"`
 	ModifiedAt         types.String  `tfsdk:"modified_at"`
 }
 
@@ -116,6 +117,12 @@ func (r *FeedbackConfigResource) Schema(ctx context.Context, req resource.Schema
 			"workspace_id": schema.StringAttribute{
 				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
+				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
@@ -248,6 +255,7 @@ func (r *FeedbackConfigResource) readFeedbackConfig(ctx context.Context, data *F
 	data.ID = types.StringValue(found.FeedbackKey)
 	data.FeedbackKey = types.StringValue(found.FeedbackKey)
 	reconcileWorkspaceID(&data.WorkspaceID, found.WorkspaceID, diags)
+	data.TenantID = data.WorkspaceID
 	data.ModifiedAt = types.StringValue(found.ModifiedAt)
 	data.IsLowerScoreBetter = types.BoolValue(found.IsLowerScoreBetter)
 

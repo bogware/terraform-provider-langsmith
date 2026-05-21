@@ -46,4 +46,5 @@ resource "langsmith_annotation_queue" "example" {
 - `queue_type` (String) The type of annotation queue.
 - `run_rule_id` (String) The ID of the run rule associated with this queue.
 - `source_rule_id` (String) The ID of the source rule that created this queue.
+- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead.
 - `updated_at` (String) The last update timestamp of the annotation queue.
