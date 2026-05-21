@@ -35,6 +35,7 @@ type AnnotationQueueDataSourceModel struct {
 	EnableReservations  types.Bool   `tfsdk:"enable_reservations"`
 	ReservationMinutes  types.Int64  `tfsdk:"reservation_minutes"`
 	WorkspaceID         types.String `tfsdk:"workspace_id"`
+	TenantID            types.String `tfsdk:"tenant_id"`
 	CreatedAt           types.String `tfsdk:"created_at"`
 	UpdatedAt           types.String `tfsdk:"updated_at"`
 }
@@ -89,6 +90,11 @@ func (d *AnnotationQueueDataSource) Schema(ctx context.Context, req datasource.S
 				MarkdownDescription: "The workspace ID. If set, overrides the provider-level `workspace_id` for all API calls made by this data source.",
 				Optional:            true,
 				Computed:            true,
+			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "Deprecated: use `workspace_id` instead. The workspace ID.",
+				Computed:            true,
+				DeprecationMessage:  "Use 'workspace_id' instead. This attribute will be removed in a future version.",
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "The creation timestamp.",
@@ -162,6 +168,7 @@ func mapAnnotationQueueDSResponse(data *AnnotationQueueDataSourceModel, r *annot
 	data.Name = types.StringValue(r.Name)
 	data.EnableReservations = types.BoolValue(r.EnableReservations)
 	reconcileWorkspaceID(&data.WorkspaceID, r.WorkspaceID, diags)
+	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(r.CreatedAt)
 	data.UpdatedAt = types.StringValue(r.UpdatedAt)
 

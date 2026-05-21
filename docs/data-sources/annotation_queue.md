@@ -34,4 +34,5 @@ data "langsmith_annotation_queue" "example" {
 - `enable_reservations` (Boolean) Whether reservations are enabled.
 - `num_reviewers_per_item` (Number) The number of reviewers per item.
 - `reservation_minutes` (Number) The number of minutes a reservation is held.
+- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead. The workspace ID.
 - `updated_at` (String) The last update timestamp.

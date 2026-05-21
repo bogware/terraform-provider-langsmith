@@ -42,6 +42,7 @@ type ProjectDataSourceModel struct {
 	Extra              types.String `tfsdk:"extra"`
 	TraceTier          types.String `tfsdk:"trace_tier"`
 	WorkspaceID        types.String `tfsdk:"workspace_id"`
+	TenantID           types.String `tfsdk:"tenant_id"`
 	StartTime          types.String `tfsdk:"start_time"`
 	RunCount           types.Int64  `tfsdk:"run_count"`
 }
@@ -102,6 +103,11 @@ func (d *ProjectDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 				MarkdownDescription: "The workspace ID. If set, overrides the provider-level `workspace_id` for all API calls made by this data source.",
 				Optional:            true,
 				Computed:            true,
+			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "Deprecated: use `workspace_id` instead. The workspace ID.",
+				Computed:            true,
+				DeprecationMessage:  "Use 'workspace_id' instead. This attribute will be removed in a future version.",
 			},
 			"start_time": schema.StringAttribute{
 				MarkdownDescription: "The start time of the project.",
@@ -214,6 +220,7 @@ func (d *ProjectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	}
 
 	reconcileWorkspaceID(&data.WorkspaceID, result.WorkspaceID, &resp.Diagnostics)
+	data.TenantID = data.WorkspaceID
 	data.StartTime = types.StringValue(result.StartTime)
 	data.RunCount = types.Int64Value(result.RunCount)
 

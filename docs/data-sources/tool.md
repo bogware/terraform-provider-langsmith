@@ -39,4 +39,5 @@ data "langsmith_tool" "lookup_customer" {
 - `name` (String)
 - `parameters` (String)
 - `returns` (String)
+- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead. The workspace ID.
 - `updated_at` (String)

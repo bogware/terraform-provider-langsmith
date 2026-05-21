@@ -33,6 +33,7 @@ type PromptDataSourceModel struct {
 	IsPublic    types.Bool   `tfsdk:"is_public"`
 	IsArchived  types.Bool   `tfsdk:"is_archived"`
 	WorkspaceID types.String `tfsdk:"workspace_id"`
+	TenantID    types.String `tfsdk:"tenant_id"`
 	CreatedAt   types.String `tfsdk:"created_at"`
 	UpdatedAt   types.String `tfsdk:"updated_at"`
 }
@@ -92,6 +93,11 @@ func (d *PromptDataSource) Schema(ctx context.Context, req datasource.SchemaRequ
 				Optional:            true,
 				Computed:            true,
 			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "Deprecated: use `workspace_id` instead. The workspace ID.",
+				Computed:            true,
+				DeprecationMessage:  "Use 'workspace_id' instead. This attribute will be removed in a future version.",
+			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "When the prompt was created.",
 				Computed:            true,
@@ -135,6 +141,7 @@ func (d *PromptDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 	data.IsPublic = types.BoolValue(result.Repo.IsPublic)
 	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
 	reconcileWorkspaceID(&data.WorkspaceID, result.Repo.WorkspaceID, &resp.Diagnostics)
+	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.Repo.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.Repo.UpdatedAt)
 
