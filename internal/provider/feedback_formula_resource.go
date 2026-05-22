@@ -163,6 +163,7 @@ func (r *FeedbackFormulaResource) Create(ctx context.Context, req resource.Creat
 
 	mapFeedbackFormulaResponseToState(&data, &result)
 	data.FormulaParts = planFormulaParts
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created feedback formula resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -186,6 +187,7 @@ func (r *FeedbackFormulaResource) Read(ctx context.Context, req resource.ReadReq
 	}
 
 	mapFeedbackFormulaResponseToState(&data, &result)
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

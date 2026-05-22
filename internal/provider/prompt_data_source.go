@@ -50,7 +50,7 @@ type promptDataSourceAPIResponse struct {
 		Readme      *string `json:"readme"`
 		IsPublic    bool    `json:"is_public"`
 		IsArchived  bool    `json:"is_archived"`
-		WorkspaceID string  `json:"workspace_id"`
+		WorkspaceID string  `json:"tenant_id"`
 		CreatedAt   string  `json:"created_at"`
 		UpdatedAt   string  `json:"updated_at"`
 	} `json:"repo"`

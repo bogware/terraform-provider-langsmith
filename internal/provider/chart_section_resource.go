@@ -145,6 +145,7 @@ func (r *ChartSectionResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	mapChartSectionResponseToState(&data, &result)
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created chart section resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -179,6 +180,7 @@ func (r *ChartSectionResource) Read(ctx context.Context, req resource.ReadReques
 	}
 
 	mapChartSectionResponseToState(&data, &result)
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	// Restore timestamps since the read endpoint doesn't return them.
 	data.CreatedAt = savedCreatedAt
 	data.UpdatedAt = savedUpdatedAt

@@ -256,6 +256,7 @@ func (r *AlertRuleResource) Create(ctx context.Context, req resource.CreateReque
 	sessionID := data.SessionID.ValueString()
 	mapAlertRuleResponseToState(&data, &result)
 	data.SessionID = types.StringValue(sessionID)
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created alert rule resource", map[string]interface{}{"id": result.Rule.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -283,6 +284,7 @@ func (r *AlertRuleResource) Read(ctx context.Context, req resource.ReadRequest, 
 	}
 
 	mapAlertRuleResponseToState(&data, &result)
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

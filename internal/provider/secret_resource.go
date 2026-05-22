@@ -140,6 +140,7 @@ func (r *SecretResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	data.ID = types.StringValue(data.Key.ValueString())
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created secret resource", map[string]interface{}{"key": data.Key.ValueString()})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -184,6 +185,7 @@ func (r *SecretResource) Read(ctx context.Context, req resource.ReadRequest, res
 	// the state already holds. Like a good bartender at the Long Branch
 	// Saloon, we keep what we know to ourselves.
 	data.ID = types.StringValue(data.Key.ValueString())
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

@@ -47,7 +47,7 @@ type annotationQueueDataSourceAPIResponse struct {
 	NumReviewersPerItem *int64  `json:"num_reviewers_per_item"`
 	EnableReservations  bool    `json:"enable_reservations"`
 	ReservationMinutes  *int64  `json:"reservation_minutes"`
-	WorkspaceID         string  `json:"workspace_id"`
+	WorkspaceID         string  `json:"tenant_id"`
 	CreatedAt           string  `json:"created_at"`
 	UpdatedAt           string  `json:"updated_at"`
 }

@@ -91,7 +91,7 @@ type annotationQueueAPIResponse struct {
 	SourceRuleID        *string         `json:"source_rule_id"`
 	RunRuleID           *string         `json:"run_rule_id"`
 	QueueType           string          `json:"queue_type"`
-	WorkspaceID         string          `json:"workspace_id"`
+	WorkspaceID         string          `json:"tenant_id"`
 	CreatedAt           string          `json:"created_at"`
 	UpdatedAt           string          `json:"updated_at"`
 }

@@ -109,6 +109,7 @@ func (r *DatasetShareResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 	data.ShareToken = types.StringValue(api.ShareToken)
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "shared dataset", map[string]interface{}{"dataset_id": api.DatasetID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -133,6 +134,7 @@ func (r *DatasetShareResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 	data.ShareToken = types.StringValue(api.ShareToken)
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

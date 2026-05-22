@@ -76,7 +76,7 @@ type toolAPI struct {
 	Returns     map[string]interface{} `json:"returns"`
 	Metadata    map[string]interface{} `json:"metadata"`
 	Enabled     bool                   `json:"enabled"`
-	WorkspaceID string                 `json:"workspace_id"`
+	WorkspaceID string                 `json:"tenant_id"`
 	CreatedAt   string                 `json:"created_at"`
 	UpdatedAt   string                 `json:"updated_at"`
 }

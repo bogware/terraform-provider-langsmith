@@ -146,6 +146,7 @@ func (r *InsightsConfigResource) Create(ctx context.Context, req resource.Create
 	// plan's normalized JSON so Terraform doesn't flag drift on values the
 	// user did not set.
 	data.Config = planConfig
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created insights config", map[string]interface{}{"id": api.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -176,6 +177,7 @@ func (r *InsightsConfigResource) Read(ctx context.Context, req resource.ReadRequ
 			// Preserve the previously-stored config value to avoid phantom
 			// drift from server-injected null fields.
 			data.Config = savedConfig
+			reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 			resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 			return
 		}

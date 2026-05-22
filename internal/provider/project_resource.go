@@ -75,7 +75,7 @@ type projectAPIResponse struct {
 	ReferenceDatasetID *string         `json:"reference_dataset_id"`
 	Extra              json.RawMessage `json:"extra"`
 	TraceTier          *string         `json:"trace_tier"`
-	WorkspaceID        string          `json:"workspace_id"`
+	WorkspaceID        string          `json:"tenant_id"`
 	StartTime          string          `json:"start_time"`
 }
 

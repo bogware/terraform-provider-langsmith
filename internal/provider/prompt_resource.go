@@ -111,7 +111,7 @@ type promptAPIResponse struct {
 		IsPublic    bool     `json:"is_public"`
 		IsArchived  bool     `json:"is_archived"`
 		Tags        []string `json:"tags"`
-		WorkspaceID string   `json:"workspace_id"`
+		WorkspaceID string   `json:"tenant_id"`
 		NumCommits  int64    `json:"num_commits"`
 		Owner       *string  `json:"owner"`
 		FullName    string   `json:"full_name"`

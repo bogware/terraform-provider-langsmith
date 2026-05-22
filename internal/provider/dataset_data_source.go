@@ -63,7 +63,7 @@ type datasetDataSourceAPIResponse struct {
 	ExternallyManaged       *bool           `json:"externally_managed"`
 	Transformations         json.RawMessage `json:"transformations"`
 	Metadata                json.RawMessage `json:"metadata"`
-	WorkspaceID             string          `json:"workspace_id"`
+	WorkspaceID             string          `json:"tenant_id"`
 	CreatedAt               string          `json:"created_at"`
 	ModifiedAt              string          `json:"modified_at"`
 	ExampleCount            int64           `json:"example_count"`
