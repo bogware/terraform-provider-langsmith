@@ -9,7 +9,7 @@ Describe the changes made and the reasoning behind your approach.
 ## Testing
 
 - [ ] Lint and unit tests pass (`make lint`, `make test`)
-- [ ] Acceptance tests pass (`make testacc`) or intentionally N/A (needs `LANGSMITH_API_KEY` and usually `LANGSMITH_TENANT_ID`; fork PRs: see [CONTRIBUTING.md](../CONTRIBUTING.md#fork-pull-requests-and-github-actions-secrets))
+- [ ] Acceptance tests pass (`make testacc`) or intentionally N/A (needs `LANGSMITH_API_KEY` and usually `LANGSMITH_TENANT_ID`; fork PRs: see [CONTRIBUTING.md](/CONTRIBUTING.md#fork-pull-requests-and-github-actions-secrets))
 - [ ] Generated docs are up to date (`make generate`) if you changed schemas or `examples/`
 
 ## Checklist

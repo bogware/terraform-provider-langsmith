@@ -49,8 +49,6 @@ jobs:
           cache: true
       - run: go mod download
       - name: Run govulncheck
-        env:
-          GOTOOLCHAIN: go1.25.10
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.2.0 ./...
 
   generate:
