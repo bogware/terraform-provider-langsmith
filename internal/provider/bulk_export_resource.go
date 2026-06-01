@@ -93,7 +93,7 @@ type bulkExportAPIResponse struct {
 	IntervalHours           *int64   `json:"interval_hours"`
 	Filter                  *string  `json:"filter"`
 	Status                  string   `json:"status"`
-	WorkspaceID             string   `json:"workspace_id"`
+	WorkspaceID             string   `json:"tenant_id"`
 	CreatedAt               string   `json:"created_at"`
 	UpdatedAt               string   `json:"updated_at"`
 	FormatVersion           string   `json:"format_version"`

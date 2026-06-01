@@ -156,7 +156,7 @@ type runRuleAPIResponse struct {
 	BackfillProgress             *float64        `json:"backfill_progress"`
 	BackfillCompletedAt          *string         `json:"backfill_completed_at"`
 	BackfillError                *string         `json:"backfill_error"`
-	WorkspaceID                  string          `json:"workspace_id"`
+	WorkspaceID                  string          `json:"tenant_id"`
 	CreatedAt                    string          `json:"created_at"`
 	UpdatedAt                    string          `json:"updated_at"`
 }

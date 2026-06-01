@@ -206,6 +206,7 @@ func (r *ChartResource) Create(ctx context.Context, req resource.CreateRequest, 
 	// The chart API does not return timestamps; set to null to avoid unknown values.
 	data.CreatedAt = types.StringNull()
 	data.UpdatedAt = types.StringNull()
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created chart resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -247,6 +248,7 @@ func (r *ChartResource) Read(ctx context.Context, req resource.ReadRequest, resp
 	data.UpdatedAt = savedUpdatedAt
 	data.Series = savedSeries
 	data.SectionID = savedSectionID
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

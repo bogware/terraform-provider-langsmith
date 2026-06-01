@@ -125,6 +125,7 @@ func (r *DatasetSplitResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 	data.ID = types.StringValue(data.DatasetID.ValueString() + ":" + data.Name.ValueString())
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created dataset split", map[string]interface{}{"id": data.ID.ValueString()})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -147,6 +148,7 @@ func (r *DatasetSplitResource) Read(ctx context.Context, req resource.ReadReques
 	wanted := data.Name.ValueString()
 	for _, n := range names {
 		if n == wanted {
+			reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 			resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 			return
 		}

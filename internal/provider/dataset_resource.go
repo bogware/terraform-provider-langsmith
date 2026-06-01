@@ -91,7 +91,7 @@ type datasetAPIResponse struct {
 	SessionCount            int64           `json:"session_count"`
 	ModifiedAt              string          `json:"modified_at"`
 	LastSessionStartTime    *string         `json:"last_session_start_time"`
-	WorkspaceID             string          `json:"workspace_id"`
+	WorkspaceID             string          `json:"tenant_id"`
 	CreatedAt               string          `json:"created_at"`
 }
 

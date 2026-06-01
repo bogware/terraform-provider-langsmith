@@ -60,7 +60,7 @@ type usageLimitAPIResponse struct {
 	ID          string `json:"id"`
 	LimitType   string `json:"limit_type"`
 	LimitValue  int64  `json:"limit_value"`
-	WorkspaceID string `json:"workspace_id"`
+	WorkspaceID string `json:"tenant_id"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
 }

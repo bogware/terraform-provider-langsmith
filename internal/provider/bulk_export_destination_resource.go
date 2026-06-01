@@ -93,7 +93,7 @@ type bulkExportDestinationAPIResponse struct {
 	DisplayName     string                      `json:"display_name"`
 	DestinationType string                      `json:"destination_type"`
 	Config          bulkExportDestinationConfig `json:"config"`
-	WorkspaceID     string                      `json:"workspace_id"`
+	WorkspaceID     string                      `json:"tenant_id"`
 	CreatedAt       string                      `json:"created_at"`
 	UpdatedAt       string                      `json:"updated_at"`
 	CredentialsKeys []string                    `json:"credentials_keys"`

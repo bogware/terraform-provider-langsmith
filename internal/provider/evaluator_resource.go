@@ -100,7 +100,7 @@ type evaluatorAPI struct {
 	ID            string            `json:"id"`
 	Name          string            `json:"name"`
 	Type          string            `json:"type"`
-	WorkspaceID   string            `json:"workspace_id"`
+	WorkspaceID   string            `json:"tenant_id"`
 	CreatedAt     string            `json:"created_at"`
 	UpdatedAt     string            `json:"updated_at"`
 	CreatedBy     string            `json:"created_by"`

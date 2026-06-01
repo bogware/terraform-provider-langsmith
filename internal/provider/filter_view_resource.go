@@ -206,6 +206,7 @@ func (r *FilterViewResource) Create(ctx context.Context, req resource.CreateRequ
 	}
 
 	mapFilterViewResponseToState(&data, &result)
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created filter view resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -230,6 +231,7 @@ func (r *FilterViewResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 
 	mapFilterViewResponseToState(&data, &result)
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

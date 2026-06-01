@@ -174,6 +174,7 @@ func (r *AccessPolicyResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	mapAccessPolicyResponseToState(&data, &result)
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created access policy resource", map[string]interface{}{"id": createResult.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -197,6 +198,7 @@ func (r *AccessPolicyResource) Read(ctx context.Context, req resource.ReadReques
 	}
 
 	mapAccessPolicyResponseToState(&data, &result)
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

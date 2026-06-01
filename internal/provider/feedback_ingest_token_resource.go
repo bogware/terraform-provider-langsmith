@@ -133,6 +133,7 @@ func (r *FeedbackIngestTokenResource) Create(ctx context.Context, req resource.C
 	data.URL = types.StringValue(api.URL)
 	data.ExpiresAt = types.StringValue(api.ExpiresAt)
 	data.FeedbackKey = types.StringValue(api.FeedbackKey)
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created feedback ingest token", map[string]interface{}{"id": api.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -164,6 +165,7 @@ func (r *FeedbackIngestTokenResource) Read(ctx context.Context, req resource.Rea
 	data.ExpiresAt = types.StringValue(found.ExpiresAt)
 	data.FeedbackKey = types.StringValue(found.FeedbackKey)
 	// URL is not returned on the list endpoint; keep the original from state.
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

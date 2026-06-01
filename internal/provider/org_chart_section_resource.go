@@ -113,6 +113,7 @@ func (r *OrgChartSectionResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	mapChartSectionResponseToState(&data, &result)
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created org chart section resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -147,6 +148,7 @@ func (r *OrgChartSectionResource) Read(ctx context.Context, req resource.ReadReq
 	mapChartSectionResponseToState(&data, &result)
 	data.CreatedAt = savedCreatedAt
 	data.UpdatedAt = savedUpdatedAt
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

@@ -66,7 +66,7 @@ type webhookAPIResponse struct {
 	Triggers       []string          `json:"triggers"`
 	IncludePrompts []string          `json:"include_prompts"`
 	ExcludePrompts []string          `json:"exclude_prompts"`
-	WorkspaceID    string            `json:"workspace_id"`
+	WorkspaceID    string            `json:"tenant_id"`
 	CreatedAt      string            `json:"created_at"`
 	UpdatedAt      string            `json:"updated_at"`
 }

@@ -67,7 +67,7 @@ type feedbackConfigAPIResponse struct {
 	FeedbackKey        string                 `json:"feedback_key"`
 	FeedbackConfig     map[string]interface{} `json:"feedback_config"`
 	IsLowerScoreBetter bool                   `json:"is_lower_score_better"`
-	WorkspaceID        string                 `json:"workspace_id"`
+	WorkspaceID        string                 `json:"tenant_id"`
 	ModifiedAt         string                 `json:"modified_at"`
 }
 

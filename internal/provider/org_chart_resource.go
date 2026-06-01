@@ -154,6 +154,7 @@ func (r *OrgChartResource) Create(ctx context.Context, req resource.CreateReques
 	data.Series = planSeries
 	data.CreatedAt = types.StringNull()
 	data.UpdatedAt = types.StringNull()
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created org chart resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -191,6 +192,7 @@ func (r *OrgChartResource) Read(ctx context.Context, req resource.ReadRequest, r
 	data.UpdatedAt = savedUpdatedAt
 	data.Series = savedSeries
 	data.SectionID = savedSectionID
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

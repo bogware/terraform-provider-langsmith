@@ -148,6 +148,7 @@ func (r *HubEnvironmentResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 	tflog.Trace(ctx, "created hub environments", map[string]interface{}{"id": api.ID})
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -175,6 +176,7 @@ func (r *HubEnvironmentResource) Read(ctx context.Context, req resource.ReadRequ
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

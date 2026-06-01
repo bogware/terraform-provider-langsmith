@@ -233,6 +233,7 @@ func (r *ServiceKeyResource) Create(ctx context.Context, req resource.CreateRequ
 	data.Key = types.StringValue(result.Key)
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created service key resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -273,6 +274,7 @@ func (r *ServiceKeyResource) Read(ctx context.Context, req resource.ReadRequest,
 	// The full key is never returned on read — that was a one-time reveal.
 	// UseStateForUnknown keeps the original safe in state.
 
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

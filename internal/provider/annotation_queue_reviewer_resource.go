@@ -102,6 +102,7 @@ func (r *AnnotationQueueReviewerResource) Create(ctx context.Context, req resour
 		return
 	}
 	data.ID = types.StringValue(data.QueueID.ValueString() + ":" + data.IdentityID.ValueString())
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "added annotation queue reviewer", map[string]interface{}{"id": data.ID.ValueString()})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

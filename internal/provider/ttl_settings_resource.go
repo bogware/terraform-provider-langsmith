@@ -65,7 +65,7 @@ type ttlSettingsUpsertRequest struct {
 // ttlSettingsAPIResponse is what the API returns when you ask about TTL settings.
 type ttlSettingsAPIResponse struct {
 	ID                 string  `json:"id"`
-	WorkspaceID        *string `json:"workspace_id"`
+	WorkspaceID        *string `json:"tenant_id"`
 	DefaultTraceTier   string  `json:"default_trace_tier"`
 	ApplyToAllProjects bool    `json:"apply_to_all_projects"`
 	OrganizationID     string  `json:"organization_id"`

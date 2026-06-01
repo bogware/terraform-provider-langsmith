@@ -191,6 +191,7 @@ func (r *PromptTagResource) Create(ctx context.Context, req resource.CreateReque
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 
 	tflog.Trace(ctx, "created prompt tag", map[string]interface{}{"id": result.ID, "tag": result.TagName})
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -217,6 +218,7 @@ func (r *PromptTagResource) Read(ctx context.Context, req resource.ReadRequest, 
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

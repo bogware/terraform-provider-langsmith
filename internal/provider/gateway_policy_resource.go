@@ -269,6 +269,7 @@ func (r *GatewayPolicyResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 	tflog.Trace(ctx, "created gateway policy", map[string]interface{}{"id": api.ID})
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -291,6 +292,7 @@ func (r *GatewayPolicyResource) Read(ctx context.Context, req resource.ReadReque
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

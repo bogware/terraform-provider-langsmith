@@ -197,6 +197,7 @@ func (r *ChartSectionCloneResource) Create(ctx context.Context, req resource.Cre
 	data.SourceSectionID = sourceSectionID
 	data.SessionID = sessionID
 
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "cloned chart section resource", map[string]interface{}{"id": final.ID, "source_section_id": data.SourceSectionID.ValueString()})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -242,6 +243,7 @@ func (r *ChartSectionCloneResource) Read(ctx context.Context, req resource.ReadR
 	data.CreatedAt = savedCreatedAt
 	data.UpdatedAt = savedUpdatedAt
 
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

@@ -214,6 +214,7 @@ func (r *ModelPriceMapResource) Create(ctx context.Context, req resource.CreateR
 	mapModelPriceMapResponseToState(ctx, &data, &result, &resp.Diagnostics)
 	data.PromptCostDetails = planPromptCostDetails
 	data.CompletionCostDetails = planCompletionCostDetails
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created model price map resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -252,6 +253,7 @@ func (r *ModelPriceMapResource) Read(ctx context.Context, req resource.ReadReque
 
 	mapModelPriceMapResponseToState(ctx, &data, found, &resp.Diagnostics)
 
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

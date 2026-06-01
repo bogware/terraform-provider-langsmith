@@ -172,6 +172,7 @@ func (r *ServiceAccountResource) Create(ctx context.Context, req resource.Create
 	}
 
 	mapServiceAccountResponseToState(&data, &result)
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created service account resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -206,6 +207,7 @@ func (r *ServiceAccountResource) Read(ctx context.Context, req resource.ReadRequ
 
 	mapServiceAccountResponseToState(&data, found)
 
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

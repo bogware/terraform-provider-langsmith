@@ -166,6 +166,7 @@ func (r *TaggingResource) Create(ctx context.Context, req resource.CreateRequest
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 
 	tflog.Trace(ctx, "created tagging resource", map[string]interface{}{"id": result.ID})
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -220,6 +221,7 @@ func (r *TaggingResource) Read(ctx context.Context, req resource.ReadRequest, re
 
 	// State is already populated from the prior apply; the list endpoint
 	// doesn't return created_at, so we keep it from state.
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

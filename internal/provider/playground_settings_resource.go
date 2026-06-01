@@ -206,6 +206,7 @@ func (r *PlaygroundSettingsResource) Create(ctx context.Context, req resource.Cr
 	if !planOptions.IsNull() && !planOptions.IsUnknown() {
 		data.Options = planOptions
 	}
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created playground settings resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -244,6 +245,7 @@ func (r *PlaygroundSettingsResource) Read(ctx context.Context, req resource.Read
 
 	mapPlaygroundSettingsResponseToState(&data, found)
 
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

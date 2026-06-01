@@ -161,6 +161,7 @@ func (r *TagValueResource) Create(ctx context.Context, req resource.CreateReques
 	}
 
 	mapTagValueResponseToState(&data, &result)
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created tag value resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -189,6 +190,7 @@ func (r *TagValueResource) Read(ctx context.Context, req resource.ReadRequest, r
 
 	mapTagValueResponseToState(&data, &result)
 
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

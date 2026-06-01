@@ -138,6 +138,7 @@ func (r *RepoOwnerResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 	r.mapResponse(&api, &data)
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "added repo owner", map[string]interface{}{"email": data.Email.ValueString()})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -161,11 +162,13 @@ func (r *RepoOwnerResource) Read(ctx context.Context, req resource.ReadRequest, 
 	for _, o := range list.Owners {
 		if o.IdentityID != nil && *o.IdentityID == wanted {
 			r.mapResponse(&o, &data)
+			reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 			resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 			return
 		}
 		if o.LSUserID == data.LSUserID.ValueString() && data.LSUserID.ValueString() != "" {
 			r.mapResponse(&o, &data)
+			reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 			resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 			return
 		}

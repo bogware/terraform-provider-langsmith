@@ -212,6 +212,7 @@ func (r *ExampleResource) Create(ctx context.Context, req resource.CreateRequest
 	mapExampleResponseToState(&data, &result)
 	data.Split = planSplit
 	data.Metadata = planMetadata
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created example resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -246,6 +247,7 @@ func (r *ExampleResource) Read(ctx context.Context, req resource.ReadRequest, re
 	// Strip the API-injected dataset_split key from metadata to match user config.
 	data.Metadata = stripJSONKey(result.Metadata, "dataset_split", savedMetadata)
 
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
