@@ -78,7 +78,7 @@ func getApiKey(data LangSmithProviderModel, resp *provider.ConfigureResponse) st
 	return apiKey
 }
 
-func getApiUrl(data LangSmithProviderModel, resp *provider.ConfigureResponse) string {
+func getApiUrl(data LangSmithProviderModel) string {
 	apiURL := "https://api.smith.langchain.com"
 	if envURL := os.Getenv("LANGSMITH_API_URL"); envURL != "" {
 		apiURL = envURL
@@ -125,7 +125,7 @@ func (p *LangSmithProvider) Configure(ctx context.Context, req provider.Configur
 	}
 
 	apiKey := getApiKey(data, resp)
-	apiURL := getApiUrl(data, resp)
+	apiURL := getApiUrl(data)
 	workspaceId := getWorkspaceId(data, resp)
 	if apiURL == "" || apiKey == "" {
 		return
