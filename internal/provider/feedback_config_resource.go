@@ -67,7 +67,7 @@ type feedbackConfigAPIResponse struct {
 	FeedbackKey        string                 `json:"feedback_key"`
 	FeedbackConfig     map[string]interface{} `json:"feedback_config"`
 	IsLowerScoreBetter bool                   `json:"is_lower_score_better"`
-	WorkspaceID        string                 `json:"tenant_id"`
+	TenantID           string                 `json:"tenant_id"`
 	ModifiedAt         string                 `json:"modified_at"`
 }
 
@@ -254,7 +254,7 @@ func (r *FeedbackConfigResource) readFeedbackConfig(ctx context.Context, data *F
 
 	data.ID = types.StringValue(found.FeedbackKey)
 	data.FeedbackKey = types.StringValue(found.FeedbackKey)
-	reconcileWorkspaceID(&data.WorkspaceID, found.WorkspaceID, diags)
+	reconcileWorkspaceID(&data.WorkspaceID, found.TenantID, diags)
 	data.TenantID = data.WorkspaceID
 	data.ModifiedAt = types.StringValue(found.ModifiedAt)
 	data.IsLowerScoreBetter = types.BoolValue(found.IsLowerScoreBetter)

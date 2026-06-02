@@ -100,7 +100,7 @@ type evaluatorAPI struct {
 	ID            string            `json:"id"`
 	Name          string            `json:"name"`
 	Type          string            `json:"type"`
-	WorkspaceID   string            `json:"tenant_id"`
+	TenantID      string            `json:"tenant_id"`
 	CreatedAt     string            `json:"created_at"`
 	UpdatedAt     string            `json:"updated_at"`
 	CreatedBy     string            `json:"created_by"`
@@ -425,7 +425,7 @@ func (r *EvaluatorResource) mapResponseToModel(ctx context.Context, api *evaluat
 	data.ID = types.StringValue(api.ID)
 	data.Name = types.StringValue(api.Name)
 	data.Type = types.StringValue(api.Type)
-	reconcileWorkspaceID(&data.WorkspaceID, api.WorkspaceID, diags)
+	reconcileWorkspaceID(&data.WorkspaceID, api.TenantID, diags)
 	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(api.CreatedAt)
 	data.UpdatedAt = types.StringValue(api.UpdatedAt)

@@ -56,7 +56,7 @@ type projectDataSourceAPIResponse struct {
 	ReferenceDatasetID *string         `json:"reference_dataset_id"`
 	Extra              json.RawMessage `json:"extra"`
 	TraceTier          *string         `json:"trace_tier"`
-	WorkspaceID        string          `json:"tenant_id"`
+	TenantID           string          `json:"tenant_id"`
 	StartTime          string          `json:"start_time"`
 	RunCount           int64           `json:"run_count"`
 }
@@ -219,7 +219,7 @@ func (d *ProjectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		data.TraceTier = types.StringNull()
 	}
 
-	reconcileWorkspaceID(&data.WorkspaceID, result.WorkspaceID, &resp.Diagnostics)
+	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, &resp.Diagnostics)
 	data.TenantID = data.WorkspaceID
 	data.StartTime = types.StringValue(result.StartTime)
 	data.RunCount = types.Int64Value(result.RunCount)

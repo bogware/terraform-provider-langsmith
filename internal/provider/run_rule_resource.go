@@ -156,7 +156,7 @@ type runRuleAPIResponse struct {
 	BackfillProgress             *float64        `json:"backfill_progress"`
 	BackfillCompletedAt          *string         `json:"backfill_completed_at"`
 	BackfillError                *string         `json:"backfill_error"`
-	WorkspaceID                  string          `json:"tenant_id"`
+	TenantID                     string          `json:"tenant_id"`
 	CreatedAt                    string          `json:"created_at"`
 	UpdatedAt                    string          `json:"updated_at"`
 }
@@ -654,7 +654,7 @@ func (r *RunRuleResource) mapResponseToModel(result *runRuleAPIResponse, data *R
 	data.DisplayName = types.StringValue(result.DisplayName)
 	data.SamplingRate = types.Float64Value(result.SamplingRate)
 	data.IsEnabled = types.BoolValue(result.IsEnabled)
-	reconcileWorkspaceID(&data.WorkspaceID, result.WorkspaceID, diags)
+	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, diags)
 	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)

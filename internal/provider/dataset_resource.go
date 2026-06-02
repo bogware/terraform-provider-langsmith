@@ -91,7 +91,7 @@ type datasetAPIResponse struct {
 	SessionCount            int64           `json:"session_count"`
 	ModifiedAt              string          `json:"modified_at"`
 	LastSessionStartTime    *string         `json:"last_session_start_time"`
-	WorkspaceID             string          `json:"tenant_id"`
+	TenantID                string          `json:"tenant_id"`
 	CreatedAt               string          `json:"created_at"`
 }
 
@@ -424,7 +424,7 @@ func mapDatasetResponseToState(data *DatasetResourceModel, result *datasetAPIRes
 		data.LastSessionStartTime = types.StringNull()
 	}
 
-	reconcileWorkspaceID(&data.WorkspaceID, result.WorkspaceID, diags)
+	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, diags)
 	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 }

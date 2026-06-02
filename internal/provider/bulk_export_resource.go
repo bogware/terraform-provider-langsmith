@@ -93,7 +93,7 @@ type bulkExportAPIResponse struct {
 	IntervalHours           *int64   `json:"interval_hours"`
 	Filter                  *string  `json:"filter"`
 	Status                  string   `json:"status"`
-	WorkspaceID             string   `json:"tenant_id"`
+	TenantID                string   `json:"tenant_id"`
 	CreatedAt               string   `json:"created_at"`
 	UpdatedAt               string   `json:"updated_at"`
 	FormatVersion           string   `json:"format_version"`
@@ -404,7 +404,7 @@ func mapBulkExportResponseToState(data *BulkExportResourceModel, result *bulkExp
 	}
 
 	data.Status = types.StringValue(result.Status)
-	reconcileWorkspaceID(&data.WorkspaceID, result.WorkspaceID, diags)
+	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, diags)
 	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)

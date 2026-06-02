@@ -50,7 +50,7 @@ type promptDataSourceAPIResponse struct {
 		Readme      *string `json:"readme"`
 		IsPublic    bool    `json:"is_public"`
 		IsArchived  bool    `json:"is_archived"`
-		WorkspaceID string  `json:"tenant_id"`
+		TenantID    string  `json:"tenant_id"`
 		CreatedAt   string  `json:"created_at"`
 		UpdatedAt   string  `json:"updated_at"`
 	} `json:"repo"`
@@ -140,7 +140,7 @@ func (d *PromptDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 	data.RepoHandle = types.StringValue(result.Repo.RepoHandle)
 	data.IsPublic = types.BoolValue(result.Repo.IsPublic)
 	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
-	reconcileWorkspaceID(&data.WorkspaceID, result.Repo.WorkspaceID, &resp.Diagnostics)
+	reconcileWorkspaceID(&data.WorkspaceID, result.Repo.TenantID, &resp.Diagnostics)
 	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.Repo.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.Repo.UpdatedAt)

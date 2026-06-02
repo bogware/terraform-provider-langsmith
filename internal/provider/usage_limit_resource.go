@@ -57,12 +57,12 @@ type usageLimitAPIRequest struct {
 
 // usageLimitAPIResponse is the API response for a usage limit.
 type usageLimitAPIResponse struct {
-	ID          string `json:"id"`
-	LimitType   string `json:"limit_type"`
-	LimitValue  int64  `json:"limit_value"`
-	WorkspaceID string `json:"tenant_id"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
+	ID         string `json:"id"`
+	LimitType  string `json:"limit_type"`
+	LimitValue int64  `json:"limit_value"`
+	TenantID   string `json:"tenant_id"`
+	CreatedAt  string `json:"created_at"`
+	UpdatedAt  string `json:"updated_at"`
 }
 
 func (r *UsageLimitResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -249,7 +249,7 @@ func mapUsageLimitResponseToState(data *UsageLimitResourceModel, result *usageLi
 	data.ID = types.StringValue(result.ID)
 	data.LimitType = types.StringValue(result.LimitType)
 	data.LimitValue = types.Int64Value(result.LimitValue)
-	reconcileWorkspaceID(&data.WorkspaceID, result.WorkspaceID, diags)
+	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, diags)
 	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)

@@ -63,7 +63,7 @@ type datasetDataSourceAPIResponse struct {
 	ExternallyManaged       *bool           `json:"externally_managed"`
 	Transformations         json.RawMessage `json:"transformations"`
 	Metadata                json.RawMessage `json:"metadata"`
-	WorkspaceID             string          `json:"tenant_id"`
+	TenantID                string          `json:"tenant_id"`
 	CreatedAt               string          `json:"created_at"`
 	ModifiedAt              string          `json:"modified_at"`
 	ExampleCount            int64           `json:"example_count"`
@@ -257,7 +257,7 @@ func (d *DatasetDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		data.Metadata = types.StringNull()
 	}
 
-	reconcileWorkspaceID(&data.WorkspaceID, result.WorkspaceID, &resp.Diagnostics)
+	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, &resp.Diagnostics)
 	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.ModifiedAt = types.StringValue(result.ModifiedAt)

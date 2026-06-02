@@ -76,7 +76,7 @@ type toolAPI struct {
 	Returns     map[string]interface{} `json:"returns"`
 	Metadata    map[string]interface{} `json:"metadata"`
 	Enabled     bool                   `json:"enabled"`
-	WorkspaceID string                 `json:"tenant_id"`
+	TenantID    string                 `json:"tenant_id"`
 	CreatedAt   string                 `json:"created_at"`
 	UpdatedAt   string                 `json:"updated_at"`
 }
@@ -288,7 +288,7 @@ func (r *ToolResource) mapResponse(api *toolAPI, data *ToolResourceModel, diags 
 		data.Metadata = types.StringNull()
 	}
 	data.Enabled = types.BoolValue(api.Enabled)
-	reconcileWorkspaceID(&data.WorkspaceID, api.WorkspaceID, diags)
+	reconcileWorkspaceID(&data.WorkspaceID, api.TenantID, diags)
 	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(api.CreatedAt)
 	data.UpdatedAt = types.StringValue(api.UpdatedAt)

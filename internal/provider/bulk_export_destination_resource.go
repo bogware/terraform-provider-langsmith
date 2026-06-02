@@ -93,7 +93,7 @@ type bulkExportDestinationAPIResponse struct {
 	DisplayName     string                      `json:"display_name"`
 	DestinationType string                      `json:"destination_type"`
 	Config          bulkExportDestinationConfig `json:"config"`
-	WorkspaceID     string                      `json:"tenant_id"`
+	TenantID        string                      `json:"tenant_id"`
 	CreatedAt       string                      `json:"created_at"`
 	UpdatedAt       string                      `json:"updated_at"`
 	CredentialsKeys []string                    `json:"credentials_keys"`
@@ -390,7 +390,7 @@ func mapBulkExportDestinationResponseToState(data *BulkExportDestinationResource
 		data.IncludeBucketInPrefix = types.BoolNull()
 	}
 
-	reconcileWorkspaceID(&data.WorkspaceID, result.WorkspaceID, diags)
+	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, diags)
 	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)

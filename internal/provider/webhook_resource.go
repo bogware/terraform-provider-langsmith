@@ -66,7 +66,7 @@ type webhookAPIResponse struct {
 	Triggers       []string          `json:"triggers"`
 	IncludePrompts []string          `json:"include_prompts"`
 	ExcludePrompts []string          `json:"exclude_prompts"`
-	WorkspaceID    string            `json:"tenant_id"`
+	TenantID       string            `json:"tenant_id"`
 	CreatedAt      string            `json:"created_at"`
 	UpdatedAt      string            `json:"updated_at"`
 }
@@ -304,7 +304,7 @@ func (r *WebhookResource) ImportState(ctx context.Context, req resource.ImportSt
 func (r *WebhookResource) mapResponseToModel(ctx context.Context, result *webhookAPIResponse, data *WebhookResourceModel, diagnostics *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.URL = types.StringValue(result.URL)
-	reconcileWorkspaceID(&data.WorkspaceID, result.WorkspaceID, diagnostics)
+	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, diagnostics)
 	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)

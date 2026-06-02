@@ -47,7 +47,7 @@ type annotationQueueDataSourceAPIResponse struct {
 	NumReviewersPerItem *int64  `json:"num_reviewers_per_item"`
 	EnableReservations  bool    `json:"enable_reservations"`
 	ReservationMinutes  *int64  `json:"reservation_minutes"`
-	WorkspaceID         string  `json:"tenant_id"`
+	TenantID            string  `json:"tenant_id"`
 	CreatedAt           string  `json:"created_at"`
 	UpdatedAt           string  `json:"updated_at"`
 }
@@ -167,7 +167,7 @@ func mapAnnotationQueueDSResponse(data *AnnotationQueueDataSourceModel, r *annot
 	data.ID = types.StringValue(r.ID)
 	data.Name = types.StringValue(r.Name)
 	data.EnableReservations = types.BoolValue(r.EnableReservations)
-	reconcileWorkspaceID(&data.WorkspaceID, r.WorkspaceID, diags)
+	reconcileWorkspaceID(&data.WorkspaceID, r.TenantID, diags)
 	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(r.CreatedAt)
 	data.UpdatedAt = types.StringValue(r.UpdatedAt)

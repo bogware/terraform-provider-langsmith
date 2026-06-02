@@ -75,7 +75,7 @@ type projectAPIResponse struct {
 	ReferenceDatasetID *string         `json:"reference_dataset_id"`
 	Extra              json.RawMessage `json:"extra"`
 	TraceTier          *string         `json:"trace_tier"`
-	WorkspaceID        string          `json:"tenant_id"`
+	TenantID           string          `json:"tenant_id"`
 	StartTime          string          `json:"start_time"`
 }
 
@@ -324,7 +324,7 @@ func mapProjectResponseToState(data *ProjectResourceModel, result *projectAPIRes
 		data.TraceTier = types.StringNull()
 	}
 
-	reconcileWorkspaceID(&data.WorkspaceID, result.WorkspaceID, diags)
+	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, diags)
 	data.TenantID = data.WorkspaceID
 	data.StartTime = types.StringValue(result.StartTime)
 }

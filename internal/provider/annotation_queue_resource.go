@@ -91,7 +91,7 @@ type annotationQueueAPIResponse struct {
 	SourceRuleID        *string         `json:"source_rule_id"`
 	RunRuleID           *string         `json:"run_rule_id"`
 	QueueType           string          `json:"queue_type"`
-	WorkspaceID         string          `json:"tenant_id"`
+	TenantID            string          `json:"tenant_id"`
 	CreatedAt           string          `json:"created_at"`
 	UpdatedAt           string          `json:"updated_at"`
 }
@@ -444,7 +444,7 @@ func mapAnnotationQueueResponseToState(data *AnnotationQueueResourceModel, resul
 	}
 
 	data.QueueType = types.StringValue(result.QueueType)
-	reconcileWorkspaceID(&data.WorkspaceID, result.WorkspaceID, diags)
+	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, diags)
 	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)

@@ -111,7 +111,7 @@ type promptAPIResponse struct {
 		IsPublic    bool     `json:"is_public"`
 		IsArchived  bool     `json:"is_archived"`
 		Tags        []string `json:"tags"`
-		WorkspaceID string   `json:"tenant_id"`
+		TenantID    string   `json:"tenant_id"`
 		NumCommits  int64    `json:"num_commits"`
 		Owner       *string  `json:"owner"`
 		FullName    string   `json:"full_name"`
@@ -292,7 +292,7 @@ func (r *PromptResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	// Set remaining computed fields that the create response may not populate.
 	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
-	reconcileWorkspaceID(&data.WorkspaceID, result.Repo.WorkspaceID, &resp.Diagnostics)
+	reconcileWorkspaceID(&data.WorkspaceID, result.Repo.TenantID, &resp.Diagnostics)
 	data.TenantID = data.WorkspaceID
 
 	tflog.Trace(ctx, "created prompt resource", map[string]interface{}{"id": result.Repo.ID})
@@ -337,7 +337,7 @@ func (r *PromptResource) Read(ctx context.Context, req resource.ReadRequest, res
 		data.Owner = types.StringValue("")
 	}
 	data.FullName = types.StringValue(result.Repo.FullName)
-	reconcileWorkspaceID(&data.WorkspaceID, result.Repo.WorkspaceID, &resp.Diagnostics)
+	reconcileWorkspaceID(&data.WorkspaceID, result.Repo.TenantID, &resp.Diagnostics)
 	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.Repo.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.Repo.UpdatedAt)
@@ -459,7 +459,7 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 	data.FullName = types.StringValue(result.Repo.FullName)
 	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
-	reconcileWorkspaceID(&data.WorkspaceID, result.Repo.WorkspaceID, &resp.Diagnostics)
+	reconcileWorkspaceID(&data.WorkspaceID, result.Repo.TenantID, &resp.Diagnostics)
 	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.Repo.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.Repo.UpdatedAt)
