@@ -30,6 +30,7 @@ resource "langsmith_chart_section" "example" {
 
 - `description` (String) A description of the chart section.
 - `index` (Number) The display order index.
+- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 

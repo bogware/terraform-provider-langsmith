@@ -32,7 +32,7 @@ type ProjectDataSource struct {
 }
 
 // ProjectDataSourceModel holds the read-only attributes returned for a project:
-// name, description, tenant, start time, and run count.
+// name, description, workspace, start time, and run count.
 type ProjectDataSourceModel struct {
 	ID                 types.String `tfsdk:"id"`
 	Name               types.String `tfsdk:"name"`
@@ -41,6 +41,7 @@ type ProjectDataSourceModel struct {
 	ReferenceDatasetID types.String `tfsdk:"reference_dataset_id"`
 	Extra              types.String `tfsdk:"extra"`
 	TraceTier          types.String `tfsdk:"trace_tier"`
+	WorkspaceID        types.String `tfsdk:"workspace_id"`
 	TenantID           types.String `tfsdk:"tenant_id"`
 	StartTime          types.String `tfsdk:"start_time"`
 	RunCount           types.Int64  `tfsdk:"run_count"`
@@ -98,9 +99,15 @@ func (d *ProjectDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 				MarkdownDescription: "The trace retention tier (`longlived` or `shortlived`).",
 				Computed:            true,
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID of the project.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID. If set, overrides the provider-level `workspace_id` for all API calls made by this data source.",
+				Optional:            true,
 				Computed:            true,
+			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "Deprecated: use `workspace_id` instead. The workspace ID.",
+				Computed:            true,
+				DeprecationMessage:  "Use 'workspace_id' instead. This attribute will be removed in a future version.",
 			},
 			"start_time": schema.StringAttribute{
 				MarkdownDescription: "The start time of the project.",
@@ -152,7 +159,7 @@ func (d *ProjectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	var result projectDataSourceAPIResponse
 
 	if idSet {
-		err := d.client.Get(ctx, "/api/v1/sessions/"+data.ID.ValueString(), nil, &result)
+		err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/sessions/"+data.ID.ValueString(), nil, &result)
 		if err != nil {
 			resp.Diagnostics.AddError("Error reading project", err.Error())
 			return
@@ -162,7 +169,7 @@ func (d *ProjectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		query.Set("name", data.Name.ValueString())
 
 		var results []projectDataSourceAPIResponse
-		err := d.client.Get(ctx, "/api/v1/sessions", query, &results)
+		err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/sessions", query, &results)
 		if err != nil {
 			resp.Diagnostics.AddError("Error reading project", err.Error())
 			return
@@ -212,7 +219,8 @@ func (d *ProjectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		data.TraceTier = types.StringNull()
 	}
 
-	data.TenantID = types.StringValue(result.TenantID)
+	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, &resp.Diagnostics)
+	data.TenantID = data.WorkspaceID
 	data.StartTime = types.StringValue(result.StartTime)
 	data.RunCount = types.Int64Value(result.RunCount)
 

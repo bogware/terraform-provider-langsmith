@@ -31,6 +31,7 @@ resource "langsmith_tag_value" "example" {
 ### Optional
 
 - `description` (String) A description of the tag value.
+- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 

@@ -37,18 +37,18 @@ type WorkspaceResource struct {
 
 // WorkspaceResourceModel describes the Terraform state for a workspace.
 type WorkspaceResourceModel struct {
-	ID             types.String `tfsdk:"id"`
-	DisplayName    types.String `tfsdk:"display_name"`
-	TenantHandle   types.String `tfsdk:"tenant_handle"`
-	CreatedAt      types.String `tfsdk:"created_at"`
-	OrganizationID types.String `tfsdk:"organization_id"`
-	IsPersonal     types.Bool   `tfsdk:"is_personal"`
+	ID              types.String `tfsdk:"id"`
+	DisplayName     types.String `tfsdk:"display_name"`
+	WorkspaceHandle types.String `tfsdk:"workspace_handle"`
+	CreatedAt       types.String `tfsdk:"created_at"`
+	OrganizationID  types.String `tfsdk:"organization_id"`
+	IsPersonal      types.Bool   `tfsdk:"is_personal"`
 }
 
 // workspaceCreateRequest is the deed for establishing a new workspace.
 type workspaceCreateRequest struct {
-	DisplayName  string  `json:"display_name"`
-	TenantHandle *string `json:"tenant_handle,omitempty"`
+	DisplayName     string  `json:"display_name"`
+	WorkspaceHandle *string `json:"workspace_handle,omitempty"`
 }
 
 // workspaceUpdateRequest carries the fields allowed when renaming your territory.
@@ -59,12 +59,12 @@ type workspaceUpdateRequest struct {
 // workspaceAPIResponse is what the API returns when you inquire about a workspace —
 // the full survey of the territory, including who owns it and whether it is personal land.
 type workspaceAPIResponse struct {
-	ID             string `json:"id"`
-	DisplayName    string `json:"display_name"`
-	TenantHandle   string `json:"tenant_handle"`
-	CreatedAt      string `json:"created_at"`
-	OrganizationID string `json:"organization_id"`
-	IsPersonal     bool   `json:"is_personal"`
+	ID              string `json:"id"`
+	DisplayName     string `json:"display_name"`
+	WorkspaceHandle string `json:"workspace_handle"`
+	CreatedAt       string `json:"created_at"`
+	OrganizationID  string `json:"organization_id"`
+	IsPersonal      bool   `json:"is_personal"`
 }
 
 func (r *WorkspaceResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -86,7 +86,7 @@ func (r *WorkspaceResource) Schema(ctx context.Context, req resource.SchemaReque
 				MarkdownDescription: "The display name of the workspace.",
 				Required:            true,
 			},
-			"tenant_handle": schema.StringAttribute{
+			"workspace_handle": schema.StringAttribute{
 				MarkdownDescription: "The workspace handle/slug.",
 				Optional:            true,
 				Computed:            true,
@@ -142,9 +142,9 @@ func (r *WorkspaceResource) Create(ctx context.Context, req resource.CreateReque
 		DisplayName: data.DisplayName.ValueString(),
 	}
 
-	if !data.TenantHandle.IsNull() && !data.TenantHandle.IsUnknown() {
-		v := data.TenantHandle.ValueString()
-		body.TenantHandle = &v
+	if !data.WorkspaceHandle.IsNull() && !data.WorkspaceHandle.IsUnknown() {
+		v := data.WorkspaceHandle.ValueString()
+		body.WorkspaceHandle = &v
 	}
 
 	var result workspaceAPIResponse
@@ -245,7 +245,7 @@ func (r *WorkspaceResource) ImportState(ctx context.Context, req resource.Import
 func mapWorkspaceResponseToState(data *WorkspaceResourceModel, result *workspaceAPIResponse) {
 	data.ID = types.StringValue(result.ID)
 	data.DisplayName = types.StringValue(result.DisplayName)
-	data.TenantHandle = types.StringValue(result.TenantHandle)
+	data.WorkspaceHandle = types.StringValue(result.WorkspaceHandle)
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.OrganizationID = types.StringValue(result.OrganizationID)
 	data.IsPersonal = types.BoolValue(result.IsPersonal)

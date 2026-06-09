@@ -33,9 +33,10 @@ resource "langsmith_project" "example" {
 - `extra` (String) JSON string containing extra metadata for the project.
 - `reference_dataset_id` (String) The UUID of the reference dataset for this project.
 - `trace_tier` (String) The trace retention tier for the project. Valid values: `longlived`, `shortlived`.
+- `workspace_id` (String) The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 
 - `id` (String) The unique identifier of the project.
 - `start_time` (String) The start time of the project.
-- `tenant_id` (String) The tenant ID of the project.
+- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead.

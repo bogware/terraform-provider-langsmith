@@ -27,9 +27,10 @@ type LangSmithProvider struct {
 
 // LangSmithProviderModel describes the provider configuration.
 type LangSmithProviderModel struct {
-	APIKey   types.String `tfsdk:"api_key"`
-	APIURL   types.String `tfsdk:"api_url"`
-	TenantID types.String `tfsdk:"tenant_id"`
+	APIKey      types.String `tfsdk:"api_key"`
+	APIURL      types.String `tfsdk:"api_url"`
+	WorkspaceID types.String `tfsdk:"workspace_id"`
+	TenantID    types.String `tfsdk:"tenant_id"`
 }
 
 func (p *LangSmithProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -50,12 +51,69 @@ func (p *LangSmithProvider) Schema(ctx context.Context, req provider.SchemaReque
 				MarkdownDescription: "The LangSmith API base URL. Defaults to `https://api.smith.langchain.com`. Can also be set with the `LANGSMITH_API_URL` environment variable.",
 				Optional:            true,
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The LangSmith workspace/tenant ID. Required for org-scoped API keys. Can also be set with the `LANGSMITH_TENANT_ID` environment variable.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The LangSmith workspace ID. Required for org-scoped API keys. Can also be set with the `LANGSMITH_WORKSPACE_ID` environment variable.",
 				Optional:            true,
+			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "Deprecated: use `workspace_id` instead. The LangSmith workspace ID. Can also be set with the `LANGSMITH_TENANT_ID` environment variable.",
+				Optional:            true,
+				DeprecationMessage:  "Use 'workspace_id' instead. This attribute will be removed in a future version.",
 			},
 		},
 	}
+}
+
+func getApiKey(data LangSmithProviderModel, resp *provider.ConfigureResponse) string {
+	apiKey := strings.TrimSpace(os.Getenv("LANGSMITH_API_KEY"))
+	if !data.APIKey.IsNull() {
+		apiKey = strings.TrimSpace(data.APIKey.ValueString())
+	}
+	if apiKey == "" {
+		resp.Diagnostics.AddError(
+			"Missing API Key",
+			"The LangSmith API key must be set in the provider configuration or via the LANGSMITH_API_KEY environment variable.",
+		)
+	}
+	return apiKey
+}
+
+func getApiUrl(data LangSmithProviderModel) string {
+	apiURL := "https://api.smith.langchain.com"
+	if envURL := os.Getenv("LANGSMITH_API_URL"); envURL != "" {
+		apiURL = envURL
+	}
+	if !data.APIURL.IsNull() {
+		apiURL = data.APIURL.ValueString()
+	}
+	apiURL = strings.TrimRight(apiURL, "/")
+	return apiURL
+}
+
+func getWorkspaceId(data LangSmithProviderModel, resp *provider.ConfigureResponse) string {
+	workspaceID := os.Getenv("LANGSMITH_WORKSPACE_ID")
+	if !data.WorkspaceID.IsNull() {
+		workspaceID = data.WorkspaceID.ValueString()
+	}
+	tenantId := os.Getenv("LANGSMITH_TENANT_ID")
+	if !data.TenantID.IsNull() {
+		tenantId = data.TenantID.ValueString()
+	}
+	if tenantId != "" {
+		resp.Diagnostics.AddWarning(
+			"Deprecated tenant_id",
+			"The 'tenant_id' configuration attribute and LANGSMITH_TENANT_ID environment variable are deprecated. Use 'workspace_id' and LANGSMITH_WORKSPACE_ID instead.",
+		)
+		if workspaceID == "" {
+			workspaceID = tenantId
+		} else if workspaceID != tenantId {
+			resp.Diagnostics.AddError(
+				"Conflicting workspace_id and tenant_id",
+				"Both 'workspace_id' and 'tenant_id' are set to different values. Remove 'tenant_id' (deprecated) and use 'workspace_id' only.",
+			)
+		}
+	}
+	return workspaceID
 }
 
 func (p *LangSmithProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
@@ -66,36 +124,16 @@ func (p *LangSmithProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	apiKey := strings.TrimSpace(os.Getenv("LANGSMITH_API_KEY"))
-	if !data.APIKey.IsNull() {
-		apiKey = strings.TrimSpace(data.APIKey.ValueString())
-	}
-
-	if apiKey == "" {
-		resp.Diagnostics.AddError(
-			"Missing API Key",
-			"The LangSmith API key must be set in the provider configuration or via the LANGSMITH_API_KEY environment variable.",
-		)
+	apiKey := getApiKey(data, resp)
+	apiURL := getApiUrl(data)
+	workspaceId := getWorkspaceId(data, resp)
+	if apiURL == "" || apiKey == "" {
 		return
-	}
-
-	apiURL := "https://api.smith.langchain.com"
-	if envURL := os.Getenv("LANGSMITH_API_URL"); envURL != "" {
-		apiURL = envURL
-	}
-	if !data.APIURL.IsNull() {
-		apiURL = data.APIURL.ValueString()
-	}
-	apiURL = strings.TrimRight(apiURL, "/")
-
-	tenantID := os.Getenv("LANGSMITH_TENANT_ID")
-	if !data.TenantID.IsNull() {
-		tenantID = data.TenantID.ValueString()
 	}
 
 	userAgent := fmt.Sprintf("terraform-provider-langsmith/%s", p.version)
 
-	c := client.NewClient(apiURL, apiKey, tenantID, userAgent)
+	c := client.NewClient(apiURL, apiKey, workspaceId, userAgent)
 
 	// Validate the API key by making a lightweight request.
 	var info struct {

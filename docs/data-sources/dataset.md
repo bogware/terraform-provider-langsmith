@@ -25,6 +25,7 @@ data "langsmith_dataset" "example" {
 
 - `id` (String) The unique identifier of the dataset. Either `id` or `name` must be specified.
 - `name` (String) The name of the dataset. Either `id` or `name` must be specified.
+- `workspace_id` (String) The workspace ID. If set, overrides the provider-level `workspace_id` for all API calls made by this data source.
 
 ### Read-Only
 
@@ -39,5 +40,5 @@ data "langsmith_dataset" "example" {
 - `modified_at` (String) The last modification timestamp of the dataset.
 - `outputs_schema_definition` (String) JSON string of the outputs JSON schema definition.
 - `session_count` (Number) The number of sessions associated with the dataset.
-- `tenant_id` (String) The tenant ID of the dataset.
+- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead. The workspace ID.
 - `transformations` (String) JSON string of the dataset transformations.

@@ -35,6 +35,7 @@ resource "langsmith_prompt" "example" {
 - `manifest` (String) JSON string of the prompt manifest (LangChain serialization format). This is the actual prompt content — the template, messages, and variables. Setting this creates a new commit in the prompt repo.
 - `readme` (String) README content for the prompt.
 - `tags` (List of String) Tags for the prompt.
+- `workspace_id` (String) The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 
@@ -43,5 +44,5 @@ resource "langsmith_prompt" "example" {
 - `full_name` (String) The full name of the prompt (owner/repo_handle).
 - `id` (String) The unique identifier of the prompt repo.
 - `owner` (String) The owner of the prompt repo.
-- `tenant_id` (String) The tenant ID that owns this prompt.
+- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead.
 - `updated_at` (String) When the prompt was last updated.

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -56,6 +57,7 @@ type AnnotationQueueResourceModel struct {
 	SourceRuleID        types.String `tfsdk:"source_rule_id"`
 	RunRuleID           types.String `tfsdk:"run_rule_id"`
 	QueueType           types.String `tfsdk:"queue_type"`
+	WorkspaceID         types.String `tfsdk:"workspace_id"`
 	TenantID            types.String `tfsdk:"tenant_id"`
 	CreatedAt           types.String `tfsdk:"created_at"`
 	UpdatedAt           types.String `tfsdk:"updated_at"`
@@ -166,8 +168,15 @@ func (r *AnnotationQueueResource) Schema(ctx context.Context, req resource.Schem
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID of the annotation queue.",
+				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
+				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
@@ -249,13 +258,13 @@ func (r *AnnotationQueueResource) Create(ctx context.Context, req resource.Creat
 	planMetadata := data.Metadata
 
 	var result annotationQueueAPIResponse
-	err := r.client.Post(ctx, "/api/v1/annotation-queues", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/annotation-queues", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating annotation queue", err.Error())
 		return
 	}
 
-	mapAnnotationQueueResponseToState(&data, &result)
+	mapAnnotationQueueResponseToState(&data, &result, &resp.Diagnostics)
 	if !planRubricItems.IsUnknown() {
 		data.RubricItems = planRubricItems
 	}
@@ -275,7 +284,7 @@ func (r *AnnotationQueueResource) Read(ctx context.Context, req resource.ReadReq
 	}
 
 	var result annotationQueueAPIResponse
-	err := r.client.Get(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), nil, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -285,7 +294,7 @@ func (r *AnnotationQueueResource) Read(ctx context.Context, req resource.ReadReq
 		return
 	}
 
-	mapAnnotationQueueResponseToState(&data, &result)
+	mapAnnotationQueueResponseToState(&data, &result, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -333,7 +342,7 @@ func (r *AnnotationQueueResource) Update(ctx context.Context, req resource.Updat
 		body.Metadata = json.RawMessage(data.Metadata.ValueString())
 	}
 
-	err := r.client.Patch(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), body, nil)
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), body, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating annotation queue", err.Error())
 		return
@@ -342,13 +351,13 @@ func (r *AnnotationQueueResource) Update(ctx context.Context, req resource.Updat
 	// The PATCH response only returns {"message": "..."}, not the full resource.
 	// Like Festus reporting back with half the story, we need to go get the rest ourselves.
 	var result annotationQueueAPIResponse
-	err = r.client.Get(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), nil, &result)
+	err = effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), nil, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading annotation queue after update", err.Error())
 		return
 	}
 
-	mapAnnotationQueueResponseToState(&data, &result)
+	mapAnnotationQueueResponseToState(&data, &result, &resp.Diagnostics)
 	tflog.Trace(ctx, "updated annotation queue resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -363,7 +372,7 @@ func (r *AnnotationQueueResource) Delete(ctx context.Context, req resource.Delet
 
 	q := url.Values{}
 	q.Set("queue_ids", data.ID.ValueString())
-	err := r.client.DeleteWithQuery(ctx, "/api/v1/annotation-queues", q)
+	err := effectiveClient(r.client, data.WorkspaceID).DeleteWithQuery(ctx, "/api/v1/annotation-queues", q)
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting annotation queue", err.Error())
 		return
@@ -378,7 +387,7 @@ func (r *AnnotationQueueResource) ImportState(ctx context.Context, req resource.
 
 // mapAnnotationQueueResponseToState maps the API response onto the Terraform state,
 // setting null for any optional fields the API left unspoken.
-func mapAnnotationQueueResponseToState(data *AnnotationQueueResourceModel, result *annotationQueueAPIResponse) {
+func mapAnnotationQueueResponseToState(data *AnnotationQueueResourceModel, result *annotationQueueAPIResponse, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.Name = types.StringValue(result.Name)
 
@@ -435,7 +444,8 @@ func mapAnnotationQueueResponseToState(data *AnnotationQueueResourceModel, resul
 	}
 
 	data.QueueType = types.StringValue(result.QueueType)
-	data.TenantID = types.StringValue(result.TenantID)
+	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, diags)
+	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 }

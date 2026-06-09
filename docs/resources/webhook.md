@@ -32,10 +32,11 @@ resource "langsmith_webhook" "example" {
 - `headers` (Map of String) Custom headers to include in webhook requests.
 - `include_prompts` (List of String) Prompt names to include.
 - `triggers` (List of String) Trigger events for the webhook.
+- `workspace_id` (String) The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 
 - `created_at` (String) When the webhook was created.
 - `id` (String) The unique identifier of the webhook.
-- `tenant_id` (String) The tenant ID.
+- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead.
 - `updated_at` (String) When the webhook was last updated.

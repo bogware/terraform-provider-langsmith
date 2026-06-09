@@ -29,6 +29,10 @@ resource "langsmith_repo_owner" "bob" {
 - `owner` (String) Repo owner handle (e.g. workspace handle).
 - `repo` (String) Repo name.
 
+### Optional
+
+- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
+
 ### Read-Only
 
 - `created_at` (String)

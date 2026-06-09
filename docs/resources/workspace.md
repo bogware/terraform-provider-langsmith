@@ -27,7 +27,7 @@ resource "langsmith_workspace" "example" {
 
 ### Optional
 
-- `tenant_handle` (String) The workspace handle/slug.
+- `workspace_handle` (String) The workspace handle/slug.
 
 ### Read-Only
 

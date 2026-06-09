@@ -25,6 +25,7 @@ data "langsmith_project" "example" {
 
 - `id` (String) The unique identifier of the project. Either `id` or `name` must be specified.
 - `name` (String) The name of the project. Either `id` or `name` must be specified.
+- `workspace_id` (String) The workspace ID. If set, overrides the provider-level `workspace_id` for all API calls made by this data source.
 
 ### Read-Only
 
@@ -34,5 +35,5 @@ data "langsmith_project" "example" {
 - `reference_dataset_id` (String) The UUID of the reference dataset for this project.
 - `run_count` (Number) The number of runs in the project.
 - `start_time` (String) The start time of the project.
-- `tenant_id` (String) The tenant ID of the project.
+- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead. The workspace ID.
 - `trace_tier` (String) The trace retention tier (`longlived` or `shortlived`).

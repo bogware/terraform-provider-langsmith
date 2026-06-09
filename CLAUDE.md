@@ -9,7 +9,7 @@ All workflow commands live in `GNUmakefile`:
 - `make build` — compile the provider
 - `make install` — install the provider binary into `GOBIN` (used together with a `~/.terraformrc` dev override; see README)
 - `make test` — unit tests (`go test -v -cover -timeout=120s -parallel=10 ./...`)
-- `make testacc` — acceptance tests against the live LangSmith API; requires `LANGSMITH_API_KEY` and (for org-scoped keys) `LANGSMITH_TENANT_ID`. Sets `TF_ACC=1`.
+- `make testacc` — acceptance tests against the live LangSmith API; requires `LANGSMITH_API_KEY` and (for org-scoped keys) `LANGSMITH_WORKSPACE_ID`. Sets `TF_ACC=1`.
 - `make lint` — `golangci-lint run`
 - `make fmt` — `gofmt -s -w -e .`
 - `make generate` — regenerates `docs/` and re-formats `examples/`. Runs `tools/tools.go` go:generate directives (copywrite headers, `terraform fmt -recursive ../examples/`, `tfplugindocs generate`). CI fails if `docs/` is stale, so run this after any schema or example change and commit the result.
@@ -27,7 +27,7 @@ This is a [terraform-plugin-framework](https://github.com/hashicorp/terraform-pl
 Layering:
 
 1. **`main.go`** — provider binary entrypoint. `version` is injected via ldflags; `-debug` enables delve attach.
-2. **`internal/provider/provider.go`** — registers all resources and data sources. The `Configure` method resolves credentials (precedence: explicit attribute > `LANGSMITH_API_KEY` / `LANGSMITH_API_URL` / `LANGSMITH_TENANT_ID` env vars > defaults), builds a `*client.Client`, and validates credentials by calling `/api/v1/info` before handing the client to every resource/data source via `resp.ResourceData` / `resp.DataSourceData`.
+2. **`internal/provider/provider.go`** — registers all resources and data sources. The `Configure` method resolves credentials (precedence: explicit attribute > `LANGSMITH_API_KEY` / `LANGSMITH_API_URL` / `LANGSMITH_WORKSPACE_ID` env vars > defaults), builds a `*client.Client`, and validates credentials by calling `/api/v1/info` before handing the client to every resource/data source via `resp.ResourceData` / `resp.DataSourceData`.
 3. **`internal/provider/<name>_resource.go` / `<name>_data_source.go`** — one file per Terraform type. Each defines a `*Model` struct (Terraform state), an `apiRequest` / `apiResponse` struct (wire format), schema, and CRUD methods. Resources call into the shared `*client.Client`.
 4. **`internal/client/client.go`** — the single HTTP layer. All resources go through it; do not construct `http.Request`s elsewhere. Sets `X-API-Key`, `X-Tenant-Id` (when present), and `User-Agent`. Built-in retry: up to 5 retries on 429 and 5xx, with exponential backoff + jitter; honors `Retry-After` on 429 (capped at 60s). Response body capped at 10 MB. `client.IsNotFound(err)` is the standard way to detect 404s — use it in `Read` to remove resources from state.
 
@@ -51,6 +51,6 @@ Conventions:
 ## Environment
 
 - `LANGSMITH_API_KEY` — required for `make testacc` and for provider config when `api_key` isn't set.
-- `LANGSMITH_TENANT_ID` — required when using an org-scoped API key.
+- `LANGSMITH_WORKSPACE_ID` — required when using an org-scoped API key.
 - `LANGSMITH_API_URL` — override for self-hosted LangSmith instances (defaults to `https://api.smith.langchain.com`).
 - `TF_LOG=DEBUG` — useful when running Terraform locally against the provider.

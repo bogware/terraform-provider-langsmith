@@ -53,6 +53,7 @@ type PromptResourceModel struct {
 	Owner       types.String `tfsdk:"owner"`
 	FullName    types.String `tfsdk:"full_name"`
 	CommitHash  types.String `tfsdk:"commit_hash"`
+	WorkspaceID types.String `tfsdk:"workspace_id"`
 	TenantID    types.String `tfsdk:"tenant_id"`
 	CreatedAt   types.String `tfsdk:"created_at"`
 	UpdatedAt   types.String `tfsdk:"updated_at"`
@@ -121,7 +122,7 @@ type promptAPIResponse struct {
 
 // repoOwnerSegment returns the URL segment to use for the {owner} portion of
 // /api/v1/repos/{owner}/{repo}. Falls back to "-" (wildcard for current
-// tenant) when no concrete owner is known — e.g. for prompts created by a
+// workspace) when no concrete owner is known — e.g. for prompts created by a
 // service account, where owner is null.
 func repoOwnerSegment(owner string) string {
 	if owner == "" {
@@ -191,8 +192,15 @@ func (r *PromptResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				MarkdownDescription: "The hash of the current commit — the latest brand on the cattle.",
 				Computed:            true,
 			},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID that owns this prompt.",
+				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
+				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
@@ -249,7 +257,7 @@ func (r *PromptResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	var result promptAPIResponse
-	err := r.client.Post(ctx, "/api/v1/repos", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/repos", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating prompt", err.Error())
 		return
@@ -271,7 +279,7 @@ func (r *PromptResource) Create(ctx context.Context, req resource.CreateRequest,
 			Manifest: json.RawMessage(data.Manifest.ValueString()),
 		}
 		var commitResult promptCommitResponse
-		err := r.client.Post(ctx, fmt.Sprintf("/commits/-/%s", data.RepoHandle.ValueString()), commitBody, &commitResult)
+		err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, fmt.Sprintf("/commits/-/%s", data.RepoHandle.ValueString()), commitBody, &commitResult)
 		if err != nil {
 			resp.Diagnostics.AddError("Error creating prompt commit", err.Error())
 			return
@@ -284,7 +292,8 @@ func (r *PromptResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	// Set remaining computed fields that the create response may not populate.
 	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
-	data.TenantID = types.StringValue(result.Repo.TenantID)
+	reconcileWorkspaceID(&data.WorkspaceID, result.Repo.TenantID, &resp.Diagnostics)
+	data.TenantID = data.WorkspaceID
 
 	tflog.Trace(ctx, "created prompt resource", map[string]interface{}{"id": result.Repo.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -308,7 +317,7 @@ func (r *PromptResource) Read(ctx context.Context, req resource.ReadRequest, res
 	}
 
 	var result promptAPIResponse
-	err := r.client.Get(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", repoOwnerSegment(owner), repoHandle), nil, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", repoOwnerSegment(owner), repoHandle), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -328,7 +337,8 @@ func (r *PromptResource) Read(ctx context.Context, req resource.ReadRequest, res
 		data.Owner = types.StringValue("")
 	}
 	data.FullName = types.StringValue(result.Repo.FullName)
-	data.TenantID = types.StringValue(result.Repo.TenantID)
+	reconcileWorkspaceID(&data.WorkspaceID, result.Repo.TenantID, &resp.Diagnostics)
+	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.Repo.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.Repo.UpdatedAt)
 
@@ -353,7 +363,7 @@ func (r *PromptResource) Read(ctx context.Context, req resource.ReadRequest, res
 	// Ride over to the commits corral and fetch the latest manifest.
 	if result.Repo.NumCommits > 0 {
 		var latestCommit promptLatestCommitResponse
-		commitErr := r.client.Get(ctx, fmt.Sprintf("/commits/-/%s/latest", repoHandle), nil, &latestCommit)
+		commitErr := effectiveClient(r.client, data.WorkspaceID).Get(ctx, fmt.Sprintf("/commits/-/%s/latest", repoHandle), nil, &latestCommit)
 		if commitErr != nil {
 			resp.Diagnostics.AddWarning("Error reading prompt manifest", commitErr.Error())
 		} else {
@@ -412,7 +422,7 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 		body.IsArchived = &v
 	}
 
-	err := r.client.Patch(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", owner, repoHandle), body, nil)
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", owner, repoHandle), body, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating prompt", err.Error())
 		return
@@ -425,7 +435,7 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 			Manifest: json.RawMessage(data.Manifest.ValueString()),
 		}
 		var commitResult promptCommitResponse
-		commitErr := r.client.Post(ctx, fmt.Sprintf("/commits/-/%s", repoHandle), commitBody, &commitResult)
+		commitErr := effectiveClient(r.client, data.WorkspaceID).Post(ctx, fmt.Sprintf("/commits/-/%s", repoHandle), commitBody, &commitResult)
 		if commitErr != nil {
 			resp.Diagnostics.AddError("Error creating prompt commit", commitErr.Error())
 			return
@@ -435,7 +445,7 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 
 	// PATCH doesn't return the full resource, so we ride back to the API for the latest state.
 	var result promptAPIResponse
-	err = r.client.Get(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", owner, data.RepoHandle.ValueString()), nil, &result)
+	err = effectiveClient(r.client, data.WorkspaceID).Get(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", owner, data.RepoHandle.ValueString()), nil, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading prompt after update", err.Error())
 		return
@@ -449,7 +459,8 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 	data.FullName = types.StringValue(result.Repo.FullName)
 	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
-	data.TenantID = types.StringValue(result.Repo.TenantID)
+	reconcileWorkspaceID(&data.WorkspaceID, result.Repo.TenantID, &resp.Diagnostics)
+	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.Repo.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.Repo.UpdatedAt)
 
@@ -457,7 +468,7 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 	if data.CommitHash.IsNull() || data.CommitHash.IsUnknown() {
 		if result.Repo.NumCommits > 0 {
 			var latestCommit promptLatestCommitResponse
-			commitErr := r.client.Get(ctx, fmt.Sprintf("/commits/-/%s/latest", repoHandle), nil, &latestCommit)
+			commitErr := effectiveClient(r.client, data.WorkspaceID).Get(ctx, fmt.Sprintf("/commits/-/%s/latest", repoHandle), nil, &latestCommit)
 			if commitErr == nil {
 				data.CommitHash = types.StringValue(latestCommit.CommitHash)
 				data.Manifest = jsonStringValue(latestCommit.Manifest)
@@ -481,7 +492,7 @@ func (r *PromptResource) Delete(ctx context.Context, req resource.DeleteRequest,
 	owner := repoOwnerSegment(data.Owner.ValueString())
 	repoHandle := data.RepoHandle.ValueString()
 
-	err := r.client.Delete(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", owner, repoHandle))
+	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", owner, repoHandle))
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting prompt", err.Error())
 	}

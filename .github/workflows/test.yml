@@ -88,5 +88,5 @@ jobs:
         env:
           TF_ACC: "1"
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
-          LANGSMITH_TENANT_ID: ${{ secrets.LANGSMITH_TENANT_ID }}
+          LANGSMITH_WORKSPACE_ID: ${{ secrets.LANGSMITH_WORKSPACE_ID }}
         run: go test -v -cover -timeout 30m ./internal/provider/

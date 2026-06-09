@@ -28,6 +28,10 @@ resource "langsmith_hub_environment" "default" {
 
 - `environments` (Attributes List) Between 1 and 4 environment entries. (see [below for nested schema](#nestedatt--environments))
 
+### Optional
+
+- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
+
 ### Read-Only
 
 - `id` (String) The ID of this resource.

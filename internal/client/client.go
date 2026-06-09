@@ -26,21 +26,21 @@ const maxRetryAfterSecs = 60
 
 // Client is the LangSmith API client.
 type Client struct {
-	BaseURL    string
-	APIKey     string
-	TenantID   string
-	UserAgent  string
-	HTTPClient *http.Client
-	MaxRetries int
+	BaseURL     string
+	APIKey      string
+	WorkspaceID string
+	UserAgent   string
+	HTTPClient  *http.Client
+	MaxRetries  int
 }
 
 // NewClient creates a new LangSmith API client.
-func NewClient(baseURL, apiKey, tenantID, userAgent string) *Client {
+func NewClient(baseURL, apiKey, workspaceID, userAgent string) *Client {
 	return &Client{
-		BaseURL:   baseURL,
-		APIKey:    apiKey,
-		TenantID:  tenantID,
-		UserAgent: userAgent,
+		BaseURL:     baseURL,
+		APIKey:      apiKey,
+		WorkspaceID: workspaceID,
+		UserAgent:   userAgent,
 		HTTPClient: &http.Client{
 			Timeout: 120 * time.Second,
 		},
@@ -87,8 +87,8 @@ func (c *Client) doRequest(ctx context.Context, method, path string, query url.V
 		}
 
 		req.Header.Set("X-API-Key", c.APIKey)
-		if c.TenantID != "" {
-			req.Header.Set("X-Tenant-Id", c.TenantID)
+		if c.WorkspaceID != "" {
+			req.Header.Set("X-Tenant-Id", c.WorkspaceID)
 		}
 		if c.UserAgent != "" {
 			req.Header.Set("User-Agent", c.UserAgent)
@@ -228,6 +228,16 @@ func (e *APIError) Error() string {
 		return fmt.Sprintf("LangSmith %s %s returned %d: %s", e.Method, e.Path, e.StatusCode, e.Body)
 	}
 	return fmt.Sprintf("LangSmith API error (status %d): %s", e.StatusCode, e.Body)
+}
+
+// WithWorkspaceID returns a shallow copy of the Client with the WorkspaceID field
+// replaced by the given value. The underlying http.Client and all other
+// settings are shared with the original; only WorkspaceID differs. This is safe
+// for concurrent use because http.Client is itself concurrency-safe.
+func (c *Client) WithWorkspaceID(workspaceID string) *Client {
+	clientCopy := *c
+	clientCopy.WorkspaceID = workspaceID
+	return &clientCopy
 }
 
 // IsNotFound checks whether the error is a 404.

@@ -49,6 +49,7 @@ resource "langsmith_alert_rule" "example" {
 - `threshold` (Number) The threshold value for threshold-type rules.
 - `threshold_multiplier` (Number) The multiplier for change-type rules.
 - `threshold_window_minutes` (Number) The comparison window in minutes for change-type rules.
+- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 

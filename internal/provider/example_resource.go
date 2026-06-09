@@ -49,6 +49,7 @@ type ExampleResourceModel struct {
 	SourceRunID types.String `tfsdk:"source_run_id"`
 	CreatedAt   types.String `tfsdk:"created_at"`
 	ModifiedAt  types.String `tfsdk:"modified_at"`
+	WorkspaceID types.String `tfsdk:"workspace_id"`
 }
 
 // exampleAPICreateRequest is the wire format for branding a new example into
@@ -142,6 +143,12 @@ func (r *ExampleResource) Schema(ctx context.Context, req resource.SchemaRequest
 				MarkdownDescription: "The last modification timestamp of the example.",
 				Computed:            true,
 			},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
 	}
 }
@@ -196,7 +203,7 @@ func (r *ExampleResource) Create(ctx context.Context, req resource.CreateRequest
 	planMetadata := data.Metadata
 
 	var result exampleAPIResponse
-	err := r.client.Post(ctx, "/api/v1/examples", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/examples", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating example", err.Error())
 		return
@@ -205,6 +212,7 @@ func (r *ExampleResource) Create(ctx context.Context, req resource.CreateRequest
 	mapExampleResponseToState(&data, &result)
 	data.Split = planSplit
 	data.Metadata = planMetadata
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created example resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -222,7 +230,7 @@ func (r *ExampleResource) Read(ctx context.Context, req resource.ReadRequest, re
 	savedMetadata := data.Metadata
 
 	var result exampleAPIResponse
-	err := r.client.Get(ctx, "/api/v1/examples/"+data.ID.ValueString(), nil, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/examples/"+data.ID.ValueString(), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -239,6 +247,7 @@ func (r *ExampleResource) Read(ctx context.Context, req resource.ReadRequest, re
 	// Strip the API-injected dataset_split key from metadata to match user config.
 	data.Metadata = stripJSONKey(result.Metadata, "dataset_split", savedMetadata)
 
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -278,7 +287,7 @@ func (r *ExampleResource) Update(ctx context.Context, req resource.UpdateRequest
 	planMetadata := data.Metadata
 
 	var result exampleAPIResponse
-	err := r.client.Patch(ctx, "/api/v1/examples/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/examples/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating example", err.Error())
 		return
@@ -299,7 +308,7 @@ func (r *ExampleResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v1/examples/"+data.ID.ValueString())
+	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/api/v1/examples/"+data.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting example", err.Error())
 		return

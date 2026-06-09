@@ -113,7 +113,7 @@ func (d *AuditLogDataSource) Read(ctx context.Context, req datasource.ReadReques
 	}
 
 	var api auditLogResponse
-	if err := d.client.Get(ctx, "/api/v1/audit-logs", q, &api); err != nil {
+	if err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/audit-logs", q, &api); err != nil {
 		resp.Diagnostics.AddError("Error reading audit logs", err.Error())
 		return
 	}

@@ -25,6 +25,10 @@ data "langsmith_tool" "lookup_customer" {
 
 - `handle` (String)
 
+### Optional
+
+- `workspace_id` (String) The workspace ID. If set, overrides the provider-level `workspace_id` for all API calls made by this data source.
+
 ### Read-Only
 
 - `created_at` (String)
@@ -35,5 +39,5 @@ data "langsmith_tool" "lookup_customer" {
 - `name` (String)
 - `parameters` (String)
 - `returns` (String)
-- `tenant_id` (String)
+- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead. The workspace ID.
 - `updated_at` (String)

@@ -53,6 +53,7 @@ output "preview_data" {
 - `start_time` (String) RFC3339 start timestamp for the preview window.
 - `stride` (String) JSON-encoded `TimedeltaInput` for bucket width (e.g. `jsonencode({minutes = 15})`). Defaults to 15 minutes server-side.
 - `timezone` (String) IANA timezone for bucket alignment. Defaults to `UTC` server-side.
+- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this data source.
 
 ### Read-Only
 

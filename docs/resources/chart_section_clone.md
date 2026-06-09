@@ -32,6 +32,7 @@ resource "langsmith_chart_section_clone" "example" {
 - `session_id` (String) Optional session/project ID to associate with the cloned section. Changing this forces a new clone.
 - `source_section_id` (String) The ID of the source section to clone. Changing this forces a new clone.
 - `title` (String) The title of the cloned section. If omitted, the API's clone-generated title is used. If specified and different from the clone result, the section is patched after cloning.
+- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 

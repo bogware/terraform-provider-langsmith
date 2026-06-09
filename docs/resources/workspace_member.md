@@ -27,6 +27,10 @@ resource "langsmith_workspace_member" "example" {
 - `role_id` (String) The role ID to assign to the member.
 - `user_id` (String) The user ID of the member to add to the workspace.
 
+### Optional
+
+- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
+
 ### Read-Only
 
 - `created_at` (String) The timestamp when the member was added.

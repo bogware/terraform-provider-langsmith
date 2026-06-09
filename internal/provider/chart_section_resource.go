@@ -39,6 +39,7 @@ type ChartSectionResourceModel struct {
 	Index       types.Int64  `tfsdk:"index"`
 	CreatedAt   types.String `tfsdk:"created_at"`
 	UpdatedAt   types.String `tfsdk:"updated_at"`
+	WorkspaceID types.String `tfsdk:"workspace_id"`
 }
 
 type chartSectionCreateRequest struct {
@@ -98,6 +99,12 @@ func (r *ChartSectionResource) Schema(ctx context.Context, req resource.SchemaRe
 				MarkdownDescription: "Last update timestamp.",
 				Computed:            true,
 			},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
 	}
 }
@@ -131,13 +138,14 @@ func (r *ChartSectionResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	var result chartSectionAPIResponse
-	err := r.client.Post(ctx, "/api/v1/charts/section", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/charts/section", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating chart section", err.Error())
 		return
 	}
 
 	mapChartSectionResponseToState(&data, &result)
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created chart section resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -161,7 +169,7 @@ func (r *ChartSectionResource) Read(ctx context.Context, req resource.ReadReques
 		EndTime   string `json:"end_time"`
 	}{OmitData: true, StartTime: "2020-01-01T00:00:00Z", EndTime: "2020-01-01T00:01:00Z"}
 	var result chartSectionAPIResponse
-	err := r.client.Post(ctx, "/api/v1/charts/section/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/charts/section/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -172,6 +180,7 @@ func (r *ChartSectionResource) Read(ctx context.Context, req resource.ReadReques
 	}
 
 	mapChartSectionResponseToState(&data, &result)
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	// Restore timestamps since the read endpoint doesn't return them.
 	data.CreatedAt = savedCreatedAt
 	data.UpdatedAt = savedUpdatedAt
@@ -197,7 +206,7 @@ func (r *ChartSectionResource) Update(ctx context.Context, req resource.UpdateRe
 	}
 
 	var result chartSectionAPIResponse
-	err := r.client.Patch(ctx, "/api/v1/charts/section/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/charts/section/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating chart section", err.Error())
 		return
@@ -216,7 +225,7 @@ func (r *ChartSectionResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v1/charts/section/"+data.ID.ValueString())
+	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/api/v1/charts/section/"+data.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting chart section", err.Error())
 		return

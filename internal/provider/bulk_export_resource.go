@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -52,6 +53,7 @@ type BulkExportResourceModel struct {
 	IntervalHours           types.Int64  `tfsdk:"interval_hours"`
 	Filter                  types.String `tfsdk:"filter"`
 	Status                  types.String `tfsdk:"status"`
+	WorkspaceID             types.String `tfsdk:"workspace_id"`
 	TenantID                types.String `tfsdk:"tenant_id"`
 	CreatedAt               types.String `tfsdk:"created_at"`
 	UpdatedAt               types.String `tfsdk:"updated_at"`
@@ -178,8 +180,15 @@ func (r *BulkExportResource) Schema(ctx context.Context, req resource.SchemaRequ
 				MarkdownDescription: "The status of the bulk export.",
 				Computed:            true,
 			},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID.",
+				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
+				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
@@ -277,13 +286,13 @@ func (r *BulkExportResource) Create(ctx context.Context, req resource.CreateRequ
 	}
 
 	var result bulkExportAPIResponse
-	err := r.client.Post(ctx, "/api/v1/bulk-exports", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/bulk-exports", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating bulk export", err.Error())
 		return
 	}
 
-	mapBulkExportResponseToState(&data, &result)
+	mapBulkExportResponseToState(&data, &result, &resp.Diagnostics)
 	tflog.Trace(ctx, "created bulk export resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -297,7 +306,7 @@ func (r *BulkExportResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 
 	var result bulkExportAPIResponse
-	err := r.client.Get(ctx, "/api/v1/bulk-exports/"+data.ID.ValueString(), nil, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/bulk-exports/"+data.ID.ValueString(), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -307,7 +316,7 @@ func (r *BulkExportResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	mapBulkExportResponseToState(&data, &result)
+	mapBulkExportResponseToState(&data, &result, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -324,13 +333,13 @@ func (r *BulkExportResource) Update(ctx context.Context, req resource.UpdateRequ
 	}
 
 	var result bulkExportAPIResponse
-	err := r.client.Patch(ctx, "/api/v1/bulk-exports/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/bulk-exports/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating bulk export", err.Error())
 		return
 	}
 
-	mapBulkExportResponseToState(&data, &result)
+	mapBulkExportResponseToState(&data, &result, &resp.Diagnostics)
 	tflog.Trace(ctx, "updated bulk export resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -349,7 +358,7 @@ func (r *BulkExportResource) Delete(ctx context.Context, req resource.DeleteRequ
 		Status: "Cancelled",
 	}
 
-	err := r.client.Patch(ctx, "/api/v1/bulk-exports/"+data.ID.ValueString(), body, nil)
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/bulk-exports/"+data.ID.ValueString(), body, nil)
 	if err != nil {
 		if client.IsNotFound(err) {
 			return
@@ -367,7 +376,7 @@ func (r *BulkExportResource) ImportState(ctx context.Context, req resource.Impor
 
 // mapBulkExportResponseToState transfers the API response into Terraform state,
 // carefully setting null for any optional fields the API left empty on the prairie.
-func mapBulkExportResponseToState(data *BulkExportResourceModel, result *bulkExportAPIResponse) {
+func mapBulkExportResponseToState(data *BulkExportResourceModel, result *bulkExportAPIResponse, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.BulkExportDestinationID = types.StringValue(result.BulkExportDestinationID)
 	data.SessionID = types.StringValue(result.SessionID)
@@ -395,7 +404,8 @@ func mapBulkExportResponseToState(data *BulkExportResourceModel, result *bulkExp
 	}
 
 	data.Status = types.StringValue(result.Status)
-	data.TenantID = types.StringValue(result.TenantID)
+	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, diags)
+	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 

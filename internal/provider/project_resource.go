@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -48,6 +49,7 @@ type ProjectResourceModel struct {
 	ReferenceDatasetID types.String `tfsdk:"reference_dataset_id"`
 	Extra              types.String `tfsdk:"extra"`
 	TraceTier          types.String `tfsdk:"trace_tier"`
+	WorkspaceID        types.String `tfsdk:"workspace_id"`
 	TenantID           types.String `tfsdk:"tenant_id"`
 	StartTime          types.String `tfsdk:"start_time"`
 }
@@ -119,8 +121,15 @@ func (r *ProjectResource) Schema(ctx context.Context, req resource.SchemaRequest
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{stringvalidator.OneOf("longlived", "shortlived")},
 			},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID of the project.",
+				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
+				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
@@ -183,13 +192,13 @@ func (r *ProjectResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	var result projectAPIResponse
-	err := r.client.Post(ctx, "/api/v1/sessions", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/sessions", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating project", err.Error())
 		return
 	}
 
-	mapProjectResponseToState(&data, &result)
+	mapProjectResponseToState(&data, &result, &resp.Diagnostics)
 	tflog.Trace(ctx, "created project resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -203,7 +212,7 @@ func (r *ProjectResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 
 	var result projectAPIResponse
-	err := r.client.Get(ctx, "/api/v1/sessions/"+data.ID.ValueString(), nil, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/sessions/"+data.ID.ValueString(), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -213,7 +222,7 @@ func (r *ProjectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	mapProjectResponseToState(&data, &result)
+	mapProjectResponseToState(&data, &result, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -251,13 +260,13 @@ func (r *ProjectResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	var result projectAPIResponse
-	err := r.client.Patch(ctx, "/api/v1/sessions/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/sessions/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating project", err.Error())
 		return
 	}
 
-	mapProjectResponseToState(&data, &result)
+	mapProjectResponseToState(&data, &result, &resp.Diagnostics)
 	tflog.Trace(ctx, "updated project resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -270,7 +279,7 @@ func (r *ProjectResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v1/sessions/"+data.ID.ValueString())
+	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/api/v1/sessions/"+data.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting project", err.Error())
 		return
@@ -285,7 +294,7 @@ func (r *ProjectResource) ImportState(ctx context.Context, req resource.ImportSt
 
 // mapProjectResponseToState translates the API response into Terraform state,
 // branding each field so Terraform can track it on the open range.
-func mapProjectResponseToState(data *ProjectResourceModel, result *projectAPIResponse) {
+func mapProjectResponseToState(data *ProjectResourceModel, result *projectAPIResponse, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.Name = types.StringValue(result.Name)
 
@@ -315,6 +324,7 @@ func mapProjectResponseToState(data *ProjectResourceModel, result *projectAPIRes
 		data.TraceTier = types.StringNull()
 	}
 
-	data.TenantID = types.StringValue(result.TenantID)
+	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, diags)
+	data.TenantID = data.WorkspaceID
 	data.StartTime = types.StringValue(result.StartTime)
 }

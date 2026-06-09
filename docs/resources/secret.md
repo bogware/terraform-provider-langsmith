@@ -27,6 +27,10 @@ resource "langsmith_secret" "example" {
 - `key` (String) The secret key name.
 - `value` (String, Sensitive) The secret value. This is write-only and will not be returned by the API after being set.
 
+### Optional
+
+- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
+
 ### Read-Only
 
 - `id` (String) The identifier of the secret (same as the key name).

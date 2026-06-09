@@ -32,6 +32,7 @@ resource "langsmith_playground_settings" "example" {
 - `name` (String) The name of the playground settings.
 - `options` (String) JSON-encoded options object.
 - `settings_type` (String) The settings type. Valid values: `complex`, `simple`. Defaults to `complex`. Cannot be changed after creation.
+- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 

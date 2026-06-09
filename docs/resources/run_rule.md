@@ -54,6 +54,7 @@ resource "langsmith_run_rule" "example" {
 - `tree_filter` (String) Tree filter expression.
 - `use_corrections_dataset` (Boolean) Whether to use a corrections dataset.
 - `webhooks` (String) JSON-encoded array of webhook configurations.
+- `workspace_id` (String) The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 
@@ -70,5 +71,5 @@ resource "langsmith_run_rule" "example" {
 - `dataset_name` (String) The name of the associated dataset.
 - `id` (String) The unique identifier of the run rule.
 - `session_name` (String) The name of the associated session/project.
-- `tenant_id` (String) The tenant ID.
+- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead.
 - `updated_at` (String) When the rule was last updated.

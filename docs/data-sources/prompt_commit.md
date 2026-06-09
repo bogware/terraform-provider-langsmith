@@ -29,6 +29,7 @@ data "langsmith_prompt_commit" "example" {
 ### Optional
 
 - `ref` (String) The commit reference: a commit hash, tag name, or `latest` (default).
+- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this data source.
 
 ### Read-Only
 

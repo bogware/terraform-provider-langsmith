@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -56,6 +57,7 @@ type DatasetResourceModel struct {
 	SessionCount            types.Int64  `tfsdk:"session_count"`
 	ModifiedAt              types.String `tfsdk:"modified_at"`
 	LastSessionStartTime    types.String `tfsdk:"last_session_start_time"`
+	WorkspaceID             types.String `tfsdk:"workspace_id"`
 	TenantID                types.String `tfsdk:"tenant_id"`
 	CreatedAt               types.String `tfsdk:"created_at"`
 }
@@ -164,8 +166,15 @@ func (r *DatasetResource) Schema(ctx context.Context, req resource.SchemaRequest
 				MarkdownDescription: "The start time of the last session.",
 				Computed:            true,
 			},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID of the dataset.",
+				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
+				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
@@ -239,13 +248,13 @@ func (r *DatasetResource) Create(ctx context.Context, req resource.CreateRequest
 	planMetadata := data.Metadata
 
 	var result datasetAPIResponse
-	err := r.client.Post(ctx, "/api/v1/datasets", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/datasets", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating dataset", err.Error())
 		return
 	}
 
-	mapDatasetResponseToState(&data, &result)
+	mapDatasetResponseToState(&data, &result, &resp.Diagnostics)
 	// Only preserve plan values that are actually known (not unknown from Computed fields).
 	if !planInputsSchema.IsUnknown() {
 		data.InputsSchemaDefinition = planInputsSchema
@@ -272,7 +281,7 @@ func (r *DatasetResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 
 	var result datasetAPIResponse
-	err := r.client.Get(ctx, "/api/v1/datasets/"+data.ID.ValueString(), nil, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/datasets/"+data.ID.ValueString(), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -282,7 +291,7 @@ func (r *DatasetResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	mapDatasetResponseToState(&data, &result)
+	mapDatasetResponseToState(&data, &result, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -331,13 +340,13 @@ func (r *DatasetResource) Update(ctx context.Context, req resource.UpdateRequest
 	planMetadata := data.Metadata
 
 	var result datasetAPIResponse
-	err := r.client.Patch(ctx, "/api/v1/datasets/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/datasets/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating dataset", err.Error())
 		return
 	}
 
-	mapDatasetResponseToState(&data, &result)
+	mapDatasetResponseToState(&data, &result, &resp.Diagnostics)
 	// Only preserve plan values that are actually known (not unknown from Computed fields).
 	if !planInputsSchema.IsUnknown() {
 		data.InputsSchemaDefinition = planInputsSchema
@@ -363,7 +372,7 @@ func (r *DatasetResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v1/datasets/"+data.ID.ValueString())
+	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/api/v1/datasets/"+data.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting dataset", err.Error())
 		return
@@ -378,7 +387,7 @@ func (r *DatasetResource) ImportState(ctx context.Context, req resource.ImportSt
 
 // mapDatasetResponseToState translates the API response into Terraform state.
 // Mind the nulls — an absent field means nothing's there, not that it's empty.
-func mapDatasetResponseToState(data *DatasetResourceModel, result *datasetAPIResponse) {
+func mapDatasetResponseToState(data *DatasetResourceModel, result *datasetAPIResponse, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.Name = types.StringValue(result.Name)
 
@@ -415,6 +424,7 @@ func mapDatasetResponseToState(data *DatasetResourceModel, result *datasetAPIRes
 		data.LastSessionStartTime = types.StringNull()
 	}
 
-	data.TenantID = types.StringValue(result.TenantID)
+	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, diags)
+	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 }

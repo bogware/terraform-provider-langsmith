@@ -54,6 +54,7 @@ type GatewayPolicyResourceModel struct {
 	CreatedAt         types.String  `tfsdk:"created_at"`
 	UpdatedAt         types.String  `tfsdk:"updated_at"`
 	CreatedBy         types.String  `tfsdk:"created_by"`
+	WorkspaceID       types.String  `tfsdk:"workspace_id"`
 }
 
 type gatewayPolicySubjectMatcher struct {
@@ -177,6 +178,12 @@ func (r *GatewayPolicyResource) Schema(ctx context.Context, req resource.SchemaR
 			"created_at": schema.StringAttribute{Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"updated_at": schema.StringAttribute{Computed: true},
 			"created_by": schema.StringAttribute{Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
 	}
 }
@@ -253,7 +260,7 @@ func (r *GatewayPolicyResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 	var api gatewayPolicyAPI
-	if err := r.client.Post(ctx, "/v1/platform/gateway-policies", body, &api); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/v1/platform/gateway-policies", body, &api); err != nil {
 		resp.Diagnostics.AddError("Error creating gateway policy", err.Error())
 		return
 	}
@@ -262,6 +269,7 @@ func (r *GatewayPolicyResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 	tflog.Trace(ctx, "created gateway policy", map[string]interface{}{"id": api.ID})
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -272,7 +280,7 @@ func (r *GatewayPolicyResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 	var api gatewayPolicyAPI
-	if err := r.client.Get(ctx, "/v1/platform/gateway-policies/"+data.ID.ValueString(), nil, &api); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/v1/platform/gateway-policies/"+data.ID.ValueString(), nil, &api); err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
 			return
@@ -284,6 +292,7 @@ func (r *GatewayPolicyResource) Read(ctx context.Context, req resource.ReadReque
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -328,7 +337,7 @@ func (r *GatewayPolicyResource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	var api gatewayPolicyAPI
-	if err := r.client.Patch(ctx, "/v1/platform/gateway-policies/"+data.ID.ValueString(), body, &api); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/v1/platform/gateway-policies/"+data.ID.ValueString(), body, &api); err != nil {
 		resp.Diagnostics.AddError("Error updating gateway policy", err.Error())
 		return
 	}
@@ -345,7 +354,7 @@ func (r *GatewayPolicyResource) Delete(ctx context.Context, req resource.DeleteR
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if err := r.client.Delete(ctx, "/v1/platform/gateway-policies/"+data.ID.ValueString()); err != nil && !client.IsNotFound(err) {
+	if err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/v1/platform/gateway-policies/"+data.ID.ValueString()); err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting gateway policy", err.Error())
 		return
 	}

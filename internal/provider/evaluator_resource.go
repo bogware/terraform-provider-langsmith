@@ -41,6 +41,7 @@ type EvaluatorResourceModel struct {
 	ID            types.String        `tfsdk:"id"`
 	Name          types.String        `tfsdk:"name"`
 	Type          types.String        `tfsdk:"type"`
+	WorkspaceID   types.String        `tfsdk:"workspace_id"`
 	TenantID      types.String        `tfsdk:"tenant_id"`
 	CodeEvaluator *codeEvaluatorModel `tfsdk:"code_evaluator"`
 	LLMEvaluator  *llmEvaluatorModel  `tfsdk:"llm_evaluator"`
@@ -148,8 +149,15 @@ func (r *EvaluatorResource) Schema(ctx context.Context, req resource.SchemaReque
 				Validators:          []validator.String{stringvalidator.OneOf("code", "llm")},
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The workspace/tenant the evaluator lives in.",
+				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
+				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
@@ -289,7 +297,7 @@ func (r *EvaluatorResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	var created evaluatorCreateResponse
-	if err := r.client.Post(ctx, "/v1/platform/evaluators", body, &created); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/v1/platform/evaluators", body, &created); err != nil {
 		resp.Diagnostics.AddError("Error creating evaluator", err.Error())
 		return
 	}
@@ -310,7 +318,7 @@ func (r *EvaluatorResource) Read(ctx context.Context, req resource.ReadRequest, 
 	}
 
 	var api evaluatorAPI
-	if err := r.client.Get(ctx, "/v1/platform/evaluators/"+data.ID.ValueString(), nil, &api); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/v1/platform/evaluators/"+data.ID.ValueString(), nil, &api); err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
 			return
@@ -384,7 +392,7 @@ func (r *EvaluatorResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 
 	var updated evaluatorCreateResponse
-	if err := r.client.Patch(ctx, "/v1/platform/evaluators/"+data.ID.ValueString(), body, &updated); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/v1/platform/evaluators/"+data.ID.ValueString(), body, &updated); err != nil {
 		resp.Diagnostics.AddError("Error updating evaluator", err.Error())
 		return
 	}
@@ -403,7 +411,7 @@ func (r *EvaluatorResource) Delete(ctx context.Context, req resource.DeleteReque
 		return
 	}
 
-	if err := r.client.Delete(ctx, "/v1/platform/evaluators/"+data.ID.ValueString()); err != nil && !client.IsNotFound(err) {
+	if err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/v1/platform/evaluators/"+data.ID.ValueString()); err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting evaluator", err.Error())
 		return
 	}
@@ -417,7 +425,8 @@ func (r *EvaluatorResource) mapResponseToModel(ctx context.Context, api *evaluat
 	data.ID = types.StringValue(api.ID)
 	data.Name = types.StringValue(api.Name)
 	data.Type = types.StringValue(api.Type)
-	data.TenantID = types.StringValue(api.TenantID)
+	reconcileWorkspaceID(&data.WorkspaceID, api.TenantID, diags)
+	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(api.CreatedAt)
 	data.UpdatedAt = types.StringValue(api.UpdatedAt)
 	data.CreatedBy = types.StringValue(api.CreatedBy)

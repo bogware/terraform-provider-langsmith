@@ -32,6 +32,7 @@ type PromptDataSourceModel struct {
 	Readme      types.String `tfsdk:"readme"`
 	IsPublic    types.Bool   `tfsdk:"is_public"`
 	IsArchived  types.Bool   `tfsdk:"is_archived"`
+	WorkspaceID types.String `tfsdk:"workspace_id"`
 	TenantID    types.String `tfsdk:"tenant_id"`
 	CreatedAt   types.String `tfsdk:"created_at"`
 	UpdatedAt   types.String `tfsdk:"updated_at"`
@@ -87,9 +88,15 @@ func (d *PromptDataSource) Schema(ctx context.Context, req datasource.SchemaRequ
 				MarkdownDescription: "Whether the prompt is archived.",
 				Computed:            true,
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID. If set, overrides the provider-level `workspace_id` for all API calls made by this data source.",
+				Optional:            true,
 				Computed:            true,
+			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "Deprecated: use `workspace_id` instead. The workspace ID.",
+				Computed:            true,
+				DeprecationMessage:  "Use 'workspace_id' instead. This attribute will be removed in a future version.",
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "When the prompt was created.",
@@ -123,7 +130,7 @@ func (d *PromptDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 	}
 
 	var result promptDataSourceAPIResponse
-	err := d.client.Get(ctx, "/api/v1/repos/-/"+data.RepoHandle.ValueString(), nil, &result)
+	err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/repos/-/"+data.RepoHandle.ValueString(), nil, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading prompt", err.Error())
 		return
@@ -133,7 +140,8 @@ func (d *PromptDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 	data.RepoHandle = types.StringValue(result.Repo.RepoHandle)
 	data.IsPublic = types.BoolValue(result.Repo.IsPublic)
 	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
-	data.TenantID = types.StringValue(result.Repo.TenantID)
+	reconcileWorkspaceID(&data.WorkspaceID, result.Repo.TenantID, &resp.Diagnostics)
+	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.Repo.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.Repo.UpdatedAt)
 

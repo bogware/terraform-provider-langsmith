@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -39,12 +40,13 @@ type UsageLimitResource struct {
 // UsageLimitResourceModel holds the Terraform state for a usage limit,
 // including the limit type, value, and audit timestamps.
 type UsageLimitResourceModel struct {
-	ID         types.String `tfsdk:"id"`
-	LimitType  types.String `tfsdk:"limit_type"`
-	LimitValue types.Int64  `tfsdk:"limit_value"`
-	TenantID   types.String `tfsdk:"tenant_id"`
-	CreatedAt  types.String `tfsdk:"created_at"`
-	UpdatedAt  types.String `tfsdk:"updated_at"`
+	ID          types.String `tfsdk:"id"`
+	LimitType   types.String `tfsdk:"limit_type"`
+	LimitValue  types.Int64  `tfsdk:"limit_value"`
+	WorkspaceID types.String `tfsdk:"workspace_id"`
+	TenantID    types.String `tfsdk:"tenant_id"`
+	CreatedAt   types.String `tfsdk:"created_at"`
+	UpdatedAt   types.String `tfsdk:"updated_at"`
 }
 
 // usageLimitAPIRequest is the request body for creating/updating a usage limit.
@@ -89,12 +91,19 @@ func (r *UsageLimitResource) Schema(ctx context.Context, req resource.SchemaRequ
 				MarkdownDescription: "The limit value.",
 				Required:            true,
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
+				Optional:            true,
 				Computed:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
+			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
+				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "The creation timestamp.",
@@ -141,13 +150,13 @@ func (r *UsageLimitResource) Create(ctx context.Context, req resource.CreateRequ
 	}
 
 	var result usageLimitAPIResponse
-	err := r.client.Put(ctx, "/api/v1/usage-limits", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Put(ctx, "/api/v1/usage-limits", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating usage limit", err.Error())
 		return
 	}
 
-	mapUsageLimitResponseToState(&data, &result)
+	mapUsageLimitResponseToState(&data, &result, &resp.Diagnostics)
 	tflog.Trace(ctx, "created usage limit resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -161,7 +170,7 @@ func (r *UsageLimitResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 
 	var results []usageLimitAPIResponse
-	err := r.client.Get(ctx, "/api/v1/usage-limits", nil, &results)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/usage-limits", nil, &results)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -184,7 +193,7 @@ func (r *UsageLimitResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	mapUsageLimitResponseToState(&data, found)
+	mapUsageLimitResponseToState(&data, found, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -202,13 +211,13 @@ func (r *UsageLimitResource) Update(ctx context.Context, req resource.UpdateRequ
 	}
 
 	var result usageLimitAPIResponse
-	err := r.client.Put(ctx, "/api/v1/usage-limits", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Put(ctx, "/api/v1/usage-limits", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating usage limit", err.Error())
 		return
 	}
 
-	mapUsageLimitResponseToState(&data, &result)
+	mapUsageLimitResponseToState(&data, &result, &resp.Diagnostics)
 	tflog.Trace(ctx, "updated usage limit resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -221,7 +230,7 @@ func (r *UsageLimitResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v1/usage-limits/"+data.ID.ValueString())
+	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/api/v1/usage-limits/"+data.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting usage limit", err.Error())
 		return
@@ -236,11 +245,12 @@ func (r *UsageLimitResource) ImportState(ctx context.Context, req resource.Impor
 
 // mapUsageLimitResponseToState maps the API response fields into Terraform state --
 // a straightforward transfer with no surprises, which is how Doc Adams prefers things.
-func mapUsageLimitResponseToState(data *UsageLimitResourceModel, result *usageLimitAPIResponse) {
+func mapUsageLimitResponseToState(data *UsageLimitResourceModel, result *usageLimitAPIResponse, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.LimitType = types.StringValue(result.LimitType)
 	data.LimitValue = types.Int64Value(result.LimitValue)
-	data.TenantID = types.StringValue(result.TenantID)
+	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, diags)
+	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 }

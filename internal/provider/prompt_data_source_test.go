@@ -36,7 +36,7 @@ data "langsmith_prompt" "test" {
 					resource.TestCheckResourceAttr("data.langsmith_prompt.test", "is_public", "false"),
 					resource.TestCheckResourceAttr("data.langsmith_prompt.test", "description", "ds acceptance test"),
 					resource.TestCheckResourceAttrSet("data.langsmith_prompt.test", "id"),
-					resource.TestCheckResourceAttrSet("data.langsmith_prompt.test", "tenant_id"),
+					resource.TestCheckResourceAttrSet("data.langsmith_prompt.test", "workspace_id"),
 					// Counters were removed in 0.9.0 — confirm gone.
 					resource.TestCheckNoResourceAttr("data.langsmith_prompt.test", "num_likes"),
 					resource.TestCheckNoResourceAttr("data.langsmith_prompt.test", "num_commits"),

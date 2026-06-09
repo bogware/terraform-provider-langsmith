@@ -41,6 +41,7 @@ type RunRuleDataSourceModel struct {
 	Webhooks     types.String  `tfsdk:"webhooks"`
 	CreatedAt    types.String  `tfsdk:"created_at"`
 	UpdatedAt    types.String  `tfsdk:"updated_at"`
+	WorkspaceID  types.String  `tfsdk:"workspace_id"`
 }
 
 type runRuleDataSourceAPIResponse struct {
@@ -112,6 +113,10 @@ func (d *RunRuleDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "Last update timestamp.", Computed: true,
 			},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this data source.",
+				Optional:            true,
+			},
 		},
 	}
 }
@@ -144,7 +149,7 @@ func (d *RunRuleDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	}
 
 	var rules []runRuleDataSourceAPIResponse
-	err := d.client.Get(ctx, "/api/v1/runs/rules", nil, &rules)
+	err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/runs/rules", nil, &rules)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading run rules", err.Error())
 		return

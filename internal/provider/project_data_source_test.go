@@ -25,7 +25,7 @@ func TestAccProjectDataSource_basic(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("data.langsmith_project.test", "id"),
 					resource.TestCheckResourceAttr("data.langsmith_project.test", "name", rName),
-					resource.TestCheckResourceAttrSet("data.langsmith_project.test", "tenant_id"),
+					resource.TestCheckResourceAttrSet("data.langsmith_project.test", "workspace_id"),
 					resource.TestCheckResourceAttrSet("data.langsmith_project.test", "start_time"),
 				),
 			},

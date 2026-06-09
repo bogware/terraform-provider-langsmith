@@ -10,6 +10,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
@@ -33,6 +34,7 @@ type AnnotationQueueDataSourceModel struct {
 	NumReviewersPerItem types.Int64  `tfsdk:"num_reviewers_per_item"`
 	EnableReservations  types.Bool   `tfsdk:"enable_reservations"`
 	ReservationMinutes  types.Int64  `tfsdk:"reservation_minutes"`
+	WorkspaceID         types.String `tfsdk:"workspace_id"`
 	TenantID            types.String `tfsdk:"tenant_id"`
 	CreatedAt           types.String `tfsdk:"created_at"`
 	UpdatedAt           types.String `tfsdk:"updated_at"`
@@ -84,9 +86,15 @@ func (d *AnnotationQueueDataSource) Schema(ctx context.Context, req datasource.S
 				MarkdownDescription: "The number of minutes a reservation is held.",
 				Computed:            true,
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID. If set, overrides the provider-level `workspace_id` for all API calls made by this data source.",
+				Optional:            true,
 				Computed:            true,
+			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "Deprecated: use `workspace_id` instead. The workspace ID.",
+				Computed:            true,
+				DeprecationMessage:  "Use 'workspace_id' instead. This attribute will be removed in a future version.",
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "The creation timestamp.",
@@ -129,17 +137,17 @@ func (d *AnnotationQueueDataSource) Read(ctx context.Context, req datasource.Rea
 
 	if idSet {
 		var result annotationQueueDataSourceAPIResponse
-		err := d.client.Get(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), nil, &result)
+		err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), nil, &result)
 		if err != nil {
 			resp.Diagnostics.AddError("Error reading annotation queue", err.Error())
 			return
 		}
-		mapAnnotationQueueDSResponse(&data, &result)
+		mapAnnotationQueueDSResponse(&data, &result, &resp.Diagnostics)
 	} else {
 		query := url.Values{}
 		query.Set("name", data.Name.ValueString())
 		var results []annotationQueueDataSourceAPIResponse
-		err := d.client.Get(ctx, "/api/v1/annotation-queues", query, &results)
+		err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/annotation-queues", query, &results)
 		if err != nil {
 			resp.Diagnostics.AddError("Error reading annotation queue", err.Error())
 			return
@@ -148,18 +156,19 @@ func (d *AnnotationQueueDataSource) Read(ctx context.Context, req datasource.Rea
 			resp.Diagnostics.AddError("Annotation Queue Not Found", fmt.Sprintf("No queue found with name %q.", data.Name.ValueString()))
 			return
 		}
-		mapAnnotationQueueDSResponse(&data, &results[0])
+		mapAnnotationQueueDSResponse(&data, &results[0], &resp.Diagnostics)
 	}
 
 	tflog.Trace(ctx, "read annotation queue data source", map[string]interface{}{"id": data.ID.ValueString()})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func mapAnnotationQueueDSResponse(data *AnnotationQueueDataSourceModel, r *annotationQueueDataSourceAPIResponse) {
+func mapAnnotationQueueDSResponse(data *AnnotationQueueDataSourceModel, r *annotationQueueDataSourceAPIResponse, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(r.ID)
 	data.Name = types.StringValue(r.Name)
 	data.EnableReservations = types.BoolValue(r.EnableReservations)
-	data.TenantID = types.StringValue(r.TenantID)
+	reconcileWorkspaceID(&data.WorkspaceID, r.TenantID, diags)
+	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(r.CreatedAt)
 	data.UpdatedAt = types.StringValue(r.UpdatedAt)
 

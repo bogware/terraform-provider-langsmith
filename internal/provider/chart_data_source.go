@@ -35,6 +35,7 @@ type ChartDataSourceModel struct {
 	Series        types.String `tfsdk:"series"`
 	Metadata      types.String `tfsdk:"metadata"`
 	CommonFilters types.String `tfsdk:"common_filters"`
+	WorkspaceID   types.String `tfsdk:"workspace_id"`
 }
 
 // chartSingleAPIResponse matches SingleCustomChartResponse. Note: the single-chart
@@ -91,6 +92,10 @@ func (d *ChartDataSource) Schema(ctx context.Context, req datasource.SchemaReque
 				MarkdownDescription: "JSON-encoded common filter configuration.",
 				Computed:            true,
 			},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this data source.",
+				Optional:            true,
+			},
 		},
 	}
 }
@@ -120,7 +125,7 @@ func (d *ChartDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		EndTime   string `json:"end_time"`
 	}{OmitData: true, StartTime: "2020-01-01T00:00:00Z", EndTime: "2020-01-01T00:01:00Z"}
 	var result chartSingleAPIResponse
-	err := d.client.Post(ctx, "/api/v1/charts/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(d.client, data.WorkspaceID).Post(ctx, "/api/v1/charts/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading chart", err.Error())
 		return

@@ -36,6 +36,7 @@ type HubEnvironmentResource struct {
 type HubEnvironmentResourceModel struct {
 	ID           types.String `tfsdk:"id"`
 	Environments types.List   `tfsdk:"environments"`
+	WorkspaceID  types.String `tfsdk:"workspace_id"`
 }
 
 type hubEnvEntry struct {
@@ -73,6 +74,12 @@ func (r *HubEnvironmentResource) Schema(ctx context.Context, req resource.Schema
 						"name": schema.StringAttribute{Required: true, MarkdownDescription: "Environment name (1-64 chars)."},
 					},
 				},
+			},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
 	}
@@ -131,7 +138,7 @@ func (r *HubEnvironmentResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 	var api hubEnvAPI
-	if err := r.client.Post(ctx, "/api/v1/hub/environments", hubEnvRequest{Environments: entries}, &api); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/hub/environments", hubEnvRequest{Environments: entries}, &api); err != nil {
 		resp.Diagnostics.AddError("Error creating hub environments", err.Error())
 		return
 	}
@@ -141,6 +148,7 @@ func (r *HubEnvironmentResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 	tflog.Trace(ctx, "created hub environments", map[string]interface{}{"id": api.ID})
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -151,7 +159,7 @@ func (r *HubEnvironmentResource) Read(ctx context.Context, req resource.ReadRequ
 		return
 	}
 	var api hubEnvAPI
-	if err := r.client.Get(ctx, "/api/v1/hub/environments", nil, &api); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/hub/environments", nil, &api); err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
 			return
@@ -168,6 +176,7 @@ func (r *HubEnvironmentResource) Read(ctx context.Context, req resource.ReadRequ
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -182,7 +191,7 @@ func (r *HubEnvironmentResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 	var api hubEnvAPI
-	if err := r.client.Patch(ctx, "/api/v1/hub/environments/"+data.ID.ValueString(), hubEnvRequest{Environments: entries}, &api); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/hub/environments/"+data.ID.ValueString(), hubEnvRequest{Environments: entries}, &api); err != nil {
 		resp.Diagnostics.AddError("Error updating hub environments", err.Error())
 		return
 	}
@@ -200,7 +209,7 @@ func (r *HubEnvironmentResource) Delete(ctx context.Context, req resource.Delete
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if err := r.client.Delete(ctx, "/api/v1/hub/environments/"+data.ID.ValueString()); err != nil && !client.IsNotFound(err) {
+	if err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/api/v1/hub/environments/"+data.ID.ValueString()); err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting hub environments", err.Error())
 		return
 	}

@@ -25,6 +25,10 @@ data "langsmith_chart" "example" {
 
 - `id` (String) The unique identifier of the chart.
 
+### Optional
+
+- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this data source.
+
 ### Read-Only
 
 - `chart_type` (String) The chart type (`line` or `bar`).

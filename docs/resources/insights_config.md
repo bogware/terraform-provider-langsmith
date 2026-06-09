@@ -41,6 +41,7 @@ resource "langsmith_insights_config" "topics" {
 
 - `description` (String) Free-form description.
 - `schedule_cron` (String) Cron expression to schedule the job.
+- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 

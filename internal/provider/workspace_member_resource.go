@@ -38,12 +38,13 @@ type WorkspaceMemberResource struct {
 
 // WorkspaceMemberResourceModel describes the Terraform state for a workspace member.
 type WorkspaceMemberResourceModel struct {
-	ID        types.String `tfsdk:"id"`
-	UserID    types.String `tfsdk:"user_id"`
-	RoleID    types.String `tfsdk:"role_id"`
-	Email     types.String `tfsdk:"email"`
-	FullName  types.String `tfsdk:"full_name"`
-	CreatedAt types.String `tfsdk:"created_at"`
+	ID          types.String `tfsdk:"id"`
+	UserID      types.String `tfsdk:"user_id"`
+	RoleID      types.String `tfsdk:"role_id"`
+	Email       types.String `tfsdk:"email"`
+	FullName    types.String `tfsdk:"full_name"`
+	CreatedAt   types.String `tfsdk:"created_at"`
+	WorkspaceID types.String `tfsdk:"workspace_id"`
 }
 
 // workspaceMemberCreateRequest is the summons to bring a new member into the
@@ -129,6 +130,12 @@ func (r *WorkspaceMemberResource) Schema(ctx context.Context, req resource.Schem
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
 	}
 }
@@ -163,7 +170,7 @@ func (r *WorkspaceMemberResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	var createResult workspaceMemberCreateResponse
-	err := r.client.Post(ctx, "/api/v1/workspaces/current/members", body, &createResult)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/workspaces/current/members", body, &createResult)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating workspace member", err.Error())
 		return
@@ -174,7 +181,7 @@ func (r *WorkspaceMemberResource) Create(ctx context.Context, req resource.Creat
 	data.ID = types.StringValue(createResult.ID)
 
 	var listResult workspaceMemberListAPIResponse
-	err = r.client.Get(ctx, "/api/v1/workspaces/current/members", nil, &listResult)
+	err = effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/workspaces/current/members", nil, &listResult)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading workspace member after create", err.Error())
 		return
@@ -197,6 +204,16 @@ func (r *WorkspaceMemberResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	mapWorkspaceMemberResponseToState(&data, found)
+	// workspace_id is not returned by the API; preserve the explicitly
+	// supplied plan value when set, otherwise fall back to the effective
+	// client workspace or null.
+	if data.WorkspaceID.IsNull() || data.WorkspaceID.IsUnknown() {
+		if ws := effectiveClient(r.client, data.WorkspaceID).WorkspaceID; ws != "" {
+			data.WorkspaceID = types.StringValue(ws)
+		} else {
+			data.WorkspaceID = types.StringNull()
+		}
+	}
 	tflog.Trace(ctx, "created workspace member resource", map[string]interface{}{"id": createResult.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -211,7 +228,7 @@ func (r *WorkspaceMemberResource) Read(ctx context.Context, req resource.ReadReq
 
 	// No single-member endpoint -- we have to call roll on the whole bunkhouse.
 	var listResult workspaceMemberListAPIResponse
-	err := r.client.Get(ctx, "/api/v1/workspaces/current/members", nil, &listResult)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/workspaces/current/members", nil, &listResult)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading workspace members", err.Error())
 		return
@@ -232,6 +249,15 @@ func (r *WorkspaceMemberResource) Read(ctx context.Context, req resource.ReadReq
 	}
 
 	mapWorkspaceMemberResponseToState(&data, found)
+	// workspace_id is not returned by the API; preserve the state value
+	// when set, otherwise fall back to the effective client workspace or null.
+	if data.WorkspaceID.IsNull() || data.WorkspaceID.IsUnknown() {
+		if ws := effectiveClient(r.client, data.WorkspaceID).WorkspaceID; ws != "" {
+			data.WorkspaceID = types.StringValue(ws)
+		} else {
+			data.WorkspaceID = types.StringNull()
+		}
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -248,7 +274,7 @@ func (r *WorkspaceMemberResource) Update(ctx context.Context, req resource.Updat
 	}
 
 	var result workspaceMemberAPIResponse
-	err := r.client.Patch(ctx, "/api/v1/workspaces/current/members/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/workspaces/current/members/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating workspace member", err.Error())
 		return
@@ -267,7 +293,7 @@ func (r *WorkspaceMemberResource) Delete(ctx context.Context, req resource.Delet
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v1/workspaces/current/members/"+data.ID.ValueString())
+	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/api/v1/workspaces/current/members/"+data.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting workspace member", err.Error())
 		return

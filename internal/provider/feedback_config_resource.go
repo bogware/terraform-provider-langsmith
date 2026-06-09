@@ -50,6 +50,7 @@ type FeedbackConfigResourceModel struct {
 	Max                types.Float64 `tfsdk:"max"`
 	Categories         types.String  `tfsdk:"categories"`
 	IsLowerScoreBetter types.Bool    `tfsdk:"is_lower_score_better"`
+	WorkspaceID        types.String  `tfsdk:"workspace_id"`
 	TenantID           types.String  `tfsdk:"tenant_id"`
 	ModifiedAt         types.String  `tfsdk:"modified_at"`
 }
@@ -113,8 +114,15 @@ func (r *FeedbackConfigResource) Schema(ctx context.Context, req resource.Schema
 				Computed:            true,
 				Default:             booldefault.StaticBool(false),
 			},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID.",
+				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
+				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
@@ -176,7 +184,7 @@ func (r *FeedbackConfigResource) Create(ctx context.Context, req resource.Create
 		body.IsLowerScoreBetter = &v
 	}
 
-	err := r.client.Post(ctx, "/api/v1/feedback-configs", body, nil)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/feedback-configs", body, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating feedback config", err.Error())
 		return
@@ -222,7 +230,7 @@ func (r *FeedbackConfigResource) Read(ctx context.Context, req resource.ReadRequ
 // The API doesn't offer a direct lookup, so we ride through the whole herd.
 func (r *FeedbackConfigResource) readFeedbackConfig(ctx context.Context, data *FeedbackConfigResourceModel, diags *diag.Diagnostics) bool {
 	var configs []feedbackConfigAPIResponse
-	err := r.client.Get(ctx, "/api/v1/feedback-configs", nil, &configs)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/feedback-configs", nil, &configs)
 	if err != nil {
 		diags.AddError("Error reading feedback configs", err.Error())
 		return false
@@ -246,7 +254,8 @@ func (r *FeedbackConfigResource) readFeedbackConfig(ctx context.Context, data *F
 
 	data.ID = types.StringValue(found.FeedbackKey)
 	data.FeedbackKey = types.StringValue(found.FeedbackKey)
-	data.TenantID = types.StringValue(found.TenantID)
+	reconcileWorkspaceID(&data.WorkspaceID, found.TenantID, diags)
+	data.TenantID = data.WorkspaceID
 	data.ModifiedAt = types.StringValue(found.ModifiedAt)
 	data.IsLowerScoreBetter = types.BoolValue(found.IsLowerScoreBetter)
 
@@ -292,7 +301,7 @@ func (r *FeedbackConfigResource) Update(ctx context.Context, req resource.Update
 		body.IsLowerScoreBetter = &v
 	}
 
-	err := r.client.Patch(ctx, "/api/v1/feedback-configs", body, nil)
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/feedback-configs", body, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating feedback config", err.Error())
 		return
@@ -319,7 +328,7 @@ func (r *FeedbackConfigResource) Delete(ctx context.Context, req resource.Delete
 
 	q := url.Values{}
 	q.Set("feedback_key", data.FeedbackKey.ValueString())
-	err := r.client.DeleteWithQuery(ctx, "/api/v1/feedback-configs", q)
+	err := effectiveClient(r.client, data.WorkspaceID).DeleteWithQuery(ctx, "/api/v1/feedback-configs", q)
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting feedback config", err.Error())
 	}

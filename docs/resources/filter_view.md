@@ -38,6 +38,7 @@ resource "langsmith_filter_view" "example" {
 - `trace_filter_string` (String) The trace filter expression.
 - `tree_filter_string` (String) The tree filter expression.
 - `type` (String) The type of filter view. Valid values: `runs`, `threads`.
+- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 

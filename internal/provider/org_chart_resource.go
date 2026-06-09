@@ -92,6 +92,12 @@ func (r *OrgChartResource) Schema(ctx context.Context, req resource.SchemaReques
 				MarkdownDescription: "Last update timestamp.",
 				Computed:            true,
 			},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
 	}
 }
@@ -138,7 +144,7 @@ func (r *OrgChartResource) Create(ctx context.Context, req resource.CreateReques
 	planSeries := data.Series
 
 	var result chartAPIResponse
-	err := r.client.Post(ctx, "/api/v1/org-charts/create", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/org-charts/create", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating org chart", err.Error())
 		return
@@ -148,6 +154,7 @@ func (r *OrgChartResource) Create(ctx context.Context, req resource.CreateReques
 	data.Series = planSeries
 	data.CreatedAt = types.StringNull()
 	data.UpdatedAt = types.StringNull()
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created org chart resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -170,7 +177,7 @@ func (r *OrgChartResource) Read(ctx context.Context, req resource.ReadRequest, r
 		EndTime   string `json:"end_time"`
 	}{OmitData: true, StartTime: "2020-01-01T00:00:00Z", EndTime: "2020-01-01T00:01:00Z"}
 	var result chartAPIResponse
-	err := r.client.Post(ctx, "/api/v1/org-charts/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/org-charts/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -185,6 +192,7 @@ func (r *OrgChartResource) Read(ctx context.Context, req resource.ReadRequest, r
 	data.UpdatedAt = savedUpdatedAt
 	data.Series = savedSeries
 	data.SectionID = savedSectionID
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -219,7 +227,7 @@ func (r *OrgChartResource) Update(ctx context.Context, req resource.UpdateReques
 	planSeries := data.Series
 
 	var result chartAPIResponse
-	err := r.client.Patch(ctx, "/api/v1/org-charts/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/org-charts/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating org chart", err.Error())
 		return
@@ -238,7 +246,7 @@ func (r *OrgChartResource) Delete(ctx context.Context, req resource.DeleteReques
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v1/org-charts/"+data.ID.ValueString())
+	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/api/v1/org-charts/"+data.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting org chart", err.Error())
 		return

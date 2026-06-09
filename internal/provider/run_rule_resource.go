@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -80,6 +81,7 @@ type RunRuleResourceModel struct {
 	BackfillProgress             types.Float64 `tfsdk:"backfill_progress"`
 	BackfillCompletedAt          types.String  `tfsdk:"backfill_completed_at"`
 	BackfillError                types.String  `tfsdk:"backfill_error"`
+	WorkspaceID                  types.String  `tfsdk:"workspace_id"`
 	TenantID                     types.String  `tfsdk:"tenant_id"`
 	CreatedAt                    types.String  `tfsdk:"created_at"`
 	UpdatedAt                    types.String  `tfsdk:"updated_at"`
@@ -336,8 +338,15 @@ func (r *RunRuleResource) Schema(ctx context.Context, req resource.SchemaRequest
 				MarkdownDescription: "The error message from a failed backfill operation, if any.",
 				Computed:            true,
 			},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID.",
+				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
+				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
 				Computed:            true,
 			},
 			"created_at": schema.StringAttribute{
@@ -463,13 +472,13 @@ func (r *RunRuleResource) Create(ctx context.Context, req resource.CreateRequest
 	planCreateAlignmentQueue := data.CreateAlignmentQueue
 
 	var result runRuleAPIResponse
-	err := r.client.Post(ctx, "/api/v1/runs/rules", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/runs/rules", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating run rule", err.Error())
 		return
 	}
 
-	r.mapResponseToModel(&result, &data)
+	r.mapResponseToModel(&result, &data, &resp.Diagnostics)
 	data.Evaluators = planEvaluators
 	data.CodeEvaluators = planCodeEvaluators
 	data.Alerts = planAlerts
@@ -488,7 +497,7 @@ func (r *RunRuleResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 
 	var rules []runRuleAPIResponse
-	err := r.client.Get(ctx, "/api/v1/runs/rules", nil, &rules)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/runs/rules", nil, &rules)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading run rules", err.Error())
 		return
@@ -506,7 +515,7 @@ func (r *RunRuleResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	r.mapResponseToModel(found, &data)
+	r.mapResponseToModel(found, &data, &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -606,13 +615,13 @@ func (r *RunRuleResource) Update(ctx context.Context, req resource.UpdateRequest
 	planCreateAlignmentQueue := data.CreateAlignmentQueue
 
 	var result runRuleAPIResponse
-	err := r.client.Patch(ctx, fmt.Sprintf("/api/v1/runs/rules/%s", data.ID.ValueString()), body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, fmt.Sprintf("/api/v1/runs/rules/%s", data.ID.ValueString()), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating run rule", err.Error())
 		return
 	}
 
-	r.mapResponseToModel(&result, &data)
+	r.mapResponseToModel(&result, &data, &resp.Diagnostics)
 	data.Evaluators = planEvaluators
 	data.CodeEvaluators = planCodeEvaluators
 	data.Alerts = planAlerts
@@ -628,7 +637,7 @@ func (r *RunRuleResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	err := r.client.Delete(ctx, fmt.Sprintf("/api/v1/runs/rules/%s", data.ID.ValueString()))
+	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, fmt.Sprintf("/api/v1/runs/rules/%s", data.ID.ValueString()))
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting run rule", err.Error())
 	}
@@ -640,12 +649,13 @@ func (r *RunRuleResource) ImportState(ctx context.Context, req resource.ImportSt
 
 // mapResponseToModel translates the API's response into Terraform state,
 // setting null for any optional fields that came back empty from the territory.
-func (r *RunRuleResource) mapResponseToModel(result *runRuleAPIResponse, data *RunRuleResourceModel) {
+func (r *RunRuleResource) mapResponseToModel(result *runRuleAPIResponse, data *RunRuleResourceModel, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.DisplayName = types.StringValue(result.DisplayName)
 	data.SamplingRate = types.Float64Value(result.SamplingRate)
 	data.IsEnabled = types.BoolValue(result.IsEnabled)
-	data.TenantID = types.StringValue(result.TenantID)
+	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, diags)
+	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 

@@ -46,6 +46,7 @@ type TTLSettingsResourceModel struct {
 	ID                 types.String `tfsdk:"id"`
 	DefaultTraceTier   types.String `tfsdk:"default_trace_tier"`
 	ApplyToAllProjects types.Bool   `tfsdk:"apply_to_all_projects"`
+	WorkspaceID        types.String `tfsdk:"workspace_id"`
 	TenantID           types.String `tfsdk:"tenant_id"`
 	OrganizationID     types.String `tfsdk:"organization_id"`
 	ConfiguredBy       types.String `tfsdk:"configured_by"`
@@ -57,7 +58,7 @@ type TTLSettingsResourceModel struct {
 // ttlSettingsUpsertRequest is the request body for upserting TTL settings.
 type ttlSettingsUpsertRequest struct {
 	DefaultTraceTier   string  `json:"default_trace_tier"`
-	TenantID           *string `json:"tenant_id,omitempty"`
+	WorkspaceID        *string `json:"workspace_id,omitempty"`
 	ApplyToAllProjects bool    `json:"apply_to_all_projects"`
 }
 
@@ -100,8 +101,15 @@ func (r *TTLSettingsResource) Schema(ctx context.Context, req resource.SchemaReq
 				Computed:            true,
 				Default:             booldefault.StaticBool(false),
 			},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID to scope the TTL settings to. If omitted, applies at the org level.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant (workspace) ID to scope the TTL settings to. If omitted, applies at the org level.",
+				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
+				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -156,24 +164,39 @@ func (r *TTLSettingsResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
+	// Resolve deprecated tenant_id / workspace_id aliases.
+	if !data.TenantID.IsNull() && !data.TenantID.IsUnknown() {
+		if !data.WorkspaceID.IsNull() && !data.WorkspaceID.IsUnknown() &&
+			data.WorkspaceID.ValueString() != data.TenantID.ValueString() {
+			resp.Diagnostics.AddError(
+				"Conflicting workspace_id and tenant_id",
+				"Only one of workspace_id or tenant_id may be set at a time. Use workspace_id; tenant_id is deprecated.",
+			)
+			return
+		}
+		if data.WorkspaceID.IsNull() || data.WorkspaceID.IsUnknown() {
+			data.WorkspaceID = data.TenantID
+		}
+	}
+
 	body := ttlSettingsUpsertRequest{
 		DefaultTraceTier:   data.DefaultTraceTier.ValueString(),
 		ApplyToAllProjects: data.ApplyToAllProjects.ValueBool(),
 	}
 
-	if !data.TenantID.IsNull() && !data.TenantID.IsUnknown() {
-		v := data.TenantID.ValueString()
-		body.TenantID = &v
+	if !data.WorkspaceID.IsNull() && !data.WorkspaceID.IsUnknown() {
+		v := data.WorkspaceID.ValueString()
+		body.WorkspaceID = &v
 	}
 
 	var result ttlSettingsAPIResponse
-	err := r.client.Put(ctx, "/api/v1/orgs/ttl-settings", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Put(ctx, "/api/v1/orgs/ttl-settings", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating TTL settings", err.Error())
 		return
 	}
 
-	mapTTLSettingsResponseToState(&data, &result)
+	mapTTLSettingsResponseToState(&data, &result, &resp.Diagnostics)
 	tflog.Trace(ctx, "created TTL settings resource", map[string]interface{}{"id": data.ID.ValueString()})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -206,24 +229,39 @@ func (r *TTLSettingsResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
+	// Resolve deprecated tenant_id / workspace_id aliases.
+	if !data.TenantID.IsNull() && !data.TenantID.IsUnknown() {
+		if !data.WorkspaceID.IsNull() && !data.WorkspaceID.IsUnknown() &&
+			data.WorkspaceID.ValueString() != data.TenantID.ValueString() {
+			resp.Diagnostics.AddError(
+				"Conflicting workspace_id and tenant_id",
+				"Only one of workspace_id or tenant_id may be set at a time. Use workspace_id; tenant_id is deprecated.",
+			)
+			return
+		}
+		if data.WorkspaceID.IsNull() || data.WorkspaceID.IsUnknown() {
+			data.WorkspaceID = data.TenantID
+		}
+	}
+
 	body := ttlSettingsUpsertRequest{
 		DefaultTraceTier:   data.DefaultTraceTier.ValueString(),
 		ApplyToAllProjects: data.ApplyToAllProjects.ValueBool(),
 	}
 
-	if !data.TenantID.IsNull() && !data.TenantID.IsUnknown() {
-		v := data.TenantID.ValueString()
-		body.TenantID = &v
+	if !data.WorkspaceID.IsNull() && !data.WorkspaceID.IsUnknown() {
+		v := data.WorkspaceID.ValueString()
+		body.WorkspaceID = &v
 	}
 
 	var result ttlSettingsAPIResponse
-	err := r.client.Put(ctx, "/api/v1/orgs/ttl-settings", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Put(ctx, "/api/v1/orgs/ttl-settings", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating TTL settings", err.Error())
 		return
 	}
 
-	mapTTLSettingsResponseToState(&data, &result)
+	mapTTLSettingsResponseToState(&data, &result, &resp.Diagnostics)
 	tflog.Trace(ctx, "updated TTL settings resource", map[string]interface{}{"id": data.ID.ValueString()})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -243,7 +281,7 @@ func (r *TTLSettingsResource) ImportState(ctx context.Context, req resource.Impo
 // endpoint returns a list, so we find the matching entry by ID.
 func (r *TTLSettingsResource) readTTLSettings(ctx context.Context, data *TTLSettingsResourceModel, diags *diag.Diagnostics) {
 	var results []ttlSettingsAPIResponse
-	err := r.client.Get(ctx, "/api/v1/orgs/ttl-settings", nil, &results)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/orgs/ttl-settings", nil, &results)
 	if err != nil {
 		if client.IsNotFound(err) {
 			data.ID = types.StringNull()
@@ -271,12 +309,12 @@ func (r *TTLSettingsResource) readTTLSettings(ctx context.Context, data *TTLSett
 		found = &results[0]
 	}
 
-	mapTTLSettingsResponseToState(data, found)
+	mapTTLSettingsResponseToState(data, found, diags)
 }
 
 // mapTTLSettingsResponseToState brands the Terraform state with values from the
 // API response -- straightforward enough that even Festus could follow along.
-func mapTTLSettingsResponseToState(data *TTLSettingsResourceModel, result *ttlSettingsAPIResponse) {
+func mapTTLSettingsResponseToState(data *TTLSettingsResourceModel, result *ttlSettingsAPIResponse, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.DefaultTraceTier = types.StringValue(result.DefaultTraceTier)
 	data.ApplyToAllProjects = types.BoolValue(result.ApplyToAllProjects)
@@ -285,11 +323,12 @@ func mapTTLSettingsResponseToState(data *TTLSettingsResourceModel, result *ttlSe
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 
+	apiWorkspaceID := ""
 	if result.TenantID != nil {
-		data.TenantID = types.StringValue(*result.TenantID)
-	} else {
-		data.TenantID = types.StringNull()
+		apiWorkspaceID = *result.TenantID
 	}
+	reconcileWorkspaceID(&data.WorkspaceID, apiWorkspaceID, diags)
+	data.TenantID = data.WorkspaceID
 
 	if result.LonglivedTTLDays != nil {
 		data.LonglivedTTLDays = types.Int64Value(*result.LonglivedTTLDays)

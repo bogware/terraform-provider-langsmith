@@ -34,6 +34,7 @@ type ToolDataSourceModel struct {
 	Returns     types.String `tfsdk:"returns"`
 	Metadata    types.String `tfsdk:"metadata"`
 	Enabled     types.Bool   `tfsdk:"enabled"`
+	WorkspaceID types.String `tfsdk:"workspace_id"`
 	TenantID    types.String `tfsdk:"tenant_id"`
 	CreatedAt   types.String `tfsdk:"created_at"`
 	UpdatedAt   types.String `tfsdk:"updated_at"`
@@ -55,9 +56,18 @@ func (d *ToolDataSource) Schema(ctx context.Context, req datasource.SchemaReques
 			"returns":     schema.StringAttribute{Computed: true},
 			"metadata":    schema.StringAttribute{Computed: true},
 			"enabled":     schema.BoolAttribute{Computed: true},
-			"tenant_id":   schema.StringAttribute{Computed: true},
-			"created_at":  schema.StringAttribute{Computed: true},
-			"updated_at":  schema.StringAttribute{Computed: true},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID. If set, overrides the provider-level `workspace_id` for all API calls made by this data source.",
+				Optional:            true,
+				Computed:            true,
+			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "Deprecated: use `workspace_id` instead. The workspace ID.",
+				Computed:            true,
+				DeprecationMessage:  "Use 'workspace_id' instead. This attribute will be removed in a future version.",
+			},
+			"created_at": schema.StringAttribute{Computed: true},
+			"updated_at": schema.StringAttribute{Computed: true},
 		},
 	}
 }
@@ -81,7 +91,7 @@ func (d *ToolDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 	var api toolAPI
-	if err := d.client.Get(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), nil, &api); err != nil {
+	if err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), nil, &api); err != nil {
 		resp.Diagnostics.AddError("Error reading tool", err.Error())
 		return
 	}
@@ -106,7 +116,8 @@ func (d *ToolDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		data.Metadata = types.StringNull()
 	}
 	data.Enabled = types.BoolValue(api.Enabled)
-	data.TenantID = types.StringValue(api.TenantID)
+	reconcileWorkspaceID(&data.WorkspaceID, api.TenantID, &resp.Diagnostics)
+	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(api.CreatedAt)
 	data.UpdatedAt = types.StringValue(api.UpdatedAt)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

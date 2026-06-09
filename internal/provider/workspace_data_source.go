@@ -31,24 +31,24 @@ type WorkspaceDataSource struct {
 }
 
 // WorkspaceDataSourceModel holds the read-only attributes for a workspace:
-// display name, tenant handle, creation timestamp, and which outfit it belongs to.
+// display name, workspace handle, creation timestamp, and which outfit it belongs to.
 type WorkspaceDataSourceModel struct {
-	ID             types.String `tfsdk:"id"`
-	DisplayName    types.String `tfsdk:"display_name"`
-	TenantHandle   types.String `tfsdk:"tenant_handle"`
-	OrganizationID types.String `tfsdk:"organization_id"`
-	IsPersonal     types.Bool   `tfsdk:"is_personal"`
-	CreatedAt      types.String `tfsdk:"created_at"`
+	ID              types.String `tfsdk:"id"`
+	DisplayName     types.String `tfsdk:"display_name"`
+	WorkspaceHandle types.String `tfsdk:"workspace_handle"`
+	OrganizationID  types.String `tfsdk:"organization_id"`
+	IsPersonal      types.Bool   `tfsdk:"is_personal"`
+	CreatedAt       types.String `tfsdk:"created_at"`
 }
 
 // workspaceDataSourceAPIResponse is the API response for a workspace lookup.
 type workspaceDataSourceAPIResponse struct {
-	ID             string  `json:"id"`
-	DisplayName    string  `json:"display_name"`
-	TenantHandle   string  `json:"tenant_handle"`
-	OrganizationID *string `json:"organization_id"`
-	IsPersonal     *bool   `json:"is_personal"`
-	CreatedAt      string  `json:"created_at"`
+	ID              string  `json:"id"`
+	DisplayName     string  `json:"display_name"`
+	WorkspaceHandle string  `json:"workspace_handle"`
+	OrganizationID  *string `json:"organization_id"`
+	IsPersonal      *bool   `json:"is_personal"`
+	CreatedAt       string  `json:"created_at"`
 }
 
 func (d *WorkspaceDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -69,8 +69,8 @@ func (d *WorkspaceDataSource) Schema(ctx context.Context, req datasource.SchemaR
 				Optional:            true,
 				Computed:            true,
 			},
-			"tenant_handle": schema.StringAttribute{
-				MarkdownDescription: "The tenant handle of the workspace.",
+			"workspace_handle": schema.StringAttribute{
+				MarkdownDescription: "The workspace handle of the workspace.",
 				Computed:            true,
 			},
 			"organization_id": schema.StringAttribute{
@@ -163,7 +163,7 @@ func (d *WorkspaceDataSource) Read(ctx context.Context, req datasource.ReadReque
 
 	data.ID = types.StringValue(found.ID)
 	data.DisplayName = types.StringValue(found.DisplayName)
-	data.TenantHandle = types.StringValue(found.TenantHandle)
+	data.WorkspaceHandle = types.StringValue(found.WorkspaceHandle)
 
 	if found.OrganizationID != nil {
 		data.OrganizationID = types.StringValue(*found.OrganizationID)

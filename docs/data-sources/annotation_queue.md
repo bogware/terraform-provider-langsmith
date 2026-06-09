@@ -25,6 +25,7 @@ data "langsmith_annotation_queue" "example" {
 
 - `id` (String) The unique identifier of the queue. Either `id` or `name` must be specified.
 - `name` (String) The name of the queue. Either `id` or `name` must be specified.
+- `workspace_id` (String) The workspace ID. If set, overrides the provider-level `workspace_id` for all API calls made by this data source.
 
 ### Read-Only
 
@@ -33,5 +34,5 @@ data "langsmith_annotation_queue" "example" {
 - `enable_reservations` (Boolean) Whether reservations are enabled.
 - `num_reviewers_per_item` (Number) The number of reviewers per item.
 - `reservation_minutes` (Number) The number of minutes a reservation is held.
-- `tenant_id` (String) The tenant ID.
+- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead. The workspace ID.
 - `updated_at` (String) The last update timestamp.

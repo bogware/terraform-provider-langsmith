@@ -40,6 +40,7 @@ type GatewayPolicyDataSourceModel struct {
 	CurrentSpendUSD     types.Float64 `tfsdk:"current_spend_usd"`
 	CreatedAt           types.String  `tfsdk:"created_at"`
 	UpdatedAt           types.String  `tfsdk:"updated_at"`
+	WorkspaceID         types.String  `tfsdk:"workspace_id"`
 }
 
 func (d *GatewayPolicyDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -64,6 +65,10 @@ func (d *GatewayPolicyDataSource) Schema(ctx context.Context, req datasource.Sch
 			"current_spend_usd":     schema.Float64Attribute{Computed: true},
 			"created_at":            schema.StringAttribute{Computed: true},
 			"updated_at":            schema.StringAttribute{Computed: true},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this data source.",
+				Optional:            true,
+			},
 		},
 	}
 }
@@ -87,7 +92,7 @@ func (d *GatewayPolicyDataSource) Read(ctx context.Context, req datasource.ReadR
 		return
 	}
 	var api gatewayPolicyAPI
-	if err := d.client.Get(ctx, "/v1/platform/gateway-policies/"+data.ID.ValueString(), nil, &api); err != nil {
+	if err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/v1/platform/gateway-policies/"+data.ID.ValueString(), nil, &api); err != nil {
 		resp.Diagnostics.AddError("Error reading gateway policy", err.Error())
 		return
 	}

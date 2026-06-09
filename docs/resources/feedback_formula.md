@@ -44,6 +44,7 @@ resource "langsmith_feedback_formula" "example" {
 
 - `dataset_id` (String) Optional dataset ID to scope the formula.
 - `session_id` (String) Optional session/project ID to scope the formula.
+- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 

@@ -41,6 +41,7 @@ type ChartSectionCloneResourceModel struct {
 	Index           types.Int64  `tfsdk:"index"`
 	CreatedAt       types.String `tfsdk:"created_at"`
 	UpdatedAt       types.String `tfsdk:"updated_at"`
+	WorkspaceID     types.String `tfsdk:"workspace_id"`
 }
 
 type chartSectionCloneRequest struct {
@@ -98,6 +99,12 @@ func (r *ChartSectionCloneResource) Schema(ctx context.Context, req resource.Sch
 				MarkdownDescription: "Last update timestamp.",
 				Computed:            true,
 			},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
 	}
 }
@@ -126,7 +133,7 @@ func (r *ChartSectionCloneResource) Create(ctx context.Context, req resource.Cre
 	setOptionalString(&cloneBody.SessionID, data.SessionID)
 
 	var cloned chartSectionAPIResponse
-	if err := r.client.Post(ctx, "/api/v1/charts/section/clone", cloneBody, &cloned); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/charts/section/clone", cloneBody, &cloned); err != nil {
 		resp.Diagnostics.AddError("Error cloning chart section", err.Error())
 		return
 	}
@@ -166,7 +173,7 @@ func (r *ChartSectionCloneResource) Create(ctx context.Context, req resource.Cre
 	final := cloned
 	if needsPatch {
 		var patched chartSectionAPIResponse
-		if err := r.client.Patch(ctx, "/api/v1/charts/section/"+cloned.ID, patchBody, &patched); err != nil {
+		if err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/charts/section/"+cloned.ID, patchBody, &patched); err != nil {
 			resp.Diagnostics.AddError("Error applying post-clone updates", err.Error())
 			return
 		}
@@ -190,6 +197,7 @@ func (r *ChartSectionCloneResource) Create(ctx context.Context, req resource.Cre
 	data.SourceSectionID = sourceSectionID
 	data.SessionID = sessionID
 
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "cloned chart section resource", map[string]interface{}{"id": final.ID, "source_section_id": data.SourceSectionID.ValueString()})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -212,7 +220,7 @@ func (r *ChartSectionCloneResource) Read(ctx context.Context, req resource.ReadR
 		EndTime   string `json:"end_time"`
 	}{OmitData: true, StartTime: "2020-01-01T00:00:00Z", EndTime: "2020-01-01T00:01:00Z"}
 	var result chartSectionAPIResponse
-	err := r.client.Post(ctx, "/api/v1/charts/section/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/charts/section/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -235,6 +243,7 @@ func (r *ChartSectionCloneResource) Read(ctx context.Context, req resource.ReadR
 	data.CreatedAt = savedCreatedAt
 	data.UpdatedAt = savedUpdatedAt
 
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -258,7 +267,7 @@ func (r *ChartSectionCloneResource) Update(ctx context.Context, req resource.Upd
 	}
 
 	var result chartSectionAPIResponse
-	err := r.client.Patch(ctx, "/api/v1/charts/section/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/charts/section/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating cloned chart section", err.Error())
 		return
@@ -288,7 +297,7 @@ func (r *ChartSectionCloneResource) Delete(ctx context.Context, req resource.Del
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v1/charts/section/"+data.ID.ValueString())
+	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/api/v1/charts/section/"+data.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting cloned chart section", err.Error())
 		return

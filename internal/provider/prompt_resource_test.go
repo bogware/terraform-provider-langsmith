@@ -28,7 +28,7 @@ func TestAccPromptResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttr("langsmith_prompt.test", "description", "initial description"),
 					// owner may be empty for prompts created via a service account.
 					resource.TestCheckResourceAttrSet("langsmith_prompt.test", "full_name"),
-					resource.TestCheckResourceAttrSet("langsmith_prompt.test", "tenant_id"),
+					resource.TestCheckResourceAttrSet("langsmith_prompt.test", "workspace_id"),
 					// counters have been removed in 0.9.0 — verify they're truly gone.
 					resource.TestCheckNoResourceAttr("langsmith_prompt.test", "num_likes"),
 					resource.TestCheckNoResourceAttr("langsmith_prompt.test", "num_views"),

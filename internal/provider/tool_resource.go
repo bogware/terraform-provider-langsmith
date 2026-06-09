@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -41,6 +42,7 @@ type ToolResourceModel struct {
 	Returns     types.String `tfsdk:"returns"`
 	Metadata    types.String `tfsdk:"metadata"`
 	Enabled     types.Bool   `tfsdk:"enabled"`
+	WorkspaceID types.String `tfsdk:"workspace_id"`
 	TenantID    types.String `tfsdk:"tenant_id"`
 	CreatedAt   types.String `tfsdk:"created_at"`
 	UpdatedAt   types.String `tfsdk:"updated_at"`
@@ -110,8 +112,19 @@ func (r *ToolResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 				Optional:            true,
 				MarkdownDescription: "JSON-encoded free-form metadata.",
 			},
-			"enabled":    schema.BoolAttribute{Optional: true, Computed: true, MarkdownDescription: "Whether the tool is enabled."},
-			"tenant_id":  schema.StringAttribute{Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"enabled": schema.BoolAttribute{Optional: true, Computed: true, MarkdownDescription: "Whether the tool is enabled."},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
+				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"created_at": schema.StringAttribute{Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"updated_at": schema.StringAttribute{Computed: true},
 		},
@@ -169,11 +182,11 @@ func (r *ToolResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 
 	var api toolAPI
-	if err := r.client.Post(ctx, "/v1/platform/tools", body, &api); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/v1/platform/tools", body, &api); err != nil {
 		resp.Diagnostics.AddError("Error creating tool", err.Error())
 		return
 	}
-	r.mapResponse(&api, &data)
+	r.mapResponse(&api, &data, &resp.Diagnostics)
 	tflog.Trace(ctx, "created tool", map[string]interface{}{"handle": api.Handle})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -185,7 +198,7 @@ func (r *ToolResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 	var api toolAPI
-	if err := r.client.Get(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), nil, &api); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), nil, &api); err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
 			return
@@ -193,7 +206,7 @@ func (r *ToolResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		resp.Diagnostics.AddError("Error reading tool", err.Error())
 		return
 	}
-	r.mapResponse(&api, &data)
+	r.mapResponse(&api, &data, &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -227,11 +240,11 @@ func (r *ToolResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 
 	var api toolAPI
-	if err := r.client.Patch(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), body, &api); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), body, &api); err != nil {
 		resp.Diagnostics.AddError("Error updating tool", err.Error())
 		return
 	}
-	r.mapResponse(&api, &data)
+	r.mapResponse(&api, &data, &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -241,7 +254,7 @@ func (r *ToolResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if err := r.client.Delete(ctx, "/v1/platform/tools/"+data.Handle.ValueString()); err != nil && !client.IsNotFound(err) {
+	if err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/v1/platform/tools/"+data.Handle.ValueString()); err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting tool", err.Error())
 		return
 	}
@@ -251,7 +264,7 @@ func (r *ToolResource) ImportState(ctx context.Context, req resource.ImportState
 	resource.ImportStatePassthroughID(ctx, path.Root("handle"), req, resp)
 }
 
-func (r *ToolResource) mapResponse(api *toolAPI, data *ToolResourceModel) {
+func (r *ToolResource) mapResponse(api *toolAPI, data *ToolResourceModel, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(api.ID)
 	data.Handle = types.StringValue(api.Handle)
 	data.Name = types.StringValue(api.Name)
@@ -275,7 +288,8 @@ func (r *ToolResource) mapResponse(api *toolAPI, data *ToolResourceModel) {
 		data.Metadata = types.StringNull()
 	}
 	data.Enabled = types.BoolValue(api.Enabled)
-	data.TenantID = types.StringValue(api.TenantID)
+	reconcileWorkspaceID(&data.WorkspaceID, api.TenantID, diags)
+	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(api.CreatedAt)
 	data.UpdatedAt = types.StringValue(api.UpdatedAt)
 }

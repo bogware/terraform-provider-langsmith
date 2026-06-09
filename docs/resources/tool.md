@@ -56,10 +56,11 @@ resource "langsmith_tool" "lookup_customer" {
 - `enabled` (Boolean) Whether the tool is enabled.
 - `metadata` (String) JSON-encoded free-form metadata.
 - `returns` (String) JSON-encoded JSON Schema object describing the tool's return type.
+- `workspace_id` (String) The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 
 - `created_at` (String)
 - `id` (String) The ID of this resource.
-- `tenant_id` (String)
+- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead.
 - `updated_at` (String)

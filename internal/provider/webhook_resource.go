@@ -43,6 +43,7 @@ type WebhookResourceModel struct {
 	Triggers       types.List   `tfsdk:"triggers"`
 	IncludePrompts types.List   `tfsdk:"include_prompts"`
 	ExcludePrompts types.List   `tfsdk:"exclude_prompts"`
+	WorkspaceID    types.String `tfsdk:"workspace_id"`
 	TenantID       types.String `tfsdk:"tenant_id"`
 	CreatedAt      types.String `tfsdk:"created_at"`
 	UpdatedAt      types.String `tfsdk:"updated_at"`
@@ -107,12 +108,19 @@ func (r *WebhookResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Optional:            true,
 				ElementType:         types.StringType,
 			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID.",
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
+				Optional:            true,
 				Computed:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
+			},
+			"tenant_id": schema.StringAttribute{
+				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
+				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "When the webhook was created.",
@@ -186,7 +194,7 @@ func (r *WebhookResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 
 	var result webhookAPIResponse
-	err := r.client.Post(ctx, "/api/v1/prompt-webhooks", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/prompt-webhooks", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating webhook", err.Error())
 		return
@@ -206,7 +214,7 @@ func (r *WebhookResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 
 	var result webhookAPIResponse
-	err := r.client.Get(ctx, fmt.Sprintf("/api/v1/prompt-webhooks/%s", data.ID.ValueString()), nil, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, fmt.Sprintf("/api/v1/prompt-webhooks/%s", data.ID.ValueString()), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -264,7 +272,7 @@ func (r *WebhookResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 
 	var result webhookAPIResponse
-	err := r.client.Patch(ctx, fmt.Sprintf("/api/v1/prompt-webhooks/%s", data.ID.ValueString()), body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, fmt.Sprintf("/api/v1/prompt-webhooks/%s", data.ID.ValueString()), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating webhook", err.Error())
 		return
@@ -281,7 +289,7 @@ func (r *WebhookResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	err := r.client.Delete(ctx, fmt.Sprintf("/api/v1/prompt-webhooks/%s", data.ID.ValueString()))
+	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, fmt.Sprintf("/api/v1/prompt-webhooks/%s", data.ID.ValueString()))
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting webhook", err.Error())
 	}
@@ -296,7 +304,8 @@ func (r *WebhookResource) ImportState(ctx context.Context, req resource.ImportSt
 func (r *WebhookResource) mapResponseToModel(ctx context.Context, result *webhookAPIResponse, data *WebhookResourceModel, diagnostics *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.URL = types.StringValue(result.URL)
-	data.TenantID = types.StringValue(result.TenantID)
+	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, diagnostics)
+	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 

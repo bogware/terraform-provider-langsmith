@@ -52,6 +52,7 @@ type ModelPriceMapResourceModel struct {
 	MatchPath             types.List    `tfsdk:"match_path"`
 	PromptCostDetails     types.String  `tfsdk:"prompt_cost_details"`
 	CompletionCostDetails types.String  `tfsdk:"completion_cost_details"`
+	WorkspaceID           types.String  `tfsdk:"workspace_id"`
 }
 
 // modelPriceMapAPIRequest is the request body for creating/updating a model price map.
@@ -134,6 +135,12 @@ func (r *ModelPriceMapResource) Schema(ctx context.Context, req resource.SchemaR
 				MarkdownDescription: "JSON-encoded cost details object for completion tokens — every last cent accounted for.",
 				Optional:            true,
 			},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
 	}
 }
@@ -198,7 +205,7 @@ func (r *ModelPriceMapResource) Create(ctx context.Context, req resource.CreateR
 	planCompletionCostDetails := data.CompletionCostDetails
 
 	var result modelPriceMapAPIResponse
-	err := r.client.Post(ctx, "/api/v1/model-price-map", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/model-price-map", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating model price map", err.Error())
 		return
@@ -207,6 +214,7 @@ func (r *ModelPriceMapResource) Create(ctx context.Context, req resource.CreateR
 	mapModelPriceMapResponseToState(ctx, &data, &result, &resp.Diagnostics)
 	data.PromptCostDetails = planPromptCostDetails
 	data.CompletionCostDetails = planCompletionCostDetails
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created model price map resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -220,7 +228,7 @@ func (r *ModelPriceMapResource) Read(ctx context.Context, req resource.ReadReque
 	}
 
 	var results []modelPriceMapAPIResponse
-	err := r.client.Get(ctx, "/api/v1/model-price-map", nil, &results)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/model-price-map", nil, &results)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -245,6 +253,7 @@ func (r *ModelPriceMapResource) Read(ctx context.Context, req resource.ReadReque
 
 	mapModelPriceMapResponseToState(ctx, &data, found, &resp.Diagnostics)
 
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -291,7 +300,7 @@ func (r *ModelPriceMapResource) Update(ctx context.Context, req resource.UpdateR
 	planCompletionCostDetails := data.CompletionCostDetails
 
 	var result modelPriceMapAPIResponse
-	err := r.client.Put(ctx, "/api/v1/model-price-map/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Put(ctx, "/api/v1/model-price-map/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating model price map", err.Error())
 		return
@@ -312,7 +321,7 @@ func (r *ModelPriceMapResource) Delete(ctx context.Context, req resource.DeleteR
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v1/model-price-map/"+data.ID.ValueString())
+	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/api/v1/model-price-map/"+data.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting model price map", err.Error())
 		return

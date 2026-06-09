@@ -33,9 +33,10 @@ type AnnotationQueueReviewerResource struct {
 }
 
 type AnnotationQueueReviewerResourceModel struct {
-	ID         types.String `tfsdk:"id"`
-	QueueID    types.String `tfsdk:"queue_id"`
-	IdentityID types.String `tfsdk:"identity_id"`
+	ID          types.String `tfsdk:"id"`
+	QueueID     types.String `tfsdk:"queue_id"`
+	IdentityID  types.String `tfsdk:"identity_id"`
+	WorkspaceID types.String `tfsdk:"workspace_id"`
 }
 
 type addReviewerRequest struct {
@@ -48,7 +49,7 @@ func (r *AnnotationQueueReviewerResource) Metadata(ctx context.Context, req reso
 
 func (r *AnnotationQueueReviewerResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Assigns an identity as a reviewer on a LangSmith annotation queue. The LangSmith API does not expose a per-pair read endpoint; Read for this resource is a no-op (the membership is taken to exist as long as it is in state).",
+		MarkdownDescription: "Assigns an identity as a reviewer on a LangSmith annotation queue. The LangSmith API does not expose a per-pair read endpoint; Read for this resource is a no-op (the membership is taken to exist as long as it is in state). Import ID format: `<queue_id>:<identity_id>` or `<queue_id>:<identity_id>:<workspace_id>`.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:      true,
@@ -63,6 +64,12 @@ func (r *AnnotationQueueReviewerResource) Schema(ctx context.Context, req resour
 				Required:            true,
 				MarkdownDescription: "UUID of the reviewer identity (user or service account).",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
 	}
@@ -90,11 +97,12 @@ func (r *AnnotationQueueReviewerResource) Create(ctx context.Context, req resour
 	var result struct {
 		IdentityID string `json:"identity_id"`
 	}
-	if err := r.client.Post(ctx, "/v1/platform/annotation-queues/"+data.QueueID.ValueString()+"/reviewers", body, &result); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/v1/platform/annotation-queues/"+data.QueueID.ValueString()+"/reviewers", body, &result); err != nil {
 		resp.Diagnostics.AddError("Error adding annotation queue reviewer", err.Error())
 		return
 	}
 	data.ID = types.StringValue(data.QueueID.ValueString() + ":" + data.IdentityID.ValueString())
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "added annotation queue reviewer", map[string]interface{}{"id": data.ID.ValueString()})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -108,14 +116,18 @@ func (r *AnnotationQueueReviewerResource) Update(ctx context.Context, req resour
 }
 
 func (r *AnnotationQueueReviewerResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	parts := strings.SplitN(req.ID, ":", 2)
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-		resp.Diagnostics.AddError("Invalid import ID", "Expected \"<queue_id>:<identity_id>\".")
+	parts := strings.SplitN(req.ID, ":", 3)
+	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
+		resp.Diagnostics.AddError("Invalid import ID", "Expected \"<queue_id>:<identity_id>\" or \"<queue_id>:<identity_id>:<workspace_id>\".")
 		return
 	}
+	compositeID := parts[0] + ":" + parts[1]
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("queue_id"), parts[0])...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("identity_id"), parts[1])...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), compositeID)...)
+	if len(parts) == 3 && parts[2] != "" {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("workspace_id"), parts[2])...)
+	}
 }
 
 func (r *AnnotationQueueReviewerResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -124,7 +136,7 @@ func (r *AnnotationQueueReviewerResource) Delete(ctx context.Context, req resour
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if err := r.client.Delete(ctx, "/v1/platform/annotation-queues/"+data.QueueID.ValueString()+"/reviewers/"+data.IdentityID.ValueString()); err != nil && !client.IsNotFound(err) {
+	if err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/v1/platform/annotation-queues/"+data.QueueID.ValueString()+"/reviewers/"+data.IdentityID.ValueString()); err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error removing annotation queue reviewer", err.Error())
 		return
 	}

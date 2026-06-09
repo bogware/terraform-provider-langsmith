@@ -33,6 +33,7 @@ type ChartSectionDataSourceModel struct {
 	ChartCount  types.Int64  `tfsdk:"chart_count"`
 	CreatedAt   types.String `tfsdk:"created_at"`
 	UpdatedAt   types.String `tfsdk:"updated_at"`
+	WorkspaceID types.String `tfsdk:"workspace_id"`
 }
 
 // chartSectionListAPIResponse matches CustomChartsSectionResponse.
@@ -84,6 +85,10 @@ func (d *ChartSectionDataSource) Schema(ctx context.Context, req datasource.Sche
 				MarkdownDescription: "Last update timestamp.",
 				Computed:            true,
 			},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this data source.",
+				Optional:            true,
+			},
 		},
 	}
 }
@@ -116,7 +121,7 @@ func (d *ChartSectionDataSource) Read(ctx context.Context, req datasource.ReadRe
 	}
 
 	var sections []chartSectionListAPIResponse
-	err := d.client.Get(ctx, "/api/v1/charts/section", nil, &sections)
+	err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/charts/section", nil, &sections)
 	if err != nil {
 		resp.Diagnostics.AddError("Error listing chart sections", err.Error())
 		return

@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -52,6 +53,7 @@ type BulkExportDestinationResourceModel struct {
 	AccessKeyID           types.String `tfsdk:"access_key_id"`
 	SecretAccessKey       types.String `tfsdk:"secret_access_key"`
 	SessionToken          types.String `tfsdk:"session_token"`
+	WorkspaceID           types.String `tfsdk:"workspace_id"`
 	TenantID              types.String `tfsdk:"tenant_id"`
 	CreatedAt             types.String `tfsdk:"created_at"`
 	UpdatedAt             types.String `tfsdk:"updated_at"`
@@ -178,8 +180,15 @@ func (r *BulkExportDestinationResource) Schema(ctx context.Context, req resource
 				Optional:            true,
 				Sensitive:           true,
 			},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The tenant ID.",
+				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
+				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
@@ -266,13 +275,13 @@ func (r *BulkExportDestinationResource) Create(ctx context.Context, req resource
 	}
 
 	var result bulkExportDestinationAPIResponse
-	err := r.client.Post(ctx, "/api/v1/bulk-exports/destinations", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/bulk-exports/destinations", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating bulk export destination", err.Error())
 		return
 	}
 
-	mapBulkExportDestinationResponseToState(&data, &result)
+	mapBulkExportDestinationResponseToState(&data, &result, &resp.Diagnostics)
 	tflog.Trace(ctx, "created bulk export destination resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -286,7 +295,7 @@ func (r *BulkExportDestinationResource) Read(ctx context.Context, req resource.R
 	}
 
 	var result bulkExportDestinationAPIResponse
-	err := r.client.Get(ctx, "/api/v1/bulk-exports/destinations/"+data.ID.ValueString(), nil, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/bulk-exports/destinations/"+data.ID.ValueString(), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -296,7 +305,7 @@ func (r *BulkExportDestinationResource) Read(ctx context.Context, req resource.R
 		return
 	}
 
-	mapBulkExportDestinationResponseToState(&data, &result)
+	mapBulkExportDestinationResponseToState(&data, &result, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -328,13 +337,13 @@ func (r *BulkExportDestinationResource) Update(ctx context.Context, req resource
 	}
 
 	var result bulkExportDestinationAPIResponse
-	err := r.client.Patch(ctx, "/api/v1/bulk-exports/destinations/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/bulk-exports/destinations/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating bulk export destination", err.Error())
 		return
 	}
 
-	mapBulkExportDestinationResponseToState(&data, &result)
+	mapBulkExportDestinationResponseToState(&data, &result, &resp.Diagnostics)
 	tflog.Trace(ctx, "updated bulk export destination resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -353,7 +362,7 @@ func (r *BulkExportDestinationResource) ImportState(ctx context.Context, req res
 // mapBulkExportDestinationResponseToState rounds up the API response fields and
 // brands them onto the Terraform state model. Absent optional fields get null values
 // to keep Terraform from reporting phantom drift.
-func mapBulkExportDestinationResponseToState(data *BulkExportDestinationResourceModel, result *bulkExportDestinationAPIResponse) {
+func mapBulkExportDestinationResponseToState(data *BulkExportDestinationResourceModel, result *bulkExportDestinationAPIResponse, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.DisplayName = types.StringValue(result.DisplayName)
 	data.DestinationType = types.StringValue(result.DestinationType)
@@ -381,7 +390,8 @@ func mapBulkExportDestinationResponseToState(data *BulkExportDestinationResource
 		data.IncludeBucketInPrefix = types.BoolNull()
 	}
 
-	data.TenantID = types.StringValue(result.TenantID)
+	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, diags)
+	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 

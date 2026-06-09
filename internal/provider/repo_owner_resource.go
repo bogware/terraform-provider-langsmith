@@ -33,14 +33,15 @@ type RepoOwnerResource struct {
 }
 
 type RepoOwnerResourceModel struct {
-	ID         types.String `tfsdk:"id"`
-	Owner      types.String `tfsdk:"owner"`
-	Repo       types.String `tfsdk:"repo"`
-	Email      types.String `tfsdk:"email"`
-	IdentityID types.String `tfsdk:"identity_id"`
-	LSUserID   types.String `tfsdk:"ls_user_id"`
-	FullName   types.String `tfsdk:"full_name"`
-	CreatedAt  types.String `tfsdk:"created_at"`
+	ID          types.String `tfsdk:"id"`
+	Owner       types.String `tfsdk:"owner"`
+	Repo        types.String `tfsdk:"repo"`
+	Email       types.String `tfsdk:"email"`
+	IdentityID  types.String `tfsdk:"identity_id"`
+	LSUserID    types.String `tfsdk:"ls_user_id"`
+	FullName    types.String `tfsdk:"full_name"`
+	CreatedAt   types.String `tfsdk:"created_at"`
+	WorkspaceID types.String `tfsdk:"workspace_id"`
 }
 
 type repoOwnerAPI struct {
@@ -98,6 +99,12 @@ func (r *RepoOwnerResource) Schema(ctx context.Context, req resource.SchemaReque
 			"ls_user_id": schema.StringAttribute{Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"full_name":  schema.StringAttribute{Computed: true},
 			"created_at": schema.StringAttribute{Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
 	}
 }
@@ -125,12 +132,13 @@ func (r *RepoOwnerResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 	var api repoOwnerAPI
-	if err := r.client.Post(ctx, r.repoPath(data.Owner.ValueString(), data.Repo.ValueString()),
+	if err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, r.repoPath(data.Owner.ValueString(), data.Repo.ValueString()),
 		addRepoOwnerRequest{Email: data.Email.ValueString()}, &api); err != nil {
 		resp.Diagnostics.AddError("Error adding repo owner", err.Error())
 		return
 	}
 	r.mapResponse(&api, &data)
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "added repo owner", map[string]interface{}{"email": data.Email.ValueString()})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -142,7 +150,7 @@ func (r *RepoOwnerResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 	var list listRepoOwnersResponse
-	if err := r.client.Get(ctx, r.repoPath(data.Owner.ValueString(), data.Repo.ValueString()), nil, &list); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, r.repoPath(data.Owner.ValueString(), data.Repo.ValueString()), nil, &list); err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
 			return
@@ -154,11 +162,13 @@ func (r *RepoOwnerResource) Read(ctx context.Context, req resource.ReadRequest, 
 	for _, o := range list.Owners {
 		if o.IdentityID != nil && *o.IdentityID == wanted {
 			r.mapResponse(&o, &data)
+			reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 			resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 			return
 		}
 		if o.LSUserID == data.LSUserID.ValueString() && data.LSUserID.ValueString() != "" {
 			r.mapResponse(&o, &data)
+			reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 			resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 			return
 		}
@@ -182,7 +192,7 @@ func (r *RepoOwnerResource) Delete(ctx context.Context, req resource.DeleteReque
 			"identity_id is not set in state, so the owner cannot be removed via the API. Remove the resource from state only.")
 		return
 	}
-	if err := r.client.DeleteWithBody(ctx, r.repoPath(data.Owner.ValueString(), data.Repo.ValueString()),
+	if err := effectiveClient(r.client, data.WorkspaceID).DeleteWithBody(ctx, r.repoPath(data.Owner.ValueString(), data.Repo.ValueString()),
 		removeRepoOwnerRequest{IdentityID: data.IdentityID.ValueString()}); err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error removing repo owner", err.Error())
 		return

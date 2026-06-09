@@ -25,6 +25,7 @@ data "langsmith_chart_section" "example" {
 
 - `id` (String) The unique identifier of the section. Either `id` or `title` must be specified.
 - `title` (String) The title of the section. Either `id` or `title` must be specified.
+- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this data source.
 
 ### Read-Only
 

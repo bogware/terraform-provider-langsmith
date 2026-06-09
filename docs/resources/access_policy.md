@@ -45,6 +45,7 @@ resource "langsmith_access_policy" "example" {
 - `condition_groups` (String) JSON-encoded array of condition groups.
 - `description` (String) A description of the access policy.
 - `role_ids` (String) JSON-encoded array of role IDs to attach this policy to.
+- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 

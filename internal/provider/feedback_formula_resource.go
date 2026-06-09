@@ -43,6 +43,7 @@ type FeedbackFormulaResourceModel struct {
 	SessionID       types.String `tfsdk:"session_id"`
 	CreatedAt       types.String `tfsdk:"created_at"`
 	ModifiedAt      types.String `tfsdk:"modified_at"`
+	WorkspaceID     types.String `tfsdk:"workspace_id"`
 }
 
 type feedbackFormulaCreateRequest struct {
@@ -113,6 +114,12 @@ func (r *FeedbackFormulaResource) Schema(ctx context.Context, req resource.Schem
 				MarkdownDescription: "Last modification timestamp.",
 				Computed:            true,
 			},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
 	}
 }
@@ -148,7 +155,7 @@ func (r *FeedbackFormulaResource) Create(ctx context.Context, req resource.Creat
 	planFormulaParts := data.FormulaParts
 
 	var result feedbackFormulaAPIResponse
-	err := r.client.Post(ctx, "/api/v1/feedback/formulas", body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/feedback/formulas", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating feedback formula", err.Error())
 		return
@@ -156,6 +163,7 @@ func (r *FeedbackFormulaResource) Create(ctx context.Context, req resource.Creat
 
 	mapFeedbackFormulaResponseToState(&data, &result)
 	data.FormulaParts = planFormulaParts
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created feedback formula resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -168,7 +176,7 @@ func (r *FeedbackFormulaResource) Read(ctx context.Context, req resource.ReadReq
 	}
 
 	var result feedbackFormulaAPIResponse
-	err := r.client.Get(ctx, "/api/v1/feedback/formulas/"+data.ID.ValueString(), nil, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/feedback/formulas/"+data.ID.ValueString(), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -179,6 +187,7 @@ func (r *FeedbackFormulaResource) Read(ctx context.Context, req resource.ReadReq
 	}
 
 	mapFeedbackFormulaResponseToState(&data, &result)
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -199,7 +208,7 @@ func (r *FeedbackFormulaResource) Update(ctx context.Context, req resource.Updat
 	planFormulaParts := data.FormulaParts
 
 	var result feedbackFormulaAPIResponse
-	err := r.client.Put(ctx, "/api/v1/feedback/formulas/"+data.ID.ValueString(), body, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Put(ctx, "/api/v1/feedback/formulas/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating feedback formula", err.Error())
 		return
@@ -218,7 +227,7 @@ func (r *FeedbackFormulaResource) Delete(ctx context.Context, req resource.Delet
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v1/feedback/formulas/"+data.ID.ValueString())
+	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/api/v1/feedback/formulas/"+data.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting feedback formula", err.Error())
 		return

@@ -41,6 +41,7 @@ type AccessPolicyResourceModel struct {
 	RoleIDs         types.String `tfsdk:"role_ids"`
 	CreatedAt       types.String `tfsdk:"created_at"`
 	UpdatedAt       types.String `tfsdk:"updated_at"`
+	WorkspaceID     types.String `tfsdk:"workspace_id"`
 }
 
 type accessPolicyCreateRequest struct {
@@ -108,6 +109,12 @@ func (r *AccessPolicyResource) Schema(ctx context.Context, req resource.SchemaRe
 				MarkdownDescription: "Last update timestamp.",
 				Computed:            true,
 			},
+			"workspace_id": schema.StringAttribute{
+				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
 	}
 }
@@ -150,7 +157,7 @@ func (r *AccessPolicyResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	var createResult accessPolicyCreateResponse
-	err := r.client.Post(ctx, "/v1/platform/orgs/current/access-policies", body, &createResult)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/v1/platform/orgs/current/access-policies", body, &createResult)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating access policy", err.Error())
 		return
@@ -160,13 +167,14 @@ func (r *AccessPolicyResource) Create(ctx context.Context, req resource.CreateRe
 
 	// Read back to get full state.
 	var result accessPolicyAPIResponse
-	err = r.client.Get(ctx, "/v1/platform/orgs/current/access-policies/"+createResult.ID, nil, &result)
+	err = effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/v1/platform/orgs/current/access-policies/"+createResult.ID, nil, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading access policy after creation", err.Error())
 		return
 	}
 
 	mapAccessPolicyResponseToState(&data, &result)
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created access policy resource", map[string]interface{}{"id": createResult.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -179,7 +187,7 @@ func (r *AccessPolicyResource) Read(ctx context.Context, req resource.ReadReques
 	}
 
 	var result accessPolicyAPIResponse
-	err := r.client.Get(ctx, "/v1/platform/orgs/current/access-policies/"+data.ID.ValueString(), nil, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/v1/platform/orgs/current/access-policies/"+data.ID.ValueString(), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -190,6 +198,7 @@ func (r *AccessPolicyResource) Read(ctx context.Context, req resource.ReadReques
 	}
 
 	mapAccessPolicyResponseToState(&data, &result)
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -210,7 +219,7 @@ func (r *AccessPolicyResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	err := r.client.Delete(ctx, "/v1/platform/orgs/current/access-policies/"+data.ID.ValueString())
+	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/v1/platform/orgs/current/access-policies/"+data.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting access policy", err.Error())
 		return

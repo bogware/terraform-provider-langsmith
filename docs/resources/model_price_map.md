@@ -39,6 +39,7 @@ resource "langsmith_model_price_map" "example" {
 - `model_provider` (String) The model provider name (e.g., `openai`, `anthropic`).
 - `prompt_cost_details` (String) JSON-encoded cost details object for prompt tokens — the fine print on what you owe.
 - `start_time` (String) The effective start time for this price map entry.
+- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 

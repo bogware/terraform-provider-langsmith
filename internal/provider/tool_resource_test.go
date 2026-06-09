@@ -25,7 +25,7 @@ func TestAccToolResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttr("langsmith_tool.test", "handle", handle),
 					resource.TestCheckResourceAttr("langsmith_tool.test", "name", "Lookup customer"),
 					resource.TestCheckResourceAttrSet("langsmith_tool.test", "id"),
-					resource.TestCheckResourceAttrSet("langsmith_tool.test", "tenant_id"),
+					resource.TestCheckResourceAttrSet("langsmith_tool.test", "workspace_id"),
 				),
 			},
 			{
