@@ -9,6 +9,8 @@ BREAKING CHANGES:
 
 BUG FIXES:
 
+* Many resources could fail apply with "Provider returned invalid result object after apply: ... workspace_id ... unknown" or leave `workspace_id` null in state. All resources and data sources now resolve `workspace_id` to a known value after every operation: the API-returned value when available (decoding both the `workspace_id` and legacy `tenant_id` response keys — several endpoints only return the latter), falling back to the workspace the provider is configured against. Affected: `langsmith_project`, `langsmith_dataset`, `langsmith_prompt`, `langsmith_annotation_queue`, `langsmith_tool`, `langsmith_alert_rule`, `langsmith_chart`, `langsmith_chart_section`, `langsmith_chart_section_clone`, `langsmith_org_chart`, `langsmith_org_chart_section`, `langsmith_example`, `langsmith_secret`, `langsmith_tagging`, `langsmith_tag_key`, `langsmith_tag_value`, `langsmith_dataset_share`, `langsmith_dataset_split`, `langsmith_insights_config`, `langsmith_feedback_formula`, and the corresponding data sources.
+* `langsmith_feedback_config`: a server-returned JSON `null` for `categories` was stored as the literal string `"null"`, causing "inconsistent result after apply" errors.
 * `langsmith_prompt` (resource): `owner` and `full_name` were never populated on Create/Read because the API nests them inside `repo` while the wire struct expected them at the top level. Fixed; `owner` may now be empty (the API returns `null` for service-account-created prompts), so all path construction falls back to `-` (current-workspace wildcard) when `owner` is unset.
 * `langsmith_prompt` (resource): Update path could leave `manifest` as unknown after apply when the repo had no commits; now explicitly nulled.
 * `langsmith_prompt` (data source): same nested-`repo` decoding bug as the resource — every read returned all-zero values. Fixed.
@@ -24,6 +26,24 @@ INTERNAL / RESILIENCY:
 
 FEATURES:
 
+* **New Resource:** `langsmith_experiment_view_override` - Per-dataset experiment view column configuration
+* **New Resource:** `langsmith_feature_model_config` - Default/disabled model configuration per platform feature
+* **New Resource:** `langsmith_mcp_vendor_settings` - MCP vendor settings (org/project bindings per vendor)
+* **New Resource:** `langsmith_agent_builder_integrations` - Workspace Agent Builder integrations settings (singleton)
+* **New Resource:** `langsmith_issues_agent` - **Beta:** per-project issues agent configuration
+* **New Resource:** `langsmith_data_plane` - Self-hosted data planes (create-only; deprovisioning requires support)
+* **New Resource:** `langsmith_dataset_version_tag` - Named tags on dataset versions (e.g. pin `prod` to a snapshot; `as_of` accepts a version timestamp or `latest`)
+* **New Resource:** `langsmith_run_share` - Public share state for a run (mirror of `langsmith_dataset_share`)
+* **New Resource:** `langsmith_workspace_handle` - Workspace hub handle (set-only; handles cannot be unset)
+* **New Resource:** `langsmith_organization_settings` - Current-organization settings (display name, login methods, security toggles)
+* **New Data Source:** `langsmith_workspaces` - List all workspaces; combine with `for_each` and resource-level `workspace_id` for dynamic multi-workspace management (#21)
+* **New Data Source:** `langsmith_permissions` - Org permission catalog for authoring `langsmith_org_role`
+* **New Data Source:** `langsmith_projects`, `langsmith_datasets`, `langsmith_prompts`, `langsmith_evaluators`, `langsmith_run_rules` - Filterable plural listings with pagination
+* **New Data Source:** `langsmith_playground_settings`, `langsmith_usage_limits`, `langsmith_hub_environments`, `langsmith_secret_names` - Workspace-level listings (secret values are never returned)
+* **New Data Source:** `langsmith_workspace_members`, `langsmith_org_members` - Member and pending-invite listings
+* **New Data Source:** `langsmith_example`, `langsmith_feedback_config`, `langsmith_filter_view`, `langsmith_tag_value`, `langsmith_bulk_export`, `langsmith_sso_settings` - Singular lookups for existing resource types
+* **New Data Source:** `langsmith_workspace_stats`, `langsmith_org_usage`, `langsmith_evaluator_spend` - Usage and statistics reads
+* **New Data Source:** `langsmith_issues` - **Beta:** list detected issues, optionally per project
 * **New Resource:** `langsmith_org_chart` - Organization-scoped custom charts (mirror of `langsmith_chart` at org scope)
 * **New Resource:** `langsmith_org_chart_section` - Organization-scoped chart sections
 * **New Resource:** `langsmith_evaluator` - Code and LLM-as-judge evaluators
