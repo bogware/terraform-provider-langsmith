@@ -113,7 +113,18 @@ resource "langsmith_project" "staging_traces" {
 }
 ```
 
-This pattern works well for a known, static set of workspaces. Dynamic `for_each` over a list of workspaces is not currently supported — see [issue #21](https://github.com/bogware/terraform-provider-langsmith/issues/21).
+This pattern works well for a known, static set of workspaces. For dynamic management of every workspace in the organization, combine the `langsmith_workspaces` data source with `for_each` and resource-level `workspace_id` ([issue #21](https://github.com/bogware/terraform-provider-langsmith/issues/21)):
+
+```hcl
+data "langsmith_workspaces" "all" {}
+
+resource "langsmith_project" "tracing" {
+  for_each = { for w in data.langsmith_workspaces.all.workspaces : w.id => w }
+
+  name         = "tracing"
+  workspace_id = each.key
+}
+```
 
 You can also specify the workspace at the resource level for most resources, which allows you to manage multiple workspaces without multiple provider instances. For example:
 
@@ -140,6 +151,9 @@ resource "langsmith_project" "staging_traces" {
 | `langsmith_example` | Dataset examples (input/output pairs) |
 | `langsmith_dataset_share` | Public share state per dataset |
 | `langsmith_dataset_split` | Named split membership within a dataset |
+| `langsmith_dataset_version_tag` | Named tags on dataset versions (pin `prod` to a snapshot) |
+| `langsmith_experiment_view_override` | Per-dataset experiment view column configuration |
+| `langsmith_run_share` | Public share state for a run |
 
 ### Prompts (LangSmith Hub)
 
@@ -186,6 +200,8 @@ resource "langsmith_project" "staging_traces" {
 | `langsmith_secret` | Workspace secrets (key/value store) |
 | `langsmith_ttl_settings` | Trace retention (TTL) settings |
 | `langsmith_usage_limit` | Usage limits |
+| `langsmith_workspace_handle` | Workspace hub handle (set-only) |
+| `langsmith_feature_model_config` | Default/disabled models per platform feature |
 
 ### Org / identity / access
 
@@ -199,6 +215,8 @@ resource "langsmith_project" "staging_traces" {
 | `langsmith_sso_settings` | SSO/SAML settings |
 | `langsmith_access_policy` | Access policies (RBAC bindings) |
 | `langsmith_scim_token` | SCIM provisioning tokens |
+| `langsmith_organization_settings` | Current-organization settings (name, login methods, security toggles) |
+| `langsmith_data_plane` | Self-hosted data planes (create-only) |
 
 ### Integrations, gateway, tools
 
@@ -212,6 +230,9 @@ resource "langsmith_project" "staging_traces" {
 | `langsmith_model_price_map` | Model pricing configuration |
 | `langsmith_bulk_export_destination` | Bulk export S3 destinations |
 | `langsmith_bulk_export` | Bulk export jobs |
+| `langsmith_agent_builder_integrations` | Workspace Agent Builder integrations settings |
+| `langsmith_mcp_vendor_settings` | MCP vendor settings (org/project bindings) |
+| `langsmith_issues_agent` | **Beta:** per-project issues agent configuration |
 
 ## Data Sources
 
@@ -239,6 +260,23 @@ resource "langsmith_project" "staging_traces" {
 | `langsmith_chart` / `langsmith_chart_section` | Look up workspace charts and sections |
 | `langsmith_org_chart` / `langsmith_org_chart_section` | Look up org-scoped charts and sections |
 | `langsmith_chart_preview` / `langsmith_org_chart_preview` | Preview chart data points |
+| `langsmith_workspaces` | List all workspaces (enables `for_each` multi-workspace management) |
+| `langsmith_projects` / `langsmith_datasets` / `langsmith_prompts` | Filterable plural listings |
+| `langsmith_evaluators` / `langsmith_run_rules` | Filterable plural listings |
+| `langsmith_playground_settings` / `langsmith_usage_limits` / `langsmith_hub_environments` | Workspace-level listings |
+| `langsmith_workspace_members` / `langsmith_org_members` | Member and pending-invite listings |
+| `langsmith_permissions` | Org permission catalog (for authoring `langsmith_org_role`) |
+| `langsmith_secret_names` | List workspace secret names (values are never returned) |
+| `langsmith_example` | Read a dataset example by ID |
+| `langsmith_feedback_config` | Look up a feedback config by key |
+| `langsmith_filter_view` | Read a saved filter view |
+| `langsmith_tag_value` | Look up a tag value by ID or value |
+| `langsmith_bulk_export` | Read a bulk export job by ID |
+| `langsmith_sso_settings` | Read the org's SSO/SAML settings |
+| `langsmith_workspace_stats` | Workspace object counts |
+| `langsmith_org_usage` | Organization usage over a date range |
+| `langsmith_evaluator_spend` | Evaluator spend |
+| `langsmith_issues` | **Beta:** list detected issues, optionally per project |
 
 ## Development
 
