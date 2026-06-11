@@ -103,13 +103,15 @@ func (r *DatasetShareResource) Create(ctx context.Context, req resource.CreateRe
 			q.Set("share_projects", "false")
 		}
 	}
+	apiClient := effectiveClient(r.client, data.WorkspaceID)
 	var api datasetShareAPI
-	if err := effectiveClient(r.client, data.WorkspaceID).PutWithQuery(ctx, "/api/v1/datasets/"+data.DatasetID.ValueString()+"/share", q, nil, &api); err != nil {
+	if err := apiClient.PutWithQuery(ctx, "/api/v1/datasets/"+data.DatasetID.ValueString()+"/share", q, nil, &api); err != nil {
 		resp.Diagnostics.AddError("Error sharing dataset", err.Error())
 		return
 	}
 	data.ShareToken = types.StringValue(api.ShareToken)
-	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
+	// The share API does not return workspace information.
+	finalizeWorkspaceID(&data.WorkspaceID, apiClient, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "shared dataset", map[string]interface{}{"dataset_id": api.DatasetID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -120,8 +122,9 @@ func (r *DatasetShareResource) Read(ctx context.Context, req resource.ReadReques
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	apiClient := effectiveClient(r.client, data.WorkspaceID)
 	var api *datasetShareAPI
-	if err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/datasets/"+data.DatasetID.ValueString()+"/share", nil, &api); err != nil {
+	if err := apiClient.Get(ctx, "/api/v1/datasets/"+data.DatasetID.ValueString()+"/share", nil, &api); err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
 			return
@@ -134,7 +137,8 @@ func (r *DatasetShareResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 	data.ShareToken = types.StringValue(api.ShareToken)
-	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
+	// The share API does not return workspace information.
+	finalizeWorkspaceID(&data.WorkspaceID, apiClient, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -153,12 +157,15 @@ func (r *DatasetShareResource) Update(ctx context.Context, req resource.UpdateRe
 			q.Set("share_projects", "false")
 		}
 	}
+	apiClient := effectiveClient(r.client, data.WorkspaceID)
 	var api datasetShareAPI
-	if err := effectiveClient(r.client, data.WorkspaceID).PutWithQuery(ctx, "/api/v1/datasets/"+data.DatasetID.ValueString()+"/share", q, nil, &api); err != nil {
+	if err := apiClient.PutWithQuery(ctx, "/api/v1/datasets/"+data.DatasetID.ValueString()+"/share", q, nil, &api); err != nil {
 		resp.Diagnostics.AddError("Error updating dataset share state", err.Error())
 		return
 	}
 	data.ShareToken = types.StringValue(api.ShareToken)
+	// The share API does not return workspace information.
+	finalizeWorkspaceID(&data.WorkspaceID, apiClient, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

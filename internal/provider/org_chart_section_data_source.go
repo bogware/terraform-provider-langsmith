@@ -98,8 +98,9 @@ func (d *OrgChartSectionDataSource) Read(ctx context.Context, req datasource.Rea
 		return
 	}
 
+	c := effectiveClient(d.client, data.WorkspaceID)
 	var sections []chartSectionListAPIResponse
-	err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/org-charts/section", nil, &sections)
+	err := c.Get(ctx, "/api/v1/org-charts/section", nil, &sections)
 	if err != nil {
 		resp.Diagnostics.AddError("Error listing org chart sections", err.Error())
 		return
@@ -141,6 +142,7 @@ func (d *OrgChartSectionDataSource) Read(ctx context.Context, req datasource.Rea
 	} else {
 		data.ChartCount = types.Int64Null()
 	}
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(found.WorkspaceID, found.TenantID), &resp.Diagnostics)
 
 	tflog.Trace(ctx, "read org chart section data source", map[string]interface{}{"id": found.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

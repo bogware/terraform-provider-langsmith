@@ -114,6 +114,10 @@ type alertRuleResponseBody struct {
 	SessionID              string   `json:"session_id"`
 	CreatedAt              string   `json:"created_at"`
 	UpdatedAt              string   `json:"updated_at"`
+	// LangSmith APIs are inconsistent about which key carries the workspace
+	// identifier, so decode both spellings.
+	WorkspaceID string `json:"workspace_id"`
+	TenantID    string `json:"tenant_id"`
 }
 
 func (r *AlertRuleResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -244,8 +248,9 @@ func (r *AlertRuleResource) Create(ctx context.Context, req resource.CreateReque
 
 	apiPath := fmt.Sprintf("/v1/platform/alerts/%s", data.SessionID.ValueString())
 
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var result alertRuleResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, apiPath, body, &result)
+	err := c.Post(ctx, apiPath, body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating alert rule", err.Error())
 		return
@@ -255,6 +260,7 @@ func (r *AlertRuleResource) Create(ctx context.Context, req resource.CreateReque
 	// value from the plan. The GET endpoint returns it properly.
 	sessionID := data.SessionID.ValueString()
 	mapAlertRuleResponseToState(&data, &result)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.Rule.WorkspaceID, result.Rule.TenantID), &resp.Diagnostics)
 	data.SessionID = types.StringValue(sessionID)
 	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created alert rule resource", map[string]interface{}{"id": result.Rule.ID})
@@ -272,8 +278,9 @@ func (r *AlertRuleResource) Read(ctx context.Context, req resource.ReadRequest, 
 	apiPath := fmt.Sprintf("/v1/platform/alerts/%s/%s",
 		data.SessionID.ValueString(), data.ID.ValueString())
 
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var result alertRuleResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, apiPath, nil, &result)
+	err := c.Get(ctx, apiPath, nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -284,7 +291,7 @@ func (r *AlertRuleResource) Read(ctx context.Context, req resource.ReadRequest, 
 	}
 
 	mapAlertRuleResponseToState(&data, &result)
-	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.Rule.WorkspaceID, result.Rule.TenantID), &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -305,14 +312,16 @@ func (r *AlertRuleResource) Update(ctx context.Context, req resource.UpdateReque
 	apiPath := fmt.Sprintf("/v1/platform/alerts/%s/%s",
 		data.SessionID.ValueString(), data.ID.ValueString())
 
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var result alertRuleResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, apiPath, body, &result)
+	err := c.Patch(ctx, apiPath, body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating alert rule", err.Error())
 		return
 	}
 
 	mapAlertRuleResponseToState(&data, &result)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.Rule.WorkspaceID, result.Rule.TenantID), &resp.Diagnostics)
 	tflog.Trace(ctx, "updated alert rule resource", map[string]interface{}{"id": result.Rule.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

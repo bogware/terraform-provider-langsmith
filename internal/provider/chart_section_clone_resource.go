@@ -132,8 +132,9 @@ func (r *ChartSectionCloneResource) Create(ctx context.Context, req resource.Cre
 	setOptionalString(&cloneBody.SectionID, data.SourceSectionID)
 	setOptionalString(&cloneBody.SessionID, data.SessionID)
 
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var cloned chartSectionAPIResponse
-	if err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/charts/section/clone", cloneBody, &cloned); err != nil {
+	if err := c.Post(ctx, "/api/v1/charts/section/clone", cloneBody, &cloned); err != nil {
 		resp.Diagnostics.AddError("Error cloning chart section", err.Error())
 		return
 	}
@@ -173,7 +174,7 @@ func (r *ChartSectionCloneResource) Create(ctx context.Context, req resource.Cre
 	final := cloned
 	if needsPatch {
 		var patched chartSectionAPIResponse
-		if err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/charts/section/"+cloned.ID, patchBody, &patched); err != nil {
+		if err := c.Patch(ctx, "/api/v1/charts/section/"+cloned.ID, patchBody, &patched); err != nil {
 			resp.Diagnostics.AddError("Error applying post-clone updates", err.Error())
 			return
 		}
@@ -196,6 +197,7 @@ func (r *ChartSectionCloneResource) Create(ctx context.Context, req resource.Cre
 	}
 	data.SourceSectionID = sourceSectionID
 	data.SessionID = sessionID
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(final.WorkspaceID, final.TenantID), &resp.Diagnostics)
 
 	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "cloned chart section resource", map[string]interface{}{"id": final.ID, "source_section_id": data.SourceSectionID.ValueString()})
@@ -219,8 +221,9 @@ func (r *ChartSectionCloneResource) Read(ctx context.Context, req resource.ReadR
 		StartTime string `json:"start_time"`
 		EndTime   string `json:"end_time"`
 	}{OmitData: true, StartTime: "2020-01-01T00:00:00Z", EndTime: "2020-01-01T00:01:00Z"}
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var result chartSectionAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/charts/section/"+data.ID.ValueString(), body, &result)
+	err := c.Post(ctx, "/api/v1/charts/section/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -242,6 +245,7 @@ func (r *ChartSectionCloneResource) Read(ctx context.Context, req resource.ReadR
 	data.SessionID = savedSessionID
 	data.CreatedAt = savedCreatedAt
 	data.UpdatedAt = savedUpdatedAt
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.WorkspaceID, result.TenantID), &resp.Diagnostics)
 
 	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -266,8 +270,9 @@ func (r *ChartSectionCloneResource) Update(ctx context.Context, req resource.Upd
 		body.Index = &v
 	}
 
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var result chartSectionAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/charts/section/"+data.ID.ValueString(), body, &result)
+	err := c.Patch(ctx, "/api/v1/charts/section/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating cloned chart section", err.Error())
 		return
@@ -285,6 +290,7 @@ func (r *ChartSectionCloneResource) Update(ctx context.Context, req resource.Upd
 	data.CreatedAt = savedCreatedAt
 	data.SourceSectionID = savedSourceSectionID
 	data.SessionID = savedSessionID
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.WorkspaceID, result.TenantID), &resp.Diagnostics)
 
 	tflog.Trace(ctx, "updated cloned chart section resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

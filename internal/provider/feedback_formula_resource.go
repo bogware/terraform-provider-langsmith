@@ -69,6 +69,10 @@ type feedbackFormulaAPIResponse struct {
 	SessionID       *string         `json:"session_id"`
 	CreatedAt       string          `json:"created_at"`
 	ModifiedAt      string          `json:"modified_at"`
+	// LangSmith APIs are inconsistent about which key carries the workspace
+	// identifier, so decode both spellings.
+	WorkspaceID string `json:"workspace_id"`
+	TenantID    string `json:"tenant_id"`
 }
 
 func (r *FeedbackFormulaResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -154,14 +158,16 @@ func (r *FeedbackFormulaResource) Create(ctx context.Context, req resource.Creat
 	// Preserve plan values; the API may normalize or expand JSON fields.
 	planFormulaParts := data.FormulaParts
 
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var result feedbackFormulaAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/feedback/formulas", body, &result)
+	err := c.Post(ctx, "/api/v1/feedback/formulas", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating feedback formula", err.Error())
 		return
 	}
 
 	mapFeedbackFormulaResponseToState(&data, &result)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.WorkspaceID, result.TenantID), &resp.Diagnostics)
 	data.FormulaParts = planFormulaParts
 	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created feedback formula resource", map[string]interface{}{"id": result.ID})
@@ -175,8 +181,9 @@ func (r *FeedbackFormulaResource) Read(ctx context.Context, req resource.ReadReq
 		return
 	}
 
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var result feedbackFormulaAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/feedback/formulas/"+data.ID.ValueString(), nil, &result)
+	err := c.Get(ctx, "/api/v1/feedback/formulas/"+data.ID.ValueString(), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -187,7 +194,7 @@ func (r *FeedbackFormulaResource) Read(ctx context.Context, req resource.ReadReq
 	}
 
 	mapFeedbackFormulaResponseToState(&data, &result)
-	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.WorkspaceID, result.TenantID), &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -207,14 +214,16 @@ func (r *FeedbackFormulaResource) Update(ctx context.Context, req resource.Updat
 	// Preserve plan values; the API may normalize or expand JSON fields.
 	planFormulaParts := data.FormulaParts
 
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var result feedbackFormulaAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Put(ctx, "/api/v1/feedback/formulas/"+data.ID.ValueString(), body, &result)
+	err := c.Put(ctx, "/api/v1/feedback/formulas/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating feedback formula", err.Error())
 		return
 	}
 
 	mapFeedbackFormulaResponseToState(&data, &result)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.WorkspaceID, result.TenantID), &resp.Diagnostics)
 	data.FormulaParts = planFormulaParts
 	tflog.Trace(ctx, "updated feedback formula resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

@@ -91,6 +91,7 @@ type annotationQueueAPIResponse struct {
 	SourceRuleID        *string         `json:"source_rule_id"`
 	RunRuleID           *string         `json:"run_rule_id"`
 	QueueType           string          `json:"queue_type"`
+	WorkspaceID         string          `json:"workspace_id"`
 	TenantID            string          `json:"tenant_id"`
 	CreatedAt           string          `json:"created_at"`
 	UpdatedAt           string          `json:"updated_at"`
@@ -257,14 +258,15 @@ func (r *AnnotationQueueResource) Create(ctx context.Context, req resource.Creat
 	planRubricItems := data.RubricItems
 	planMetadata := data.Metadata
 
+	apiClient := effectiveClient(r.client, data.WorkspaceID)
 	var result annotationQueueAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/annotation-queues", body, &result)
+	err := apiClient.Post(ctx, "/api/v1/annotation-queues", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating annotation queue", err.Error())
 		return
 	}
 
-	mapAnnotationQueueResponseToState(&data, &result, &resp.Diagnostics)
+	mapAnnotationQueueResponseToState(&data, &result, apiClient, &resp.Diagnostics)
 	if !planRubricItems.IsUnknown() {
 		data.RubricItems = planRubricItems
 	}
@@ -283,8 +285,9 @@ func (r *AnnotationQueueResource) Read(ctx context.Context, req resource.ReadReq
 		return
 	}
 
+	apiClient := effectiveClient(r.client, data.WorkspaceID)
 	var result annotationQueueAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), nil, &result)
+	err := apiClient.Get(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -294,7 +297,7 @@ func (r *AnnotationQueueResource) Read(ctx context.Context, req resource.ReadReq
 		return
 	}
 
-	mapAnnotationQueueResponseToState(&data, &result, &resp.Diagnostics)
+	mapAnnotationQueueResponseToState(&data, &result, apiClient, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -342,7 +345,8 @@ func (r *AnnotationQueueResource) Update(ctx context.Context, req resource.Updat
 		body.Metadata = json.RawMessage(data.Metadata.ValueString())
 	}
 
-	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), body, nil)
+	apiClient := effectiveClient(r.client, data.WorkspaceID)
+	err := apiClient.Patch(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), body, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating annotation queue", err.Error())
 		return
@@ -351,13 +355,13 @@ func (r *AnnotationQueueResource) Update(ctx context.Context, req resource.Updat
 	// The PATCH response only returns {"message": "..."}, not the full resource.
 	// Like Festus reporting back with half the story, we need to go get the rest ourselves.
 	var result annotationQueueAPIResponse
-	err = effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), nil, &result)
+	err = apiClient.Get(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), nil, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading annotation queue after update", err.Error())
 		return
 	}
 
-	mapAnnotationQueueResponseToState(&data, &result, &resp.Diagnostics)
+	mapAnnotationQueueResponseToState(&data, &result, apiClient, &resp.Diagnostics)
 	tflog.Trace(ctx, "updated annotation queue resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -387,7 +391,7 @@ func (r *AnnotationQueueResource) ImportState(ctx context.Context, req resource.
 
 // mapAnnotationQueueResponseToState maps the API response onto the Terraform state,
 // setting null for any optional fields the API left unspoken.
-func mapAnnotationQueueResponseToState(data *AnnotationQueueResourceModel, result *annotationQueueAPIResponse, diags *diag.Diagnostics) {
+func mapAnnotationQueueResponseToState(data *AnnotationQueueResourceModel, result *annotationQueueAPIResponse, c *client.Client, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.Name = types.StringValue(result.Name)
 
@@ -444,7 +448,7 @@ func mapAnnotationQueueResponseToState(data *AnnotationQueueResourceModel, resul
 	}
 
 	data.QueueType = types.StringValue(result.QueueType)
-	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, diags)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.WorkspaceID, result.TenantID), diags)
 	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
