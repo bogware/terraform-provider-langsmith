@@ -50,6 +50,10 @@ type chartSingleAPIResponse struct {
 	Series        json.RawMessage `json:"series"`
 	Metadata      json.RawMessage `json:"metadata"`
 	CommonFilters json.RawMessage `json:"common_filters"`
+	// LangSmith APIs are inconsistent about which key carries the workspace
+	// identifier, so decode both spellings.
+	WorkspaceID string `json:"workspace_id"`
+	TenantID    string `json:"tenant_id"`
 }
 
 func (d *ChartDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -124,8 +128,9 @@ func (d *ChartDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		StartTime string `json:"start_time"`
 		EndTime   string `json:"end_time"`
 	}{OmitData: true, StartTime: "2020-01-01T00:00:00Z", EndTime: "2020-01-01T00:01:00Z"}
+	c := effectiveClient(d.client, data.WorkspaceID)
 	var result chartSingleAPIResponse
-	err := effectiveClient(d.client, data.WorkspaceID).Post(ctx, "/api/v1/charts/"+data.ID.ValueString(), body, &result)
+	err := c.Post(ctx, "/api/v1/charts/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading chart", err.Error())
 		return
@@ -139,6 +144,7 @@ func (d *ChartDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	data.Metadata = jsonStringValue(result.Metadata)
 	data.CommonFilters = jsonStringValue(result.CommonFilters)
 	setStateOptionalString(&data.Description, result.Description)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.WorkspaceID, result.TenantID), &resp.Diagnostics)
 
 	tflog.Trace(ctx, "read chart data source", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

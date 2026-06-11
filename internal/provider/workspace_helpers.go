@@ -26,6 +26,34 @@ func effectiveClient(c *client.Client, workspaceID types.String) *client.Client 
 	return c
 }
 
+// firstNonEmpty returns the first non-empty string. Useful for decoding
+// workspace identifiers from APIs that return either `workspace_id` or the
+// legacy `tenant_id` key.
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// finalizeWorkspaceID reconciles the Terraform state value of workspace_id with
+// the value returned by the API (see reconcileWorkspaceID) and, when the state
+// value is still null or unknown afterwards, falls back to the workspace the
+// client is operating in (provider-level configuration or env). This guarantees
+// workspace_id is never left unknown after apply.
+func finalizeWorkspaceID(state *types.String, c *client.Client, apiValue string, diags *diag.Diagnostics) {
+	reconcileWorkspaceID(state, apiValue, diags)
+	if state.IsNull() || state.IsUnknown() {
+		if c != nil && c.WorkspaceID != "" {
+			*state = types.StringValue(c.WorkspaceID)
+		} else {
+			*state = types.StringNull()
+		}
+	}
+}
+
 // reconcileWorkspaceID reconciles the Terraform state value of workspace_id with the
 // value returned by the API:
 //   - If apiValue is empty (the API did not return a workspace_id), the state is

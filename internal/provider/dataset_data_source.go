@@ -64,6 +64,7 @@ type datasetDataSourceAPIResponse struct {
 	Transformations         json.RawMessage `json:"transformations"`
 	Metadata                json.RawMessage `json:"metadata"`
 	WorkspaceID             string          `json:"workspace_id"`
+	TenantID                string          `json:"tenant_id"`
 	CreatedAt               string          `json:"created_at"`
 	ModifiedAt              string          `json:"modified_at"`
 	ExampleCount            int64           `json:"example_count"`
@@ -186,10 +187,11 @@ func (d *DatasetDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 
+	apiClient := effectiveClient(d.client, data.WorkspaceID)
 	var result datasetDataSourceAPIResponse
 
 	if idSet {
-		err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/datasets/"+data.ID.ValueString(), nil, &result)
+		err := apiClient.Get(ctx, "/api/v1/datasets/"+data.ID.ValueString(), nil, &result)
 		if err != nil {
 			resp.Diagnostics.AddError("Error reading dataset", err.Error())
 			return
@@ -199,7 +201,7 @@ func (d *DatasetDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		query.Set("name", data.Name.ValueString())
 
 		var results []datasetDataSourceAPIResponse
-		err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/datasets", query, &results)
+		err := apiClient.Get(ctx, "/api/v1/datasets", query, &results)
 		if err != nil {
 			resp.Diagnostics.AddError("Error reading dataset", err.Error())
 			return
@@ -257,7 +259,7 @@ func (d *DatasetDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		data.Metadata = types.StringNull()
 	}
 
-	reconcileWorkspaceID(&data.WorkspaceID, result.WorkspaceID, &resp.Diagnostics)
+	finalizeWorkspaceID(&data.WorkspaceID, apiClient, firstNonEmpty(result.WorkspaceID, result.TenantID), &resp.Diagnostics)
 	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.ModifiedAt = types.StringValue(result.ModifiedAt)

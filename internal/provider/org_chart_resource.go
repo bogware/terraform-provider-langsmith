@@ -143,14 +143,16 @@ func (r *OrgChartResource) Create(ctx context.Context, req resource.CreateReques
 
 	planSeries := data.Series
 
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var result chartAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/org-charts/create", body, &result)
+	err := c.Post(ctx, "/api/v1/org-charts/create", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating org chart", err.Error())
 		return
 	}
 
 	mapChartResponseToState(&data, &result)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.WorkspaceID, result.TenantID), &resp.Diagnostics)
 	data.Series = planSeries
 	data.CreatedAt = types.StringNull()
 	data.UpdatedAt = types.StringNull()
@@ -175,8 +177,9 @@ func (r *OrgChartResource) Read(ctx context.Context, req resource.ReadRequest, r
 		StartTime string `json:"start_time"`
 		EndTime   string `json:"end_time"`
 	}{OmitData: true, StartTime: "2020-01-01T00:00:00Z", EndTime: "2020-01-01T00:01:00Z"}
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var result chartAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/org-charts/"+data.ID.ValueString(), body, &result)
+	err := c.Post(ctx, "/api/v1/org-charts/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -187,6 +190,7 @@ func (r *OrgChartResource) Read(ctx context.Context, req resource.ReadRequest, r
 	}
 
 	mapChartResponseToState(&data, &result)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.WorkspaceID, result.TenantID), &resp.Diagnostics)
 	data.CreatedAt = savedCreatedAt
 	data.UpdatedAt = savedUpdatedAt
 	data.Series = savedSeries
@@ -224,14 +228,16 @@ func (r *OrgChartResource) Update(ctx context.Context, req resource.UpdateReques
 
 	planSeries := data.Series
 
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var result chartAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/org-charts/"+data.ID.ValueString(), body, &result)
+	err := c.Patch(ctx, "/api/v1/org-charts/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating org chart", err.Error())
 		return
 	}
 
 	mapChartResponseToState(&data, &result)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.WorkspaceID, result.TenantID), &resp.Diagnostics)
 	data.Series = planSeries
 	tflog.Trace(ctx, "updated org chart resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

@@ -9,7 +9,7 @@ All workflow commands live in `GNUmakefile`:
 - `make build` — compile the provider
 - `make install` — install the provider binary into `GOBIN` (used together with a `~/.terraformrc` dev override; see README)
 - `make test` — unit tests (`go test -v -cover -timeout=120s -parallel=10 ./...`)
-- `make testacc` — acceptance tests against the live LangSmith API; requires `LANGSMITH_API_KEY` and (for org-scoped keys) `LANGSMITH_WORKSPACE_ID`. Sets `TF_ACC=1`.
+- `make testacc` — acceptance tests against the live LangSmith API; requires `LANGSMITH_API_KEY` and (for org-scoped keys) `LANGSMITH_WORKSPACE_ID`. Sets `TF_ACC=1`. These create and delete real resources — use a dedicated, disposable workspace.
 - `make lint` — `golangci-lint run`
 - `make fmt` — `gofmt -s -w -e .`
 - `make generate` — regenerates `docs/` and re-formats `examples/`. Runs `tools/tools.go` go:generate directives (copywrite headers, `terraform fmt -recursive ../examples/`, `tfplugindocs generate`). CI fails if `docs/` is stale, so run this after any schema or example change and commit the result.
@@ -37,6 +37,7 @@ Conventions:
 - A handful of resources are create+delete only because the LangSmith API returns secrets only at creation (e.g. `service_key`, `service_account`). Mark such attributes `Sensitive: true` and use `RequiresReplace` plan modifiers where update is impossible.
 - For attributes that carry server-returned JSON (e.g. `extra` fields), use the helpers in `internal/provider/json_helpers.go` — `normalizeJSON` / `jsonStringValue` prevent phantom diffs from key reordering and whitespace.
 - Plan preservation: several resources guard against unknown values during plan (see recent commits on `dataset` / `annotation_queue`); follow that pattern when adding computed-after-apply fields.
+- Per-resource workspace override: most resources expose an `Optional + Computed` `workspace_id` attribute (with `UseStateForUnknown`) that overrides the provider-level workspace for that resource's API calls. Use the helpers in `internal/provider/workspace_helpers.go`: `effectiveClient(r.client, data.WorkspaceID)` at the top of each CRUD method (it wraps `client.WithWorkspaceID`, a shallow copy that swaps the `X-Tenant-Id` header), and `finalizeWorkspaceID(&data.WorkspaceID, c, apiValue, &resp.Diagnostics)` in **every** code path that sets state — it guarantees `workspace_id` is never left unknown after apply (Terraform hard-fails otherwise). LangSmith APIs inconsistently return the workspace as `workspace_id` or `tenant_id`: decode **both** keys in wire structs and pass `firstNonEmpty(api.WorkspaceID, api.TenantID)` as apiValue (empty string if the endpoint returns neither). The older `tenant_id` attribute is deprecated in favor of `workspace_id` — keep it `Computed`-only with a `DeprecationMessage`, don't add it to new resources.
 - `docs/` is generated — never hand-edit. Schemas + `examples/resources/langsmith_<name>/` are the source of truth; run `make generate` after changes.
 
 ## Adding a new resource

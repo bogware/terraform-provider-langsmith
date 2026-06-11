@@ -63,6 +63,10 @@ type insightsConfigAPI struct {
 	Description  *string                `json:"description"`
 	Config       map[string]interface{} `json:"config"`
 	ScheduleCron *string                `json:"schedule_cron"`
+	// LangSmith APIs are inconsistent about which key carries the workspace
+	// identifier, so decode both spellings.
+	WorkspaceID string `json:"workspace_id"`
+	TenantID    string `json:"tenant_id"`
 }
 
 func (r *InsightsConfigResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -136,12 +140,14 @@ func (r *InsightsConfigResource) Create(ctx context.Context, req resource.Create
 		body.ScheduleCron = &v
 	}
 	planConfig := data.Config
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var api insightsConfigAPI
-	if err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, r.basePath(data.SessionID.ValueString()), body, &api); err != nil {
+	if err := c.Post(ctx, r.basePath(data.SessionID.ValueString()), body, &api); err != nil {
 		resp.Diagnostics.AddError("Error creating insights config", err.Error())
 		return
 	}
 	r.mapResponse(&api, &data)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(api.WorkspaceID, api.TenantID), &resp.Diagnostics)
 	// Server expands `config` with all optional fields (nulls). Preserve the
 	// plan's normalized JSON so Terraform doesn't flag drift on values the
 	// user did not set.
@@ -160,8 +166,9 @@ func (r *InsightsConfigResource) Read(ctx context.Context, req resource.ReadRequ
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var list getInsightsConfigsResponse
-	if err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, r.basePath(data.SessionID.ValueString()), nil, &list); err != nil {
+	if err := c.Get(ctx, r.basePath(data.SessionID.ValueString()), nil, &list); err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
 			return
@@ -173,6 +180,7 @@ func (r *InsightsConfigResource) Read(ctx context.Context, req resource.ReadRequ
 		if list.Configs[i].ID == data.ID.ValueString() {
 			savedConfig := data.Config
 			r.mapResponse(&list.Configs[i], &data)
+			finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(list.Configs[i].WorkspaceID, list.Configs[i].TenantID), &resp.Diagnostics)
 			// Preserve the previously-stored config value to avoid phantom
 			// drift from server-injected null fields.
 			data.Config = savedConfig
@@ -211,12 +219,14 @@ func (r *InsightsConfigResource) Update(ctx context.Context, req resource.Update
 		body.ScheduleCron = &v
 	}
 	planConfig := data.Config
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var api insightsConfigAPI
-	if err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, r.basePath(data.SessionID.ValueString())+"/"+data.ID.ValueString(), body, &api); err != nil {
+	if err := c.Patch(ctx, r.basePath(data.SessionID.ValueString())+"/"+data.ID.ValueString(), body, &api); err != nil {
 		resp.Diagnostics.AddError("Error updating insights config", err.Error())
 		return
 	}
 	r.mapResponse(&api, &data)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(api.WorkspaceID, api.TenantID), &resp.Diagnostics)
 	data.Config = planConfig
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

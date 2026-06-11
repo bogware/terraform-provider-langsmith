@@ -45,6 +45,10 @@ type chartSectionListAPIResponse struct {
 	ChartCount  *int64  `json:"chart_count"`
 	CreatedAt   *string `json:"created_at"`
 	ModifiedAt  *string `json:"modified_at"`
+	// LangSmith APIs are inconsistent about which key carries the workspace
+	// identifier, so decode both spellings.
+	WorkspaceID string `json:"workspace_id"`
+	TenantID    string `json:"tenant_id"`
 }
 
 func (d *ChartSectionDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -120,8 +124,9 @@ func (d *ChartSectionDataSource) Read(ctx context.Context, req datasource.ReadRe
 		return
 	}
 
+	c := effectiveClient(d.client, data.WorkspaceID)
 	var sections []chartSectionListAPIResponse
-	err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/charts/section", nil, &sections)
+	err := c.Get(ctx, "/api/v1/charts/section", nil, &sections)
 	if err != nil {
 		resp.Diagnostics.AddError("Error listing chart sections", err.Error())
 		return
@@ -163,6 +168,7 @@ func (d *ChartSectionDataSource) Read(ctx context.Context, req datasource.ReadRe
 	} else {
 		data.ChartCount = types.Int64Null()
 	}
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(found.WorkspaceID, found.TenantID), &resp.Diagnostics)
 
 	tflog.Trace(ctx, "read chart section data source", map[string]interface{}{"id": found.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

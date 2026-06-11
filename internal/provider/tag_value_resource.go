@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -153,14 +154,15 @@ func (r *TagValueResource) Create(ctx context.Context, req resource.CreateReques
 
 	apiPath := fmt.Sprintf("/api/v1/workspaces/current/tag-keys/%s/tag-values", data.TagKeyID.ValueString())
 
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var result tagValueAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, apiPath, body, &result)
+	err := c.Post(ctx, apiPath, body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating tag value", err.Error())
 		return
 	}
 
-	mapTagValueResponseToState(&data, &result)
+	mapTagValueResponseToState(&data, &result, c, &resp.Diagnostics)
 	tflog.Trace(ctx, "created tag value resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -176,8 +178,9 @@ func (r *TagValueResource) Read(ctx context.Context, req resource.ReadRequest, r
 	apiPath := fmt.Sprintf("/api/v1/workspaces/current/tag-keys/%s/tag-values/%s",
 		data.TagKeyID.ValueString(), data.ID.ValueString())
 
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var result tagValueAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, apiPath, nil, &result)
+	err := c.Get(ctx, apiPath, nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -187,7 +190,7 @@ func (r *TagValueResource) Read(ctx context.Context, req resource.ReadRequest, r
 		return
 	}
 
-	mapTagValueResponseToState(&data, &result)
+	mapTagValueResponseToState(&data, &result, c, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -211,14 +214,15 @@ func (r *TagValueResource) Update(ctx context.Context, req resource.UpdateReques
 	apiPath := fmt.Sprintf("/api/v1/workspaces/current/tag-keys/%s/tag-values/%s",
 		data.TagKeyID.ValueString(), data.ID.ValueString())
 
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var result tagValueAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, apiPath, body, &result)
+	err := c.Patch(ctx, apiPath, body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating tag value", err.Error())
 		return
 	}
 
-	mapTagValueResponseToState(&data, &result)
+	mapTagValueResponseToState(&data, &result, c, &resp.Diagnostics)
 	tflog.Trace(ctx, "updated tag value resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -261,7 +265,7 @@ func (r *TagValueResource) ImportState(ctx context.Context, req resource.ImportS
 
 // mapTagValueResponseToState corrals API response data into the Terraform state model,
 // leaving description null when the API has nothing to say.
-func mapTagValueResponseToState(data *TagValueResourceModel, result *tagValueAPIResponse) {
+func mapTagValueResponseToState(data *TagValueResourceModel, result *tagValueAPIResponse, c *client.Client, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.Value = types.StringValue(result.Value)
 
@@ -273,4 +277,8 @@ func mapTagValueResponseToState(data *TagValueResourceModel, result *tagValueAPI
 
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
+
+	// The tag value API does not return workspace information, so pass "" and
+	// let the helper fall back to the client's configured workspace.
+	finalizeWorkspaceID(&data.WorkspaceID, c, "", diags)
 }

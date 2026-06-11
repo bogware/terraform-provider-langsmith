@@ -119,12 +119,15 @@ func (r *DatasetSplitResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 	body := splitMutation{SplitName: data.Name.ValueString(), Examples: ids, Remove: false}
+	apiClient := effectiveClient(r.client, data.WorkspaceID)
 	var result []string
-	if err := effectiveClient(r.client, data.WorkspaceID).Put(ctx, "/api/v1/datasets/"+data.DatasetID.ValueString()+"/splits", body, &result); err != nil {
+	if err := apiClient.Put(ctx, "/api/v1/datasets/"+data.DatasetID.ValueString()+"/splits", body, &result); err != nil {
 		resp.Diagnostics.AddError("Error creating dataset split", err.Error())
 		return
 	}
 	data.ID = types.StringValue(data.DatasetID.ValueString() + ":" + data.Name.ValueString())
+	// The splits API does not return workspace information.
+	finalizeWorkspaceID(&data.WorkspaceID, apiClient, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created dataset split", map[string]interface{}{"id": data.ID.ValueString()})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -135,8 +138,9 @@ func (r *DatasetSplitResource) Read(ctx context.Context, req resource.ReadReques
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	apiClient := effectiveClient(r.client, data.WorkspaceID)
 	var names []string
-	if err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/datasets/"+data.DatasetID.ValueString()+"/splits", nil, &names); err != nil {
+	if err := apiClient.Get(ctx, "/api/v1/datasets/"+data.DatasetID.ValueString()+"/splits", nil, &names); err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
 			return
@@ -147,6 +151,8 @@ func (r *DatasetSplitResource) Read(ctx context.Context, req resource.ReadReques
 	wanted := data.Name.ValueString()
 	for _, n := range names {
 		if n == wanted {
+			// The splits API does not return workspace information.
+			finalizeWorkspaceID(&data.WorkspaceID, apiClient, "", &resp.Diagnostics)
 			resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 			return
 		}
@@ -184,21 +190,24 @@ func (r *DatasetSplitResource) Update(ctx context.Context, req resource.UpdateRe
 	}
 
 	path := "/api/v1/datasets/" + plan.DatasetID.ValueString() + "/splits"
+	apiClient := effectiveClient(r.client, plan.WorkspaceID)
 	if len(toAdd) > 0 {
 		var ignore []string
-		if err := effectiveClient(r.client, plan.WorkspaceID).Put(ctx, path, splitMutation{SplitName: plan.Name.ValueString(), Examples: toAdd, Remove: false}, &ignore); err != nil {
+		if err := apiClient.Put(ctx, path, splitMutation{SplitName: plan.Name.ValueString(), Examples: toAdd, Remove: false}, &ignore); err != nil {
 			resp.Diagnostics.AddError("Error adding examples to split", err.Error())
 			return
 		}
 	}
 	if len(toRemove) > 0 {
 		var ignore []string
-		if err := effectiveClient(r.client, plan.WorkspaceID).Put(ctx, path, splitMutation{SplitName: plan.Name.ValueString(), Examples: toRemove, Remove: true}, &ignore); err != nil {
+		if err := apiClient.Put(ctx, path, splitMutation{SplitName: plan.Name.ValueString(), Examples: toRemove, Remove: true}, &ignore); err != nil {
 			resp.Diagnostics.AddError("Error removing examples from split", err.Error())
 			return
 		}
 	}
 	plan.ID = state.ID
+	// The splits API does not return workspace information.
+	finalizeWorkspaceID(&plan.WorkspaceID, apiClient, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 

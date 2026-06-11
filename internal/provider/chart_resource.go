@@ -82,6 +82,10 @@ type chartAPIResponse struct {
 	SectionID     *string         `json:"section_id"`
 	Metadata      json.RawMessage `json:"metadata"`
 	CommonFilters json.RawMessage `json:"common_filters"`
+	// LangSmith APIs are inconsistent about which key carries the workspace
+	// identifier, so decode both spellings.
+	WorkspaceID string `json:"workspace_id"`
+	TenantID    string `json:"tenant_id"`
 }
 
 func (r *ChartResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -194,14 +198,16 @@ func (r *ChartResource) Create(ctx context.Context, req resource.CreateRequest, 
 	// and auto-generated IDs which would cause "inconsistent result after apply".
 	planSeries := data.Series
 
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var result chartAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/charts/create", body, &result)
+	err := c.Post(ctx, "/api/v1/charts/create", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating chart", err.Error())
 		return
 	}
 
 	mapChartResponseToState(&data, &result)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.WorkspaceID, result.TenantID), &resp.Diagnostics)
 	data.Series = planSeries
 	// The chart API does not return timestamps; set to null to avoid unknown values.
 	data.CreatedAt = types.StringNull()
@@ -230,8 +236,9 @@ func (r *ChartResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		StartTime string `json:"start_time"`
 		EndTime   string `json:"end_time"`
 	}{OmitData: true, StartTime: "2020-01-01T00:00:00Z", EndTime: "2020-01-01T00:01:00Z"}
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var result chartAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/charts/"+data.ID.ValueString(), body, &result)
+	err := c.Post(ctx, "/api/v1/charts/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -242,6 +249,7 @@ func (r *ChartResource) Read(ctx context.Context, req resource.ReadRequest, resp
 	}
 
 	mapChartResponseToState(&data, &result)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.WorkspaceID, result.TenantID), &resp.Diagnostics)
 	// Restore values the read endpoint doesn't return.
 	data.CreatedAt = savedCreatedAt
 	data.UpdatedAt = savedUpdatedAt
@@ -280,14 +288,16 @@ func (r *ChartResource) Update(ctx context.Context, req resource.UpdateRequest, 
 
 	planSeries := data.Series
 
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var result chartAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/charts/"+data.ID.ValueString(), body, &result)
+	err := c.Patch(ctx, "/api/v1/charts/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating chart", err.Error())
 		return
 	}
 
 	mapChartResponseToState(&data, &result)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.WorkspaceID, result.TenantID), &resp.Diagnostics)
 	data.Series = planSeries
 	tflog.Trace(ctx, "updated chart resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

@@ -133,13 +133,15 @@ func (r *SecretResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	// The API is upsert-based and returns no body worth reading --
 	// like sending a telegram to Dodge City and getting silence back.
-	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/workspaces/current/secrets", body, nil)
+	c := effectiveClient(r.client, data.WorkspaceID)
+	err := c.Post(ctx, "/api/v1/workspaces/current/secrets", body, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating secret", err.Error())
 		return
 	}
 
 	data.ID = types.StringValue(data.Key.ValueString())
+	finalizeWorkspaceID(&data.WorkspaceID, c, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "created secret resource", map[string]interface{}{"key": data.Key.ValueString()})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -155,8 +157,9 @@ func (r *SecretResource) Read(ctx context.Context, req resource.ReadRequest, res
 	// The API only hands back a list of key names -- no individual
 	// lookups, and definitely no values. You have to round up the
 	// whole herd and find your steer by brand.
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var results []secretKeyResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/workspaces/current/secrets", nil, &results)
+	err := c.Get(ctx, "/api/v1/workspaces/current/secrets", nil, &results)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -184,6 +187,7 @@ func (r *SecretResource) Read(ctx context.Context, req resource.ReadRequest, res
 	// the state already holds. Like a good bartender at the Long Branch
 	// Saloon, we keep what we know to ourselves.
 	data.ID = types.StringValue(data.Key.ValueString())
+	finalizeWorkspaceID(&data.WorkspaceID, c, "", &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -202,13 +206,15 @@ func (r *SecretResource) Update(ctx context.Context, req resource.UpdateRequest,
 
 	// Same upsert trail as Create -- the API doesn't care whether
 	// you're a newcomer or an old hand, it treats you the same.
-	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/workspaces/current/secrets", body, nil)
+	c := effectiveClient(r.client, data.WorkspaceID)
+	err := c.Post(ctx, "/api/v1/workspaces/current/secrets", body, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating secret", err.Error())
 		return
 	}
 
 	data.ID = types.StringValue(data.Key.ValueString())
+	finalizeWorkspaceID(&data.WorkspaceID, c, "", &resp.Diagnostics)
 	tflog.Trace(ctx, "updated secret resource", map[string]interface{}{"key": data.Key.ValueString()})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

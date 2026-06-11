@@ -51,6 +51,7 @@ type promptDataSourceAPIResponse struct {
 		IsPublic    bool    `json:"is_public"`
 		IsArchived  bool    `json:"is_archived"`
 		WorkspaceID string  `json:"workspace_id"`
+		TenantID    string  `json:"tenant_id"`
 		CreatedAt   string  `json:"created_at"`
 		UpdatedAt   string  `json:"updated_at"`
 	} `json:"repo"`
@@ -129,8 +130,9 @@ func (d *PromptDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		return
 	}
 
+	c := effectiveClient(d.client, data.WorkspaceID)
 	var result promptDataSourceAPIResponse
-	err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/repos/-/"+data.RepoHandle.ValueString(), nil, &result)
+	err := c.Get(ctx, "/api/v1/repos/-/"+data.RepoHandle.ValueString(), nil, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading prompt", err.Error())
 		return
@@ -140,7 +142,7 @@ func (d *PromptDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 	data.RepoHandle = types.StringValue(result.Repo.RepoHandle)
 	data.IsPublic = types.BoolValue(result.Repo.IsPublic)
 	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
-	reconcileWorkspaceID(&data.WorkspaceID, result.Repo.WorkspaceID, &resp.Diagnostics)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.Repo.WorkspaceID, result.Repo.TenantID), &resp.Diagnostics)
 	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.Repo.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.Repo.UpdatedAt)

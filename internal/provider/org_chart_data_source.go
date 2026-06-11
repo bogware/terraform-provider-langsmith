@@ -97,8 +97,9 @@ func (d *OrgChartDataSource) Read(ctx context.Context, req datasource.ReadReques
 		StartTime string `json:"start_time"`
 		EndTime   string `json:"end_time"`
 	}{OmitData: true, StartTime: "2020-01-01T00:00:00Z", EndTime: "2020-01-01T00:01:00Z"}
+	c := effectiveClient(d.client, data.WorkspaceID)
 	var result chartSingleAPIResponse
-	err := effectiveClient(d.client, data.WorkspaceID).Post(ctx, "/api/v1/org-charts/"+data.ID.ValueString(), body, &result)
+	err := c.Post(ctx, "/api/v1/org-charts/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading org chart", err.Error())
 		return
@@ -112,6 +113,7 @@ func (d *OrgChartDataSource) Read(ctx context.Context, req datasource.ReadReques
 	data.Metadata = jsonStringValue(result.Metadata)
 	data.CommonFilters = jsonStringValue(result.CommonFilters)
 	setStateOptionalString(&data.Description, result.Description)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.WorkspaceID, result.TenantID), &resp.Diagnostics)
 
 	tflog.Trace(ctx, "read org chart data source", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
