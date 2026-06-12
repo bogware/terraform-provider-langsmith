@@ -134,20 +134,46 @@ func (r *FeatureModelConfigResource) Create(ctx context.Context, req resource.Cr
 	for _, model := range stringSetElements(ctx, data.DisabledModels, &resp.Diagnostics) {
 		if err := c.Put(ctx, featureModelConfigBasePath(feature)+"/disabled-models", featureModelRequest{Model: model}, nil); err != nil {
 			resp.Diagnostics.AddError("Error disabling model for feature", err.Error())
+			// Persist partial state so the configuration applied so far is
+			// tracked (and tainted) instead of orphaned.
+			r.persistPartialCreate(ctx, &data, resp)
 			return
 		}
 	}
 	if resp.Diagnostics.HasError() {
+		// The default model may already have been set above; persist partial
+		// state so it is tracked (and tainted) instead of orphaned.
+		r.persistPartialCreate(ctx, &data, resp)
 		return
 	}
 
 	data.ID = types.StringValue(feature)
 	r.refresh(ctx, c, &data, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
+		// The remote configuration was fully applied; persist partial state so
+		// it is tracked (and tainted) instead of orphaned when the post-create
+		// refresh fails.
+		r.persistPartialCreate(ctx, &data, resp)
 		return
 	}
 	tflog.Trace(ctx, "created feature model config", map[string]interface{}{"feature": feature})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+// persistPartialCreate saves partial state on a create error path so whatever
+// configuration was already applied remotely is tracked (and tainted) instead
+// of orphaned. Every potentially-unknown field is resolved to a known value
+// first, since Terraform rejects unknown values in state.
+func (r *FeatureModelConfigResource) persistPartialCreate(ctx context.Context, data *FeatureModelConfigResourceModel, resp *resource.CreateResponse) {
+	data.ID = types.StringValue(data.Feature.ValueString())
+	if data.DefaultModel.IsUnknown() {
+		data.DefaultModel = types.StringNull()
+	}
+	if data.DisabledModels.IsUnknown() {
+		data.DisabledModels = types.SetNull(types.StringType)
+	}
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
+	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
 }
 
 func (r *FeatureModelConfigResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {

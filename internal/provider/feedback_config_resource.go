@@ -194,12 +194,21 @@ func (r *FeedbackConfigResource) Create(ctx context.Context, req resource.Create
 
 	// POST doesn't return the resource, so we circle back to read the computed fields
 	found := r.readFeedbackConfig(ctx, &data, &resp.Diagnostics)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	if !found {
+	if !found && !resp.Diagnostics.HasError() {
 		resp.Diagnostics.AddError("Feedback config not found after creation",
 			fmt.Sprintf("Created feedback config with key %q but could not read it back.", data.FeedbackKey.ValueString()))
+	}
+	if resp.Diagnostics.HasError() {
+		// Persist partial state so the created feedback config is tracked (and
+		// tainted) instead of orphaned when the read-back fails.
+		reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
+		if data.TenantID.IsUnknown() {
+			data.TenantID = data.WorkspaceID
+		}
+		if data.ModifiedAt.IsUnknown() {
+			data.ModifiedAt = types.StringNull()
+		}
+		resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 		return
 	}
 

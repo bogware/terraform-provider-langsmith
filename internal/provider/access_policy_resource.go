@@ -170,6 +170,12 @@ func (r *AccessPolicyResource) Create(ctx context.Context, req resource.CreateRe
 	err = effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/v1/platform/orgs/current/access-policies/"+createResult.ID, nil, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading access policy after creation", err.Error())
+		// Persist partial state so the created access policy is tracked (and
+		// tainted) instead of orphaned when the read-back fails.
+		data.CreatedAt = types.StringNull()
+		data.UpdatedAt = types.StringNull()
+		reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
+		resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 		return
 	}
 
