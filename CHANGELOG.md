@@ -1,28 +1,9 @@
-## 0.9.0 (Unreleased)
-
-BREAKING CHANGES:
-
-* `langsmith_prompt` resource: removed the `num_likes`, `num_views`, `num_downloads`, `num_commits`, and `last_commit_hash` attributes. These were observability counters that the server bumps on every UI view/download, causing perpetual phantom drift on `terraform plan`. They have no declarative use case — if you need the numbers, fetch them with `curl` or the LangSmith SDK against `/api/v1/repos/-/{handle}`.
-* `langsmith_prompt` data source: removed the same fields (`num_likes`, `num_commits`, `last_commit_hash`) for consistency.
-
-  *Upgrade note:* existing state containing these attributes will be silently dropped on next `terraform plan`/`apply`; no migration required.
+## 0.10.0 (June 2026)
 
 BUG FIXES:
 
 * Many resources could fail apply with "Provider returned invalid result object after apply: ... workspace_id ... unknown" or leave `workspace_id` null in state. All resources and data sources now resolve `workspace_id` to a known value after every operation: the API-returned value when available (decoding both the `workspace_id` and legacy `tenant_id` response keys — several endpoints only return the latter), falling back to the workspace the provider is configured against. Affected: `langsmith_project`, `langsmith_dataset`, `langsmith_prompt`, `langsmith_annotation_queue`, `langsmith_tool`, `langsmith_alert_rule`, `langsmith_chart`, `langsmith_chart_section`, `langsmith_chart_section_clone`, `langsmith_org_chart`, `langsmith_org_chart_section`, `langsmith_example`, `langsmith_secret`, `langsmith_tagging`, `langsmith_tag_key`, `langsmith_tag_value`, `langsmith_dataset_share`, `langsmith_dataset_split`, `langsmith_insights_config`, `langsmith_feedback_formula`, and the corresponding data sources.
 * `langsmith_feedback_config`: a server-returned JSON `null` for `categories` was stored as the literal string `"null"`, causing "inconsistent result after apply" errors.
-* `langsmith_prompt` (resource): `owner` and `full_name` were never populated on Create/Read because the API nests them inside `repo` while the wire struct expected them at the top level. Fixed; `owner` may now be empty (the API returns `null` for service-account-created prompts), so all path construction falls back to `-` (current-workspace wildcard) when `owner` is unset.
-* `langsmith_prompt` (resource): Update path could leave `manifest` as unknown after apply when the repo had no commits; now explicitly nulled.
-* `langsmith_prompt` (data source): same nested-`repo` decoding bug as the resource — every read returned all-zero values. Fixed.
-* `langsmith_insights_config`: server-injected nulls + default `filter` field in the `config` JSON caused "Provider produced inconsistent result after apply" errors. The plan's `config` value is now preserved across Create/Update/Read so server-side normalization is invisible to Terraform.
-* `langsmith_evaluator`: removed `UseStateForUnknown` from `feedback_keys` (it's derived from `name`, so renaming was crashing with "inconsistent result").
-
-INTERNAL / RESILIENCY:
-
-* `internal/client`: `APIError` now carries the failing HTTP method and path; error messages read e.g. `LangSmith POST /v1/platform/evaluators returned 422: ...` instead of just `(status 422): ...`.
-* `internal/client`: 408 (Request Timeout) is now treated as a transient retriable status alongside 429 and 5xx.
-* `internal/client`: added 14 unit tests covering header injection, retry behavior on 408/429/5xx, `Retry-After` honoring, non-retriable 4xx fail-fast, context cancellation, body marshaling, and query encoding (this package previously had zero tests).
-* `provider`: `api_url` trailing slashes are trimmed so self-hosted instances configured as `https://host/` no longer produce `//api/v1/info` requests.
 
 FEATURES:
 
@@ -44,6 +25,33 @@ FEATURES:
 * **New Data Source:** `langsmith_example`, `langsmith_feedback_config`, `langsmith_filter_view`, `langsmith_tag_value`, `langsmith_bulk_export`, `langsmith_sso_settings` - Singular lookups for existing resource types
 * **New Data Source:** `langsmith_workspace_stats`, `langsmith_org_usage`, `langsmith_evaluator_spend` - Usage and statistics reads
 * **New Data Source:** `langsmith_issues` - **Beta:** list detected issues, optionally per project
+
+## 0.9.0 / 0.9.1 (May–June 2026)
+
+BREAKING CHANGES:
+
+* `langsmith_prompt` resource: removed the `num_likes`, `num_views`, `num_downloads`, `num_commits`, and `last_commit_hash` attributes. These were observability counters that the server bumps on every UI view/download, causing perpetual phantom drift on `terraform plan`. They have no declarative use case — if you need the numbers, fetch them with `curl` or the LangSmith SDK against `/api/v1/repos/-/{handle}`.
+* `langsmith_prompt` data source: removed the same fields (`num_likes`, `num_commits`, `last_commit_hash`) for consistency.
+
+  *Upgrade note:* existing state containing these attributes will be silently dropped on next `terraform plan`/`apply`; no migration required.
+
+BUG FIXES:
+
+* `langsmith_prompt` (resource): `owner` and `full_name` were never populated on Create/Read because the API nests them inside `repo` while the wire struct expected them at the top level. Fixed; `owner` may now be empty (the API returns `null` for service-account-created prompts), so all path construction falls back to `-` (current-workspace wildcard) when `owner` is unset.
+* `langsmith_prompt` (resource): Update path could leave `manifest` as unknown after apply when the repo had no commits; now explicitly nulled.
+* `langsmith_prompt` (data source): same nested-`repo` decoding bug as the resource — every read returned all-zero values. Fixed.
+* `langsmith_insights_config`: server-injected nulls + default `filter` field in the `config` JSON caused "Provider produced inconsistent result after apply" errors. The plan's `config` value is now preserved across Create/Update/Read so server-side normalization is invisible to Terraform.
+* `langsmith_evaluator`: removed `UseStateForUnknown` from `feedback_keys` (it's derived from `name`, so renaming was crashing with "inconsistent result").
+
+INTERNAL / RESILIENCY:
+
+* `internal/client`: `APIError` now carries the failing HTTP method and path; error messages read e.g. `LangSmith POST /v1/platform/evaluators returned 422: ...` instead of just `(status 422): ...`.
+* `internal/client`: 408 (Request Timeout) is now treated as a transient retriable status alongside 429 and 5xx.
+* `internal/client`: added 14 unit tests covering header injection, retry behavior on 408/429/5xx, `Retry-After` honoring, non-retriable 4xx fail-fast, context cancellation, body marshaling, and query encoding (this package previously had zero tests).
+* `provider`: `api_url` trailing slashes are trimmed so self-hosted instances configured as `https://host/` no longer produce `//api/v1/info` requests.
+
+FEATURES:
+
 * **New Resource:** `langsmith_org_chart` - Organization-scoped custom charts (mirror of `langsmith_chart` at org scope)
 * **New Resource:** `langsmith_org_chart_section` - Organization-scoped chart sections
 * **New Resource:** `langsmith_evaluator` - Code and LLM-as-judge evaluators
