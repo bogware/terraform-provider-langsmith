@@ -105,15 +105,16 @@ func (r *OrgChartSectionResource) Create(ctx context.Context, req resource.Creat
 		body.Index = &v
 	}
 
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var result chartSectionAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/org-charts/section", body, &result)
+	err := c.Post(ctx, "/api/v1/org-charts/section", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating org chart section", err.Error())
 		return
 	}
 
 	mapChartSectionResponseToState(&data, &result)
-	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.WorkspaceID, result.TenantID), &resp.Diagnostics)
 	tflog.Trace(ctx, "created org chart section resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -134,8 +135,9 @@ func (r *OrgChartSectionResource) Read(ctx context.Context, req resource.ReadReq
 		StartTime string `json:"start_time"`
 		EndTime   string `json:"end_time"`
 	}{OmitData: true, StartTime: "2020-01-01T00:00:00Z", EndTime: "2020-01-01T00:01:00Z"}
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var result chartSectionAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/org-charts/section/"+data.ID.ValueString(), body, &result)
+	err := c.Post(ctx, "/api/v1/org-charts/section/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -146,6 +148,7 @@ func (r *OrgChartSectionResource) Read(ctx context.Context, req resource.ReadReq
 	}
 
 	mapChartSectionResponseToState(&data, &result)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.WorkspaceID, result.TenantID), &resp.Diagnostics)
 	data.CreatedAt = savedCreatedAt
 	data.UpdatedAt = savedUpdatedAt
 	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
@@ -169,14 +172,16 @@ func (r *OrgChartSectionResource) Update(ctx context.Context, req resource.Updat
 		body.Index = &v
 	}
 
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var result chartSectionAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/org-charts/section/"+data.ID.ValueString(), body, &result)
+	err := c.Patch(ctx, "/api/v1/org-charts/section/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating org chart section", err.Error())
 		return
 	}
 
 	mapChartSectionResponseToState(&data, &result)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.WorkspaceID, result.TenantID), &resp.Diagnostics)
 	data.CreatedAt = savedCreatedAt
 	tflog.Trace(ctx, "updated org chart section resource", map[string]interface{}{"id": result.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

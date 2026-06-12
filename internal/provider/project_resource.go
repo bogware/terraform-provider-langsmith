@@ -75,6 +75,7 @@ type projectAPIResponse struct {
 	ReferenceDatasetID *string         `json:"reference_dataset_id"`
 	Extra              json.RawMessage `json:"extra"`
 	TraceTier          *string         `json:"trace_tier"`
+	WorkspaceID        string          `json:"workspace_id"`
 	TenantID           string          `json:"tenant_id"`
 	StartTime          string          `json:"start_time"`
 }
@@ -191,14 +192,15 @@ func (r *ProjectResource) Create(ctx context.Context, req resource.CreateRequest
 		body.TraceTier = &v
 	}
 
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var result projectAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/sessions", body, &result)
+	err := c.Post(ctx, "/api/v1/sessions", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating project", err.Error())
 		return
 	}
 
-	mapProjectResponseToState(&data, &result, &resp.Diagnostics)
+	mapProjectResponseToState(&data, &result, c, &resp.Diagnostics)
 	tflog.Trace(ctx, "created project resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -211,8 +213,9 @@ func (r *ProjectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var result projectAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/sessions/"+data.ID.ValueString(), nil, &result)
+	err := c.Get(ctx, "/api/v1/sessions/"+data.ID.ValueString(), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -222,7 +225,7 @@ func (r *ProjectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	mapProjectResponseToState(&data, &result, &resp.Diagnostics)
+	mapProjectResponseToState(&data, &result, c, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -259,14 +262,15 @@ func (r *ProjectResource) Update(ctx context.Context, req resource.UpdateRequest
 		body.TraceTier = &v
 	}
 
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var result projectAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/sessions/"+data.ID.ValueString(), body, &result)
+	err := c.Patch(ctx, "/api/v1/sessions/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating project", err.Error())
 		return
 	}
 
-	mapProjectResponseToState(&data, &result, &resp.Diagnostics)
+	mapProjectResponseToState(&data, &result, c, &resp.Diagnostics)
 	tflog.Trace(ctx, "updated project resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -294,7 +298,7 @@ func (r *ProjectResource) ImportState(ctx context.Context, req resource.ImportSt
 
 // mapProjectResponseToState translates the API response into Terraform state,
 // branding each field so Terraform can track it on the open range.
-func mapProjectResponseToState(data *ProjectResourceModel, result *projectAPIResponse, diags *diag.Diagnostics) {
+func mapProjectResponseToState(data *ProjectResourceModel, result *projectAPIResponse, c *client.Client, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.Name = types.StringValue(result.Name)
 
@@ -324,7 +328,7 @@ func mapProjectResponseToState(data *ProjectResourceModel, result *projectAPIRes
 		data.TraceTier = types.StringNull()
 	}
 
-	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, diags)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.WorkspaceID, result.TenantID), diags)
 	data.TenantID = data.WorkspaceID
 	data.StartTime = types.StringValue(result.StartTime)
 }

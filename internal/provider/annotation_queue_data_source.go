@@ -47,6 +47,7 @@ type annotationQueueDataSourceAPIResponse struct {
 	NumReviewersPerItem *int64  `json:"num_reviewers_per_item"`
 	EnableReservations  bool    `json:"enable_reservations"`
 	ReservationMinutes  *int64  `json:"reservation_minutes"`
+	WorkspaceID         string  `json:"workspace_id"`
 	TenantID            string  `json:"tenant_id"`
 	CreatedAt           string  `json:"created_at"`
 	UpdatedAt           string  `json:"updated_at"`
@@ -135,19 +136,20 @@ func (d *AnnotationQueueDataSource) Read(ctx context.Context, req datasource.Rea
 		return
 	}
 
+	apiClient := effectiveClient(d.client, data.WorkspaceID)
 	if idSet {
 		var result annotationQueueDataSourceAPIResponse
-		err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), nil, &result)
+		err := apiClient.Get(ctx, "/api/v1/annotation-queues/"+data.ID.ValueString(), nil, &result)
 		if err != nil {
 			resp.Diagnostics.AddError("Error reading annotation queue", err.Error())
 			return
 		}
-		mapAnnotationQueueDSResponse(&data, &result, &resp.Diagnostics)
+		mapAnnotationQueueDSResponse(&data, &result, apiClient, &resp.Diagnostics)
 	} else {
 		query := url.Values{}
 		query.Set("name", data.Name.ValueString())
 		var results []annotationQueueDataSourceAPIResponse
-		err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/annotation-queues", query, &results)
+		err := apiClient.Get(ctx, "/api/v1/annotation-queues", query, &results)
 		if err != nil {
 			resp.Diagnostics.AddError("Error reading annotation queue", err.Error())
 			return
@@ -156,18 +158,18 @@ func (d *AnnotationQueueDataSource) Read(ctx context.Context, req datasource.Rea
 			resp.Diagnostics.AddError("Annotation Queue Not Found", fmt.Sprintf("No queue found with name %q.", data.Name.ValueString()))
 			return
 		}
-		mapAnnotationQueueDSResponse(&data, &results[0], &resp.Diagnostics)
+		mapAnnotationQueueDSResponse(&data, &results[0], apiClient, &resp.Diagnostics)
 	}
 
 	tflog.Trace(ctx, "read annotation queue data source", map[string]interface{}{"id": data.ID.ValueString()})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func mapAnnotationQueueDSResponse(data *AnnotationQueueDataSourceModel, r *annotationQueueDataSourceAPIResponse, diags *diag.Diagnostics) {
+func mapAnnotationQueueDSResponse(data *AnnotationQueueDataSourceModel, r *annotationQueueDataSourceAPIResponse, c *client.Client, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(r.ID)
 	data.Name = types.StringValue(r.Name)
 	data.EnableReservations = types.BoolValue(r.EnableReservations)
-	reconcileWorkspaceID(&data.WorkspaceID, r.TenantID, diags)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(r.WorkspaceID, r.TenantID), diags)
 	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(r.CreatedAt)
 	data.UpdatedAt = types.StringValue(r.UpdatedAt)

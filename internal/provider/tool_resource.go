@@ -76,6 +76,7 @@ type toolAPI struct {
 	Returns     map[string]interface{} `json:"returns"`
 	Metadata    map[string]interface{} `json:"metadata"`
 	Enabled     bool                   `json:"enabled"`
+	WorkspaceID string                 `json:"workspace_id"`
 	TenantID    string                 `json:"tenant_id"`
 	CreatedAt   string                 `json:"created_at"`
 	UpdatedAt   string                 `json:"updated_at"`
@@ -181,12 +182,13 @@ func (r *ToolResource) Create(ctx context.Context, req resource.CreateRequest, r
 		body.Enabled = &v
 	}
 
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var api toolAPI
-	if err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/v1/platform/tools", body, &api); err != nil {
+	if err := c.Post(ctx, "/v1/platform/tools", body, &api); err != nil {
 		resp.Diagnostics.AddError("Error creating tool", err.Error())
 		return
 	}
-	r.mapResponse(&api, &data, &resp.Diagnostics)
+	r.mapResponse(&api, &data, c, &resp.Diagnostics)
 	tflog.Trace(ctx, "created tool", map[string]interface{}{"handle": api.Handle})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -197,8 +199,9 @@ func (r *ToolResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var api toolAPI
-	if err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), nil, &api); err != nil {
+	if err := c.Get(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), nil, &api); err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
 			return
@@ -206,7 +209,7 @@ func (r *ToolResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		resp.Diagnostics.AddError("Error reading tool", err.Error())
 		return
 	}
-	r.mapResponse(&api, &data, &resp.Diagnostics)
+	r.mapResponse(&api, &data, c, &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -239,12 +242,13 @@ func (r *ToolResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		body.Enabled = &v
 	}
 
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var api toolAPI
-	if err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), body, &api); err != nil {
+	if err := c.Patch(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), body, &api); err != nil {
 		resp.Diagnostics.AddError("Error updating tool", err.Error())
 		return
 	}
-	r.mapResponse(&api, &data, &resp.Diagnostics)
+	r.mapResponse(&api, &data, c, &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -264,7 +268,7 @@ func (r *ToolResource) ImportState(ctx context.Context, req resource.ImportState
 	resource.ImportStatePassthroughID(ctx, path.Root("handle"), req, resp)
 }
 
-func (r *ToolResource) mapResponse(api *toolAPI, data *ToolResourceModel, diags *diag.Diagnostics) {
+func (r *ToolResource) mapResponse(api *toolAPI, data *ToolResourceModel, c *client.Client, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(api.ID)
 	data.Handle = types.StringValue(api.Handle)
 	data.Name = types.StringValue(api.Name)
@@ -288,7 +292,7 @@ func (r *ToolResource) mapResponse(api *toolAPI, data *ToolResourceModel, diags 
 		data.Metadata = types.StringNull()
 	}
 	data.Enabled = types.BoolValue(api.Enabled)
-	reconcileWorkspaceID(&data.WorkspaceID, api.TenantID, diags)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(api.WorkspaceID, api.TenantID), diags)
 	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(api.CreatedAt)
 	data.UpdatedAt = types.StringValue(api.UpdatedAt)

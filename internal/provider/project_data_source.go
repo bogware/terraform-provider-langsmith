@@ -56,6 +56,7 @@ type projectDataSourceAPIResponse struct {
 	ReferenceDatasetID *string         `json:"reference_dataset_id"`
 	Extra              json.RawMessage `json:"extra"`
 	TraceTier          *string         `json:"trace_tier"`
+	WorkspaceID        string          `json:"workspace_id"`
 	TenantID           string          `json:"tenant_id"`
 	StartTime          string          `json:"start_time"`
 	RunCount           int64           `json:"run_count"`
@@ -156,10 +157,11 @@ func (d *ProjectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 
+	c := effectiveClient(d.client, data.WorkspaceID)
 	var result projectDataSourceAPIResponse
 
 	if idSet {
-		err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/sessions/"+data.ID.ValueString(), nil, &result)
+		err := c.Get(ctx, "/api/v1/sessions/"+data.ID.ValueString(), nil, &result)
 		if err != nil {
 			resp.Diagnostics.AddError("Error reading project", err.Error())
 			return
@@ -169,7 +171,7 @@ func (d *ProjectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		query.Set("name", data.Name.ValueString())
 
 		var results []projectDataSourceAPIResponse
-		err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/sessions", query, &results)
+		err := c.Get(ctx, "/api/v1/sessions", query, &results)
 		if err != nil {
 			resp.Diagnostics.AddError("Error reading project", err.Error())
 			return
@@ -219,7 +221,7 @@ func (d *ProjectDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		data.TraceTier = types.StringNull()
 	}
 
-	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, &resp.Diagnostics)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.WorkspaceID, result.TenantID), &resp.Diagnostics)
 	data.TenantID = data.WorkspaceID
 	data.StartTime = types.StringValue(result.StartTime)
 	data.RunCount = types.Int64Value(result.RunCount)

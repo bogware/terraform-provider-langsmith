@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -202,14 +203,15 @@ func (r *ExampleResource) Create(ctx context.Context, req resource.CreateRequest
 	planSplit := data.Split
 	planMetadata := data.Metadata
 
+	apiClient := effectiveClient(r.client, data.WorkspaceID)
 	var result exampleAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/examples", body, &result)
+	err := apiClient.Post(ctx, "/api/v1/examples", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating example", err.Error())
 		return
 	}
 
-	mapExampleResponseToState(&data, &result)
+	mapExampleResponseToState(&data, &result, apiClient, &resp.Diagnostics)
 	data.Split = planSplit
 	data.Metadata = planMetadata
 	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
@@ -229,8 +231,9 @@ func (r *ExampleResource) Read(ctx context.Context, req resource.ReadRequest, re
 	savedSplit := data.Split
 	savedMetadata := data.Metadata
 
+	apiClient := effectiveClient(r.client, data.WorkspaceID)
 	var result exampleAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/examples/"+data.ID.ValueString(), nil, &result)
+	err := apiClient.Get(ctx, "/api/v1/examples/"+data.ID.ValueString(), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -240,7 +243,7 @@ func (r *ExampleResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	mapExampleResponseToState(&data, &result)
+	mapExampleResponseToState(&data, &result, apiClient, &resp.Diagnostics)
 	// Restore split from state; the API stores it as dataset_split inside metadata
 	// rather than returning it as a standalone field.
 	data.Split = savedSplit
@@ -286,14 +289,15 @@ func (r *ExampleResource) Update(ctx context.Context, req resource.UpdateRequest
 	planSplit := data.Split
 	planMetadata := data.Metadata
 
+	apiClient := effectiveClient(r.client, data.WorkspaceID)
 	var result exampleAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/examples/"+data.ID.ValueString(), body, &result)
+	err := apiClient.Patch(ctx, "/api/v1/examples/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating example", err.Error())
 		return
 	}
 
-	mapExampleResponseToState(&data, &result)
+	mapExampleResponseToState(&data, &result, apiClient, &resp.Diagnostics)
 	data.Split = planSplit
 	data.Metadata = planMetadata
 	tflog.Trace(ctx, "updated example resource", map[string]interface{}{"id": result.ID})
@@ -323,7 +327,7 @@ func (r *ExampleResource) ImportState(ctx context.Context, req resource.ImportSt
 
 // mapExampleResponseToState translates the API response into Terraform state,
 // handling the JSON fields with the care of a good trail cook.
-func mapExampleResponseToState(data *ExampleResourceModel, result *exampleAPIResponse) {
+func mapExampleResponseToState(data *ExampleResourceModel, result *exampleAPIResponse, c *client.Client, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.DatasetID = types.StringValue(result.DatasetID)
 
@@ -345,4 +349,7 @@ func mapExampleResponseToState(data *ExampleResourceModel, result *exampleAPIRes
 
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.ModifiedAt = types.StringValue(result.ModifiedAt)
+
+	// The examples API does not return workspace information.
+	finalizeWorkspaceID(&data.WorkspaceID, c, "", diags)
 }

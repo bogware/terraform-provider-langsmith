@@ -272,7 +272,7 @@ func (r *FeedbackConfigResource) readFeedbackConfig(ctx context.Context, data *F
 	} else {
 		data.Max = types.Float64Null()
 	}
-	if cats, ok := found.FeedbackConfig["categories"]; ok {
+	if cats, ok := found.FeedbackConfig["categories"]; ok && cats != nil {
 		catsJSON, err := json.Marshal(cats)
 		if err != nil {
 			diags.AddError("Error serializing categories", err.Error())

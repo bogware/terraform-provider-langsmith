@@ -152,8 +152,9 @@ func (r *TaggingResource) Create(ctx context.Context, req resource.CreateRequest
 		ResourceID:   data.ResourceID.ValueString(),
 	}
 
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var result taggingAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/workspaces/current/taggings", body, &result)
+	err := c.Post(ctx, "/api/v1/workspaces/current/taggings", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating tagging", err.Error())
 		return
@@ -164,6 +165,7 @@ func (r *TaggingResource) Create(ctx context.Context, req resource.CreateRequest
 	data.ResourceType = types.StringValue(result.ResourceType)
 	data.ResourceID = types.StringValue(result.ResourceID)
 	data.CreatedAt = types.StringValue(result.CreatedAt)
+	finalizeWorkspaceID(&data.WorkspaceID, c, "", &resp.Diagnostics)
 
 	tflog.Trace(ctx, "created tagging resource", map[string]interface{}{"id": result.ID})
 	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
@@ -182,8 +184,9 @@ func (r *TaggingResource) Read(ctx context.Context, req resource.ReadRequest, re
 	query := url.Values{}
 	query.Set("tag_value_id", data.TagValueID.ValueString())
 
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var results []taggingListResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/workspaces/current/taggings", query, &results)
+	err := c.Get(ctx, "/api/v1/workspaces/current/taggings", query, &results)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading taggings", err.Error())
 		return
@@ -221,7 +224,7 @@ func (r *TaggingResource) Read(ctx context.Context, req resource.ReadRequest, re
 
 	// State is already populated from the prior apply; the list endpoint
 	// doesn't return created_at, so we keep it from state.
-	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
+	finalizeWorkspaceID(&data.WorkspaceID, c, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

@@ -91,6 +91,7 @@ type datasetAPIResponse struct {
 	SessionCount            int64           `json:"session_count"`
 	ModifiedAt              string          `json:"modified_at"`
 	LastSessionStartTime    *string         `json:"last_session_start_time"`
+	WorkspaceID             string          `json:"workspace_id"`
 	TenantID                string          `json:"tenant_id"`
 	CreatedAt               string          `json:"created_at"`
 }
@@ -247,14 +248,15 @@ func (r *DatasetResource) Create(ctx context.Context, req resource.CreateRequest
 	planTransformations := data.Transformations
 	planMetadata := data.Metadata
 
+	apiClient := effectiveClient(r.client, data.WorkspaceID)
 	var result datasetAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/datasets", body, &result)
+	err := apiClient.Post(ctx, "/api/v1/datasets", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating dataset", err.Error())
 		return
 	}
 
-	mapDatasetResponseToState(&data, &result, &resp.Diagnostics)
+	mapDatasetResponseToState(&data, &result, apiClient, &resp.Diagnostics)
 	// Only preserve plan values that are actually known (not unknown from Computed fields).
 	if !planInputsSchema.IsUnknown() {
 		data.InputsSchemaDefinition = planInputsSchema
@@ -280,8 +282,9 @@ func (r *DatasetResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
+	apiClient := effectiveClient(r.client, data.WorkspaceID)
 	var result datasetAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/datasets/"+data.ID.ValueString(), nil, &result)
+	err := apiClient.Get(ctx, "/api/v1/datasets/"+data.ID.ValueString(), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -291,7 +294,7 @@ func (r *DatasetResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	mapDatasetResponseToState(&data, &result, &resp.Diagnostics)
+	mapDatasetResponseToState(&data, &result, apiClient, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -339,14 +342,15 @@ func (r *DatasetResource) Update(ctx context.Context, req resource.UpdateRequest
 	planTransformations := data.Transformations
 	planMetadata := data.Metadata
 
+	apiClient := effectiveClient(r.client, data.WorkspaceID)
 	var result datasetAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/datasets/"+data.ID.ValueString(), body, &result)
+	err := apiClient.Patch(ctx, "/api/v1/datasets/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating dataset", err.Error())
 		return
 	}
 
-	mapDatasetResponseToState(&data, &result, &resp.Diagnostics)
+	mapDatasetResponseToState(&data, &result, apiClient, &resp.Diagnostics)
 	// Only preserve plan values that are actually known (not unknown from Computed fields).
 	if !planInputsSchema.IsUnknown() {
 		data.InputsSchemaDefinition = planInputsSchema
@@ -387,7 +391,7 @@ func (r *DatasetResource) ImportState(ctx context.Context, req resource.ImportSt
 
 // mapDatasetResponseToState translates the API response into Terraform state.
 // Mind the nulls — an absent field means nothing's there, not that it's empty.
-func mapDatasetResponseToState(data *DatasetResourceModel, result *datasetAPIResponse, diags *diag.Diagnostics) {
+func mapDatasetResponseToState(data *DatasetResourceModel, result *datasetAPIResponse, c *client.Client, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.Name = types.StringValue(result.Name)
 
@@ -424,7 +428,7 @@ func mapDatasetResponseToState(data *DatasetResourceModel, result *datasetAPIRes
 		data.LastSessionStartTime = types.StringNull()
 	}
 
-	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, diags)
+	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.WorkspaceID, result.TenantID), diags)
 	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 }
