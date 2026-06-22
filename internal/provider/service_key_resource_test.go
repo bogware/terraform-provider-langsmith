@@ -12,7 +12,14 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
+// TestAccServiceKeyResource_basic creates an org-wide service key. The API only
+// permits this for organization admins ("Only org admins can create org-wide
+// keys"), so it is gated behind an env var like other org-admin-only tests.
 func TestAccServiceKeyResource_basic(t *testing.T) {
+	if os.Getenv("LANGSMITH_TEST_SERVICE_KEYS_ENABLED") == "" {
+		t.Skip("Set LANGSMITH_TEST_SERVICE_KEYS_ENABLED to enable (creating org-wide service keys requires organization admin permissions)")
+	}
+
 	description := fmt.Sprintf("tf-acc-service-key-%s", acctest.RandStringFromCharSet(8, acctest.CharSetAlphaNum))
 
 	resource.Test(t, resource.TestCase{
