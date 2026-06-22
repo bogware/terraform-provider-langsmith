@@ -21,12 +21,13 @@ func TestAccPromptResource_basic(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccPromptResourceConfig(handle, false, "initial description"),
+				Config: testAccPromptResourceConfig(handle, false, "initial description", false),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("langsmith_prompt.test", "id"),
 					resource.TestCheckResourceAttr("langsmith_prompt.test", "repo_handle", handle),
 					resource.TestCheckResourceAttr("langsmith_prompt.test", "is_public", "false"),
 					resource.TestCheckResourceAttr("langsmith_prompt.test", "description", "initial description"),
+					resource.TestCheckResourceAttr("langsmith_prompt.test", "restricted_mode", "false"),
 					// owner may be empty for prompts created via a service account.
 					resource.TestCheckResourceAttrSet("langsmith_prompt.test", "full_name"),
 					resource.TestCheckResourceAttrSet("langsmith_prompt.test", "workspace_id"),
@@ -39,14 +40,16 @@ func TestAccPromptResource_basic(t *testing.T) {
 				),
 			},
 			{
-				Config: testAccPromptResourceConfig(handle, false, "updated description"),
+				Config: testAccPromptResourceConfig(handle, false, "updated description", true),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("langsmith_prompt.test", "description", "updated description"),
+					// restricted_mode must round-trip through update + refresh.
+					resource.TestCheckResourceAttr("langsmith_prompt.test", "restricted_mode", "true"),
 				),
 			},
 			// Idempotency: the owner/full_name path fixes must produce zero diff on replay.
 			{
-				Config:             testAccPromptResourceConfig(handle, false, "updated description"),
+				Config:             testAccPromptResourceConfig(handle, false, "updated description", true),
 				PlanOnly:           true,
 				ExpectNonEmptyPlan: false,
 			},
@@ -146,12 +149,13 @@ resource "langsmith_prompt" "test" {
 `, handle)
 }
 
-func testAccPromptResourceConfig(handle string, isPublic bool, description string) string {
+func testAccPromptResourceConfig(handle string, isPublic bool, description string, restrictedMode bool) string {
 	return fmt.Sprintf(`
 resource "langsmith_prompt" "test" {
-  repo_handle = %[1]q
-  is_public   = %[2]t
-  description = %[3]q
+  repo_handle     = %[1]q
+  is_public       = %[2]t
+  description     = %[3]q
+  restricted_mode = %[4]t
 }
-`, handle, isPublic, description)
+`, handle, isPublic, description, restrictedMode)
 }

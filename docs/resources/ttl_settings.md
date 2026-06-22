@@ -36,6 +36,6 @@ resource "langsmith_ttl_settings" "example" {
 - `configured_by` (String) Who configured the settings: `system` or `user`.
 - `created_at` (String) The creation timestamp.
 - `id` (String) The unique identifier of the TTL settings.
-- `longlived_ttl_days` (Number) The number of days longlived traces are retained.
+- `longlived_ttl_days` (Number) The number of days longlived traces are retained. Read-only at the organization level: this value cannot be set via the org TTL settings endpoint. To manage the per-workspace retention window, use the `langsmith_workspace_ttl_settings` resource.
 - `organization_id` (String) The organization ID that owns these TTL settings.
 - `updated_at` (String) The last update timestamp.

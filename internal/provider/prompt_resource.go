@@ -42,39 +42,45 @@ type PromptResource struct {
 // last_commit_hash were intentionally removed in v0.9.0 — they were
 // observability data that caused phantom drift on every plan. See CHANGELOG.
 type PromptResourceModel struct {
-	ID          types.String `tfsdk:"id"`
-	RepoHandle  types.String `tfsdk:"repo_handle"`
-	Manifest    types.String `tfsdk:"manifest"`
-	IsPublic    types.Bool   `tfsdk:"is_public"`
-	Description types.String `tfsdk:"description"`
-	Readme      types.String `tfsdk:"readme"`
-	Tags        types.List   `tfsdk:"tags"`
-	IsArchived  types.Bool   `tfsdk:"is_archived"`
-	Owner       types.String `tfsdk:"owner"`
-	FullName    types.String `tfsdk:"full_name"`
-	CommitHash  types.String `tfsdk:"commit_hash"`
-	WorkspaceID types.String `tfsdk:"workspace_id"`
-	TenantID    types.String `tfsdk:"tenant_id"`
-	CreatedAt   types.String `tfsdk:"created_at"`
-	UpdatedAt   types.String `tfsdk:"updated_at"`
+	ID             types.String `tfsdk:"id"`
+	RepoHandle     types.String `tfsdk:"repo_handle"`
+	Manifest       types.String `tfsdk:"manifest"`
+	IsPublic       types.Bool   `tfsdk:"is_public"`
+	Description    types.String `tfsdk:"description"`
+	Readme         types.String `tfsdk:"readme"`
+	Tags           types.List   `tfsdk:"tags"`
+	IsArchived     types.Bool   `tfsdk:"is_archived"`
+	RestrictedMode types.Bool   `tfsdk:"restricted_mode"`
+	TagValueIDs    types.List   `tfsdk:"tag_value_ids"`
+	Owner          types.String `tfsdk:"owner"`
+	FullName       types.String `tfsdk:"full_name"`
+	CommitHash     types.String `tfsdk:"commit_hash"`
+	WorkspaceID    types.String `tfsdk:"workspace_id"`
+	TenantID       types.String `tfsdk:"tenant_id"`
+	CreatedAt      types.String `tfsdk:"created_at"`
+	UpdatedAt      types.String `tfsdk:"updated_at"`
 }
 
 // promptCreateRequest is the payload for staking a new claim in the Hub.
 type promptCreateRequest struct {
-	RepoHandle  string   `json:"repo_handle"`
-	IsPublic    bool     `json:"is_public"`
-	Description string   `json:"description,omitempty"`
-	Readme      string   `json:"readme,omitempty"`
-	Tags        []string `json:"tags,omitempty"`
+	RepoHandle     string   `json:"repo_handle"`
+	IsPublic       bool     `json:"is_public"`
+	Description    string   `json:"description,omitempty"`
+	Readme         string   `json:"readme,omitempty"`
+	Tags           []string `json:"tags,omitempty"`
+	RestrictedMode *bool    `json:"restricted_mode,omitempty"`
+	TagValueIDs    []string `json:"tag_value_ids,omitempty"`
 }
 
 // promptUpdateRequest carries the fields that can be amended after the initial filing.
 type promptUpdateRequest struct {
-	Description *string  `json:"description,omitempty"`
-	Readme      *string  `json:"readme,omitempty"`
-	IsPublic    *bool    `json:"is_public,omitempty"`
-	Tags        []string `json:"tags,omitempty"`
-	IsArchived  *bool    `json:"is_archived,omitempty"`
+	Description    *string  `json:"description,omitempty"`
+	Readme         *string  `json:"readme,omitempty"`
+	IsPublic       *bool    `json:"is_public,omitempty"`
+	Tags           []string `json:"tags,omitempty"`
+	IsArchived     *bool    `json:"is_archived,omitempty"`
+	RestrictedMode *bool    `json:"restricted_mode,omitempty"`
+	TagValueIDs    []string `json:"tag_value_ids,omitempty"`
 }
 
 // promptCommitRequest is the payload for branding a new version of the prompt.
@@ -104,20 +110,21 @@ type promptLatestCommitResponse struct {
 // the "-" wildcard via repoOwnerSegment.
 type promptAPIResponse struct {
 	Repo struct {
-		ID          string   `json:"id"`
-		RepoHandle  string   `json:"repo_handle"`
-		Description string   `json:"description"`
-		Readme      string   `json:"readme"`
-		IsPublic    bool     `json:"is_public"`
-		IsArchived  bool     `json:"is_archived"`
-		Tags        []string `json:"tags"`
-		WorkspaceID string   `json:"workspace_id"`
-		TenantID    string   `json:"tenant_id"`
-		NumCommits  int64    `json:"num_commits"`
-		Owner       *string  `json:"owner"`
-		FullName    string   `json:"full_name"`
-		CreatedAt   string   `json:"created_at"`
-		UpdatedAt   string   `json:"updated_at"`
+		ID             string   `json:"id"`
+		RepoHandle     string   `json:"repo_handle"`
+		Description    string   `json:"description"`
+		Readme         string   `json:"readme"`
+		IsPublic       bool     `json:"is_public"`
+		IsArchived     bool     `json:"is_archived"`
+		RestrictedMode bool     `json:"restricted_mode"`
+		Tags           []string `json:"tags"`
+		WorkspaceID    string   `json:"workspace_id"`
+		TenantID       string   `json:"tenant_id"`
+		NumCommits     int64    `json:"num_commits"`
+		Owner          *string  `json:"owner"`
+		FullName       string   `json:"full_name"`
+		CreatedAt      string   `json:"created_at"`
+		UpdatedAt      string   `json:"updated_at"`
 	} `json:"repo"`
 }
 
@@ -178,6 +185,16 @@ func (r *PromptResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				MarkdownDescription: "Whether the prompt has been archived -- put out to pasture, so to speak.",
 				Optional:            true,
 				Computed:            true,
+			},
+			"restricted_mode": schema.BoolAttribute{
+				MarkdownDescription: "Whether the prompt repo is in restricted mode, limiting who can access it.",
+				Optional:            true,
+				Computed:            true,
+			},
+			"tag_value_ids": schema.ListAttribute{
+				MarkdownDescription: "IDs of tag values (from the workspace tag taxonomy) to associate with this prompt repo.",
+				Optional:            true,
+				ElementType:         types.StringType,
 			},
 			"owner": schema.StringAttribute{
 				MarkdownDescription: "The owner of the prompt repo.",
@@ -256,6 +273,18 @@ func (r *PromptResource) Create(ctx context.Context, req resource.CreateRequest,
 		}
 		body.Tags = tags
 	}
+	if !data.RestrictedMode.IsNull() && !data.RestrictedMode.IsUnknown() {
+		v := data.RestrictedMode.ValueBool()
+		body.RestrictedMode = &v
+	}
+	if !data.TagValueIDs.IsNull() {
+		var tagValueIDs []string
+		resp.Diagnostics.Append(data.TagValueIDs.ElementsAs(ctx, &tagValueIDs, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		body.TagValueIDs = tagValueIDs
+	}
 
 	c := effectiveClient(r.client, data.WorkspaceID)
 	var result promptAPIResponse
@@ -289,6 +318,7 @@ func (r *PromptResource) Create(ctx context.Context, req resource.CreateRequest,
 			// still-unknown computed field to a known value first.
 			data.CommitHash = types.StringNull()
 			data.IsArchived = types.BoolValue(result.Repo.IsArchived)
+			data.RestrictedMode = types.BoolValue(result.Repo.RestrictedMode)
 			finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.Repo.WorkspaceID, result.Repo.TenantID), &resp.Diagnostics)
 			data.TenantID = data.WorkspaceID
 			resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -302,6 +332,7 @@ func (r *PromptResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	// Set remaining computed fields that the create response may not populate.
 	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
+	data.RestrictedMode = types.BoolValue(result.Repo.RestrictedMode)
 	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.Repo.WorkspaceID, result.Repo.TenantID), &resp.Diagnostics)
 	data.TenantID = data.WorkspaceID
 
@@ -342,6 +373,7 @@ func (r *PromptResource) Read(ctx context.Context, req resource.ReadRequest, res
 	data.RepoHandle = types.StringValue(result.Repo.RepoHandle)
 	data.IsPublic = types.BoolValue(result.Repo.IsPublic)
 	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
+	data.RestrictedMode = types.BoolValue(result.Repo.RestrictedMode)
 	if result.Repo.Owner != nil {
 		data.Owner = types.StringValue(*result.Repo.Owner)
 	} else {
@@ -432,6 +464,18 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 		v := data.IsArchived.ValueBool()
 		body.IsArchived = &v
 	}
+	if !data.RestrictedMode.IsNull() && !data.RestrictedMode.IsUnknown() {
+		v := data.RestrictedMode.ValueBool()
+		body.RestrictedMode = &v
+	}
+	if !data.TagValueIDs.IsNull() {
+		var tagValueIDs []string
+		resp.Diagnostics.Append(data.TagValueIDs.ElementsAs(ctx, &tagValueIDs, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		body.TagValueIDs = tagValueIDs
+	}
 
 	c := effectiveClient(r.client, data.WorkspaceID)
 	err := c.Patch(ctx, fmt.Sprintf("/api/v1/repos/%s/%s", owner, repoHandle), body, nil)
@@ -471,6 +515,7 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 	data.FullName = types.StringValue(result.Repo.FullName)
 	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
+	data.RestrictedMode = types.BoolValue(result.Repo.RestrictedMode)
 	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.Repo.WorkspaceID, result.Repo.TenantID), &resp.Diagnostics)
 	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.Repo.CreatedAt)

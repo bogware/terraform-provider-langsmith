@@ -49,9 +49,11 @@ type ProjectResourceModel struct {
 	ReferenceDatasetID types.String `tfsdk:"reference_dataset_id"`
 	Extra              types.String `tfsdk:"extra"`
 	TraceTier          types.String `tfsdk:"trace_tier"`
+	TagValueIDs        types.List   `tfsdk:"tag_value_ids"`
 	WorkspaceID        types.String `tfsdk:"workspace_id"`
 	TenantID           types.String `tfsdk:"tenant_id"`
 	StartTime          types.String `tfsdk:"start_time"`
+	EndTime            types.String `tfsdk:"end_time"`
 }
 
 // projectAPIRequest is the wire format for creating or updating a project via
@@ -63,6 +65,9 @@ type projectAPIRequest struct {
 	ReferenceDatasetID *string         `json:"reference_dataset_id,omitempty"`
 	Extra              json.RawMessage `json:"extra,omitempty"`
 	TraceTier          *string         `json:"trace_tier,omitempty"`
+	TagValueIDs        []string        `json:"tag_value_ids,omitempty"`
+	StartTime          *string         `json:"start_time,omitempty"`
+	EndTime            *string         `json:"end_time,omitempty"`
 }
 
 // projectAPIResponse is what the LangSmith API sends back when a project is
@@ -75,9 +80,11 @@ type projectAPIResponse struct {
 	ReferenceDatasetID *string         `json:"reference_dataset_id"`
 	Extra              json.RawMessage `json:"extra"`
 	TraceTier          *string         `json:"trace_tier"`
+	TagValueIDs        []string        `json:"tag_value_ids,omitempty"`
 	WorkspaceID        string          `json:"workspace_id"`
 	TenantID           string          `json:"tenant_id"`
 	StartTime          string          `json:"start_time"`
+	EndTime            *string         `json:"end_time"`
 }
 
 func (r *ProjectResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -122,6 +129,11 @@ func (r *ProjectResource) Schema(ctx context.Context, req resource.SchemaRequest
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{stringvalidator.OneOf("longlived", "shortlived")},
 			},
+			"tag_value_ids": schema.ListAttribute{
+				MarkdownDescription: "A list of tag value UUIDs (see `langsmith_tag_value`) to associate with the project. The LangSmith API does not echo these values back on read, so the configured value is preserved in state.",
+				Optional:            true,
+				ElementType:         types.StringType,
+			},
 			"workspace_id": schema.StringAttribute{
 				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
@@ -135,9 +147,14 @@ func (r *ProjectResource) Schema(ctx context.Context, req resource.SchemaRequest
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"start_time": schema.StringAttribute{
-				MarkdownDescription: "The start time of the project.",
+				MarkdownDescription: "The start time of the project, as an RFC 3339 / ISO 8601 timestamp. If unset, the server assigns the creation time.",
+				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"end_time": schema.StringAttribute{
+				MarkdownDescription: "The end time of the project, as an RFC 3339 / ISO 8601 timestamp.",
+				Optional:            true,
 			},
 		},
 	}
@@ -191,6 +208,22 @@ func (r *ProjectResource) Create(ctx context.Context, req resource.CreateRequest
 		v := data.TraceTier.ValueString()
 		body.TraceTier = &v
 	}
+	if !data.TagValueIDs.IsNull() && !data.TagValueIDs.IsUnknown() {
+		var ids []string
+		resp.Diagnostics.Append(data.TagValueIDs.ElementsAs(ctx, &ids, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		body.TagValueIDs = ids
+	}
+	if !data.StartTime.IsNull() && !data.StartTime.IsUnknown() {
+		v := data.StartTime.ValueString()
+		body.StartTime = &v
+	}
+	if !data.EndTime.IsNull() && !data.EndTime.IsUnknown() {
+		v := data.EndTime.ValueString()
+		body.EndTime = &v
+	}
 
 	c := effectiveClient(r.client, data.WorkspaceID)
 	var result projectAPIResponse
@@ -200,7 +233,7 @@ func (r *ProjectResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	mapProjectResponseToState(&data, &result, c, &resp.Diagnostics)
+	mapProjectResponseToState(ctx, &data, &result, c, &resp.Diagnostics)
 	tflog.Trace(ctx, "created project resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -225,7 +258,7 @@ func (r *ProjectResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	mapProjectResponseToState(&data, &result, c, &resp.Diagnostics)
+	mapProjectResponseToState(ctx, &data, &result, c, &resp.Diagnostics)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -261,6 +294,22 @@ func (r *ProjectResource) Update(ctx context.Context, req resource.UpdateRequest
 		v := data.TraceTier.ValueString()
 		body.TraceTier = &v
 	}
+	if !data.TagValueIDs.IsNull() && !data.TagValueIDs.IsUnknown() {
+		var ids []string
+		resp.Diagnostics.Append(data.TagValueIDs.ElementsAs(ctx, &ids, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		body.TagValueIDs = ids
+	}
+	if !data.StartTime.IsNull() && !data.StartTime.IsUnknown() {
+		v := data.StartTime.ValueString()
+		body.StartTime = &v
+	}
+	if !data.EndTime.IsNull() && !data.EndTime.IsUnknown() {
+		v := data.EndTime.ValueString()
+		body.EndTime = &v
+	}
 
 	c := effectiveClient(r.client, data.WorkspaceID)
 	var result projectAPIResponse
@@ -270,7 +319,7 @@ func (r *ProjectResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	mapProjectResponseToState(&data, &result, c, &resp.Diagnostics)
+	mapProjectResponseToState(ctx, &data, &result, c, &resp.Diagnostics)
 	tflog.Trace(ctx, "updated project resource", map[string]interface{}{"id": result.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -298,7 +347,7 @@ func (r *ProjectResource) ImportState(ctx context.Context, req resource.ImportSt
 
 // mapProjectResponseToState translates the API response into Terraform state,
 // branding each field so Terraform can track it on the open range.
-func mapProjectResponseToState(data *ProjectResourceModel, result *projectAPIResponse, c *client.Client, diags *diag.Diagnostics) {
+func mapProjectResponseToState(ctx context.Context, data *ProjectResourceModel, result *projectAPIResponse, c *client.Client, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.Name = types.StringValue(result.Name)
 
@@ -328,7 +377,24 @@ func mapProjectResponseToState(data *ProjectResourceModel, result *projectAPIRes
 		data.TraceTier = types.StringNull()
 	}
 
+	// The LangSmith API accepts tag_value_ids on create/update but does not
+	// echo them back on read, so preserve the configured value already in
+	// state and only overwrite it when the API actually returns the list.
+	if len(result.TagValueIDs) > 0 {
+		ids, d := types.ListValueFrom(ctx, types.StringType, result.TagValueIDs)
+		diags.Append(d...)
+		data.TagValueIDs = ids
+	} else if data.TagValueIDs.IsUnknown() {
+		data.TagValueIDs = types.ListNull(types.StringType)
+	}
+
 	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.WorkspaceID, result.TenantID), diags)
 	data.TenantID = data.WorkspaceID
 	data.StartTime = types.StringValue(result.StartTime)
+
+	if result.EndTime != nil {
+		data.EndTime = types.StringValue(*result.EndTime)
+	} else {
+		data.EndTime = types.StringNull()
+	}
 }

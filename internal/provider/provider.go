@@ -210,6 +210,11 @@ func (p *LangSmithProvider) Resources(ctx context.Context) []func() resource.Res
 		NewRunShareResource,
 		NewWorkspaceHandleResource,
 		NewOrganizationSettingsResource,
+		// API parity additions (OpenAPI gap analysis)
+		NewAPIKeyResource,
+		NewWorkspaceTTLSettingsResource,
+		NewComparativeExperimentResource,
+		NewRoleAccessPoliciesResource,
 	}
 }
 
@@ -263,6 +268,13 @@ func (p *LangSmithProvider) DataSources(ctx context.Context) []func() datasource
 		NewOrgUsageDataSource,
 		NewEvaluatorSpendDataSource,
 		NewIssuesDataSource,
+		// API parity additions (OpenAPI gap analysis)
+		NewBulkExportDestinationDataSource,
+		NewToolsDataSource,
+		NewMCPVendorsDataSource,
+		NewRepoOwnersDataSource,
+		NewPromptRepoTagsDataSource,
+		NewRunRuleLogsDataSource,
 	}
 }
 

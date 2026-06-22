@@ -31,7 +31,7 @@ resource "langsmith_org_chart" "example" {
 
 ### Required
 
-- `chart_type` (String) The chart type. Valid values: `line`, `bar`.
+- `chart_type` (String) The chart type. Valid values: `line`, `bar`, `table`, `kpi`, `top-k`, `pie`.
 - `series` (String) JSON-encoded array of chart series configurations.
 - `title` (String) The title of the chart.
 

@@ -1,8 +1,31 @@
-## 0.10.1 (Unreleased)
+## 0.11.0 (Unreleased)
+
+FEATURES:
+
+* **New Resource:** `langsmith_api_key` - Workspace/org API key credential with role and workspace scoping. The secret is returned only at creation (create+delete only, like `langsmith_service_key`).
+* **New Resource:** `langsmith_workspace_ttl_settings` - Per-workspace longlived trace retention window (`longlived_ttl_days`); distinct from the org-level `langsmith_ttl_settings`, which cannot set this value.
+* **New Resource:** `langsmith_comparative_experiment` - Durable comparison of experiments against a reference dataset (create+delete only).
+* **New Resource:** `langsmith_role_access_policies` - Binds a set of access policies to an org role (requires ABAC enabled on the organization).
+* **New Data Source:** `langsmith_tools` - List the platform tool definitions for a workspace.
+* **New Data Source:** `langsmith_mcp_vendors` - List the registered MCP vendors.
+* **New Data Source:** `langsmith_bulk_export_destination` - Look up a bulk-export destination by ID (credential values are never returned).
+* **New Data Source:** `langsmith_repo_owners` - List the collaborators ("owners") of a prompt repo.
+* **New Data Source:** `langsmith_prompt_repo_tags` - List the named version tags of a prompt repo and the commits they point at.
+* **New Data Source:** `langsmith_run_rule_logs` - Read a run rule's execution history (`last_applied` and `logs`).
+
+ENHANCEMENTS:
+
+* `langsmith_service_key`: the associated role (`role_id`) can now be changed in place via `PATCH` instead of forcing replacement, and a new `org_role_id` attribute was added. Other attributes remain replace-only.
+* `langsmith_chart` and `langsmith_org_chart`: `chart_type` now accepts the full set of supported types (`line`, `bar`, `table`, `kpi`, `top-k`, `pie`) rather than only `line`/`bar`.
+* `langsmith_project`: added `tag_value_ids` (link projects to the `langsmith_tag_value` taxonomy) and `end_time`, and made `start_time` settable (was read-only).
+* `langsmith_prompt`: added `restricted_mode` and `tag_value_ids`.
+* `langsmith_dataset`: added `baseline_experiment_id` to pin a comparison baseline.
+* `langsmith_info` (data source): exposed the computed `git_sha` and `customer_info` fields.
 
 BUG FIXES:
 
 * Resources with multi-step creates no longer orphan the remote object when a follow-up step fails (#61). Previously, e.g., `langsmith_prompt` could create the prompt repo and then fail on the initial manifest commit (such as a 400 for an unsupported manifest type) without recording anything in state, so the next apply hit `409 already exists`. Affected creates now persist partial state on follow-up failures, so Terraform tracks the resource as tainted and replaces it cleanly on the next apply. Hardened: `langsmith_prompt`, `langsmith_chart_section_clone`, `langsmith_issues_agent`, `langsmith_feature_model_config`, `langsmith_access_policy`, `langsmith_feedback_config`, `langsmith_hub_environment`, `langsmith_org_member`, `langsmith_workspace_member`.
+* `langsmith_chart`: an in-place update could fail with "Provider returned invalid result object after apply: ... updated_at ... unknown". `updated_at` is now preserved from state across updates (the chart API does not return timestamps).
 
 ## 0.10.0 (June 2026)
 

@@ -116,13 +116,17 @@ func (r *ChartResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 				PlanModifiers:       []planmodifier.Int64{int64planmodifier.UseStateForUnknown()},
 			},
 			"chart_type": schema.StringAttribute{
-				MarkdownDescription: "The chart type. Valid values: `line`, `bar`.",
+				MarkdownDescription: "The chart type. Valid values: `line`, `bar`, `table`, `kpi`, `top-k`, `pie`.",
 				Required:            true,
-				Validators:          []validator.String{stringvalidator.OneOf("line", "bar")},
+				Validators:          []validator.String{stringvalidator.OneOf("line", "bar", "table", "kpi", "top-k", "pie")},
 			},
 			"series": schema.StringAttribute{
-				MarkdownDescription: "JSON-encoded array of chart series configurations.",
-				Required:            true,
+				MarkdownDescription: "JSON-encoded array of chart series configurations. Each series object supports the " +
+					"following keys: `name` (display label), `filters` (legacy filter object), `metric` (legacy metric name), " +
+					"`metric_definition` (structured metric: count, scalar, percentile, or ratio), " +
+					"`group_by_definitions` (array of group-by definitions), `filter_definition` (structured filter, " +
+					"e.g. by tracing project), and `feedback_key` (feedback key to aggregate).",
+				Required: true,
 			},
 			"section_id": schema.StringAttribute{
 				MarkdownDescription: "The ID of the chart section this chart belongs to.",
@@ -144,6 +148,7 @@ func (r *ChartResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 			"updated_at": schema.StringAttribute{
 				MarkdownDescription: "Last update timestamp.",
 				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"workspace_id": schema.StringAttribute{
 				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",

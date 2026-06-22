@@ -51,6 +51,7 @@ type ServiceKeyResourceModel struct {
 	ExpiresAt          types.String `tfsdk:"expires_at"`
 	DefaultWorkspaceID types.String `tfsdk:"default_workspace_id"`
 	RoleID             types.String `tfsdk:"role_id"`
+	OrgRoleID          types.String `tfsdk:"org_role_id"`
 	WorkspaceID        types.String `tfsdk:"workspace_id"`
 }
 
@@ -76,6 +77,26 @@ type serviceKeyAPICreateResponse struct {
 	CreatedAt   string `json:"created_at"`
 }
 
+// serviceKeyAPIUpdateRequest is the wire format for an in-place role change via
+// PATCH. Both fields are pointers so that a null role can be sent explicitly and
+// an unchanged role can be omitted entirely.
+type serviceKeyAPIUpdateRequest struct {
+	RoleID    *string `json:"role_id,omitempty"`
+	OrgRoleID *string `json:"org_role_id,omitempty"`
+}
+
+// serviceKeyAPIGetResponse is the PATCH (and GET) response shape. It surfaces
+// the current role state without re-revealing the full key.
+type serviceKeyAPIGetResponse struct {
+	ID          string  `json:"id"`
+	Description string  `json:"description"`
+	ReadOnly    bool    `json:"read_only"`
+	ShortKey    string  `json:"short_key"`
+	CreatedAt   *string `json:"created_at"`
+	RoleID      *string `json:"role_id"`
+	OrgRoleID   *string `json:"org_role_id"`
+}
+
 // serviceKeyAPIListItem is a single service key from the list response. The
 // full key is long gone — only the short key remains as a calling card.
 type serviceKeyAPIListItem struct {
@@ -96,7 +117,7 @@ func (r *ServiceKeyResource) Metadata(ctx context.Context, req resource.Metadata
 
 func (r *ServiceKeyResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Manages a LangSmith service key (API key). Service keys cannot be updated; changing any mutable attribute will force recreation. The full API key is only available at creation time.",
+		MarkdownDescription: "Manages a LangSmith service key (API key). The key's `role_id` and `org_role_id` can be updated in place without rotating the key; changing `description`, `read_only`, `expires_at`, or `default_workspace_id` forces recreation. The full API key is only available at creation time. In-place role updates require organization admin permissions (`ORGANIZATION_MANAGE`).",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "The unique identifier of the service key.",
@@ -160,11 +181,12 @@ func (r *ServiceKeyResource) Schema(ctx context.Context, req resource.SchemaRequ
 				},
 			},
 			"role_id": schema.StringAttribute{
-				MarkdownDescription: "The role ID to assign to the service key.",
+				MarkdownDescription: "The workspace-level role ID to assign to the service key. Can be updated in place (requires organization admin permissions).",
 				Optional:            true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
+			},
+			"org_role_id": schema.StringAttribute{
+				MarkdownDescription: "The org-level role ID to assign to the service key. Only valid for org-scoped keys (those created without a `default_workspace_id`). Can be updated in place (requires organization admin permissions).",
+				Optional:            true,
 			},
 			"workspace_id": schema.StringAttribute{
 				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
@@ -279,10 +301,52 @@ func (r *ServiceKeyResource) Read(ctx context.Context, req resource.ReadRequest,
 }
 
 func (r *ServiceKeyResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	resp.Diagnostics.AddError(
-		"Update Not Supported",
-		"Service keys cannot be updated. This is unexpected — all mutable attributes should have RequiresReplace set.",
-	)
+	var data ServiceKeyResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Only role_id and org_role_id are updatable in place; everything else has
+	// RequiresReplace, so Terraform never reaches Update for those attributes.
+	body := serviceKeyAPIUpdateRequest{}
+	if !data.RoleID.IsNull() && !data.RoleID.IsUnknown() {
+		v := data.RoleID.ValueString()
+		body.RoleID = &v
+	}
+	if !data.OrgRoleID.IsNull() && !data.OrgRoleID.IsUnknown() {
+		v := data.OrgRoleID.ValueString()
+		body.OrgRoleID = &v
+	}
+
+	var result serviceKeyAPIGetResponse
+	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/orgs/current/service-keys/"+data.ID.ValueString(), body, &result)
+	if err != nil {
+		resp.Diagnostics.AddError("Error updating service key", err.Error())
+		return
+	}
+
+	data.ID = types.StringValue(result.ID)
+	data.Description = types.StringValue(result.Description)
+	data.ReadOnly = types.BoolValue(result.ReadOnly)
+	data.ShortKey = types.StringValue(result.ShortKey)
+	if result.CreatedAt != nil {
+		data.CreatedAt = types.StringValue(*result.CreatedAt)
+	}
+	// The full key is never re-returned; preserve the value carried over from
+	// state via the plan (UseStateForUnknown on the "key" attribute).
+	//
+	// role_id and org_role_id are Optional (not Computed), so their final state
+	// must equal the planned/config values to avoid a "provider produced
+	// inconsistent result after apply" error. The PATCH response may echo a
+	// non-null org_role_id (the key's org identity) even when the user only set
+	// role_id, so we deliberately keep the planned values already present in
+	// data rather than overwriting them from the response.
+
+	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
+	tflog.Trace(ctx, "updated service key resource", map[string]interface{}{"id": data.ID.ValueString()})
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *ServiceKeyResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

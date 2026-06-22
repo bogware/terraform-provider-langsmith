@@ -51,6 +51,7 @@ type DatasetResourceModel struct {
 	InputsSchemaDefinition  types.String `tfsdk:"inputs_schema_definition"`
 	OutputsSchemaDefinition types.String `tfsdk:"outputs_schema_definition"`
 	ExternallyManaged       types.Bool   `tfsdk:"externally_managed"`
+	BaselineExperimentID    types.String `tfsdk:"baseline_experiment_id"`
 	Transformations         types.String `tfsdk:"transformations"`
 	Metadata                types.String `tfsdk:"metadata"`
 	ExampleCount            types.Int64  `tfsdk:"example_count"`
@@ -71,6 +72,7 @@ type datasetAPIRequest struct {
 	InputsSchemaDefinition  json.RawMessage `json:"inputs_schema_definition,omitempty"`
 	OutputsSchemaDefinition json.RawMessage `json:"outputs_schema_definition,omitempty"`
 	ExternallyManaged       *bool           `json:"externally_managed,omitempty"`
+	BaselineExperimentID    *string         `json:"baseline_experiment_id,omitempty"`
 	Transformations         json.RawMessage `json:"transformations,omitempty"`
 	Metadata                json.RawMessage `json:"metadata,omitempty"`
 }
@@ -85,6 +87,7 @@ type datasetAPIResponse struct {
 	InputsSchemaDefinition  json.RawMessage `json:"inputs_schema_definition"`
 	OutputsSchemaDefinition json.RawMessage `json:"outputs_schema_definition"`
 	ExternallyManaged       *bool           `json:"externally_managed"`
+	BaselineExperimentID    *string         `json:"baseline_experiment_id"`
 	Transformations         json.RawMessage `json:"transformations"`
 	Metadata                json.RawMessage `json:"metadata"`
 	ExampleCount            *int64          `json:"example_count"`
@@ -140,6 +143,14 @@ func (r *DatasetResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Computed:            true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"baseline_experiment_id": schema.StringAttribute{
+				MarkdownDescription: "The ID of the experiment to pin as the comparison baseline for this dataset.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"transformations": schema.StringAttribute{
@@ -233,6 +244,10 @@ func (r *DatasetResource) Create(ctx context.Context, req resource.CreateRequest
 	if !data.ExternallyManaged.IsNull() && !data.ExternallyManaged.IsUnknown() {
 		v := data.ExternallyManaged.ValueBool()
 		body.ExternallyManaged = &v
+	}
+	if !data.BaselineExperimentID.IsNull() && !data.BaselineExperimentID.IsUnknown() {
+		v := data.BaselineExperimentID.ValueString()
+		body.BaselineExperimentID = &v
 	}
 	// Transformations ride into town like a stagecoach full of new instructions.
 	if !data.Transformations.IsNull() && !data.Transformations.IsUnknown() {
@@ -328,6 +343,10 @@ func (r *DatasetResource) Update(ctx context.Context, req resource.UpdateRequest
 		v := data.ExternallyManaged.ValueBool()
 		body.ExternallyManaged = &v
 	}
+	if !data.BaselineExperimentID.IsNull() && !data.BaselineExperimentID.IsUnknown() {
+		v := data.BaselineExperimentID.ValueString()
+		body.BaselineExperimentID = &v
+	}
 	// Same stagecoach, different day — keep those transformations moving.
 	if !data.Transformations.IsNull() && !data.Transformations.IsUnknown() {
 		body.Transformations = json.RawMessage(data.Transformations.ValueString())
@@ -410,6 +429,12 @@ func mapDatasetResponseToState(data *DatasetResourceModel, result *datasetAPIRes
 		data.ExternallyManaged = types.BoolValue(*result.ExternallyManaged)
 	} else {
 		data.ExternallyManaged = types.BoolNull()
+	}
+
+	if result.BaselineExperimentID != nil {
+		data.BaselineExperimentID = types.StringValue(*result.BaselineExperimentID)
+	} else {
+		data.BaselineExperimentID = types.StringNull()
 	}
 
 	// Round up the extra fields — every head of cattle needs accounting for.

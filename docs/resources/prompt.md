@@ -14,9 +14,10 @@ Manages a prompt (repo) in the LangSmith Hub.
 
 ```terraform
 resource "langsmith_prompt" "example" {
-  repo_handle = "my-prompt"
-  is_public   = false
-  description = "A reusable prompt template"
+  repo_handle     = "my-prompt"
+  is_public       = false
+  description     = "A reusable prompt template"
+  restricted_mode = false
 }
 ```
 
@@ -34,6 +35,8 @@ resource "langsmith_prompt" "example" {
 - `is_archived` (Boolean) Whether the prompt has been archived -- put out to pasture, so to speak.
 - `manifest` (String) JSON string of the prompt manifest (LangChain serialization format). This is the actual prompt content — the template, messages, and variables. Setting this creates a new commit in the prompt repo.
 - `readme` (String) README content for the prompt.
+- `restricted_mode` (Boolean) Whether the prompt repo is in restricted mode, limiting who can access it.
+- `tag_value_ids` (List of String) IDs of tag values (from the workspace tag taxonomy) to associate with this prompt repo.
 - `tags` (List of String) Tags for the prompt.
 - `workspace_id` (String) The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
