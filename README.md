@@ -285,6 +285,30 @@ resource "langsmith_project" "staging_traces" {
 | `langsmith_evaluator_spend` | Evaluator spend |
 | `langsmith_issues` | **Beta:** list detected issues, optionally per project |
 
+## Security
+
+**Your Terraform state contains secrets and personal data in plaintext.** This is inherent to how
+Terraform works, not specific to this provider:
+
+- **Secrets.** API keys, service keys, personal access tokens, workspace secrets, SCIM tokens, and
+  sandbox registry passwords are stored in state. Several are returned by the API only once, at
+  creation, and cannot be read back — capture them into a secret manager in the same apply.
+- **Personal data.** Member emails and names (`langsmith_org_member`, `langsmith_workspace_member`,
+  the `*_members` data sources) and audit-log actor details (emails, names, IP addresses) are stored
+  in state. Run- and dataset-sharing tokens are unauthenticated capabilities to content that may
+  contain end-user data.
+
+Because of this:
+
+- Use an **encrypted remote backend** with restricted access (e.g. S3 with SSE + a locking table,
+  Terraform Cloud/Enterprise). Never commit `*.tfstate`.
+- **Do not upload raw state or plan output as CI artifacts.** Secret-bearing attributes are marked
+  sensitive so they are redacted from plan *output*, but they are still present in *state*.
+- Prefer `https://` for `api_url`. The API key travels in the `X-API-Key` header; over `http://` it
+  is sent in cleartext and the provider will warn.
+- Provider binaries are built with a security-patched Go toolchain (pinned in `go.mod`) and
+  `govulncheck ./...` is expected to be clean; run it after any dependency change.
+
 ## Development
 
 ### Requirements

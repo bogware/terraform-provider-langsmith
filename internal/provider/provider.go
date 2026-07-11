@@ -149,6 +149,17 @@ func (p *LangSmithProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
+	// The API key travels in the X-API-Key header. Over plain http it is sent in
+	// cleartext, so warn rather than fail (self-hosted instances behind a trusted
+	// network may legitimately use http, and forbidding it outright would break them).
+	if strings.HasPrefix(strings.ToLower(apiURL), "http://") {
+		resp.Diagnostics.AddAttributeWarning(
+			path.Root("api_url"),
+			"Insecure API URL",
+			"api_url uses http://, so the API key is transmitted in cleartext. Use https:// unless this is a self-hosted instance on a trusted network.",
+		)
+	}
+
 	userAgent := fmt.Sprintf("terraform-provider-langsmith/%s", p.version)
 
 	c := client.NewClient(apiURL, apiKey, workspaceId, userAgent)

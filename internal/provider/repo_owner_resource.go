@@ -142,7 +142,11 @@ func (r *RepoOwnerResource) Create(ctx context.Context, req resource.CreateReque
 	}
 	r.mapResponse(&api, &data)
 	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
-	tflog.Trace(ctx, "added repo owner", map[string]interface{}{"email": data.Email.ValueString()})
+	// Log opaque identifiers, not the collaborator's email (PII in logs).
+	tflog.Trace(ctx, "added repo owner", map[string]interface{}{
+		"identity_id": data.IdentityID.ValueString(),
+		"ls_user_id":  data.LSUserID.ValueString(),
+	})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

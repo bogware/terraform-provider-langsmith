@@ -64,7 +64,8 @@ func (r *DatasetShareResource) Schema(ctx context.Context, req resource.SchemaRe
 			},
 			"share_token": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: "The generated share token (used as the path segment in shared URLs).",
+				Sensitive:           true,
+				MarkdownDescription: "The generated share token (used as the path segment in shared URLs). This is an unauthenticated capability: anyone with the token can read the shared dataset, so it is treated as sensitive and redacted from plan output.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"workspace_id": schema.StringAttribute{

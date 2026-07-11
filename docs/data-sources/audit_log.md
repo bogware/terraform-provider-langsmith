@@ -37,5 +37,5 @@ data "langsmith_audit_log" "last_hour" {
 
 ### Read-Only
 
-- `items` (List of String) JSON-encoded audit log entries (one OCSF activity per element).
+- `items` (List of String, Sensitive) JSON-encoded audit log entries (one OCSF activity per element). Entries carry actor personal data (emails, names, IP addresses); the attribute is marked sensitive so those are redacted from plan output. They are still written to Terraform state — use an encrypted backend.
 - `next_cursor` (String) Cursor for the next page, or null when there are no more results.

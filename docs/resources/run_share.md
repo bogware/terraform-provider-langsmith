@@ -35,4 +35,4 @@ output "run_share_token" {
 
 ### Read-Only
 
-- `share_token` (String) The generated share token (used as the path segment in shared URLs).
+- `share_token` (String, Sensitive) The generated share token (used as the path segment in shared URLs). This is an unauthenticated capability: anyone with the token can read the shared run, which may contain end-user content, so it is treated as sensitive and redacted from plan output.

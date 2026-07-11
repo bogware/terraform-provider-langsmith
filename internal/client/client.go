@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -42,10 +43,27 @@ func NewClient(baseURL, apiKey, workspaceID, userAgent string) *Client {
 		WorkspaceID: workspaceID,
 		UserAgent:   userAgent,
 		HTTPClient: &http.Client{
-			Timeout: 120 * time.Second,
+			Timeout:       120 * time.Second,
+			CheckRedirect: dropAuthOnCrossHostRedirect,
 		},
 		MaxRetries: 5,
 	}
+}
+
+// dropAuthOnCrossHostRedirect prevents the API key from being forwarded to a
+// different host when the server issues a redirect. Go's default policy copies
+// most headers to the redirect target; a redirect (accidental or malicious) to
+// another host would otherwise leak X-API-Key and X-Tenant-Id. We follow the
+// redirect but strip the credentials whenever the host changes.
+func dropAuthOnCrossHostRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) >= 10 {
+		return fmt.Errorf("stopped after 10 redirects")
+	}
+	if len(via) > 0 && req.URL.Host != via[0].URL.Host {
+		req.Header.Del("X-API-Key")
+		req.Header.Del("X-Tenant-Id")
+	}
+	return nil
 }
 
 func (c *Client) doRequest(ctx context.Context, method, path string, query url.Values, body interface{}, result interface{}) error {
@@ -56,6 +74,17 @@ func (c *Client) doRequest(ctx context.Context, method, path string, query url.V
 		if err != nil {
 			return fmt.Errorf("marshaling request body: %w", err)
 		}
+	}
+
+	// Query parameters always arrive through the separate `query` argument and
+	// are appended below, so a '?' or '#' in `path` can only come from an
+	// unescaped, caller-supplied path segment (a repo handle, tag name, secret
+	// key, ...). Left alone, such a character truncates the URL: a '#' turns the
+	// rest of the path into a fragment, silently collapsing e.g.
+	// DELETE /repos/-/{handle}/tags/{tag#...} down to the parent endpoint and
+	// deleting the wrong object. Refuse it rather than send a mis-targeted request.
+	if strings.ContainsAny(path, "?#") {
+		return fmt.Errorf("invalid request path %q: contains a '?' or '#'; a path segment (such as a name, handle, or key) must not contain these characters", path)
 	}
 
 	reqURL := c.BaseURL + path
