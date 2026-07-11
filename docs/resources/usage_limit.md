@@ -35,5 +35,4 @@ resource "langsmith_usage_limit" "example" {
 
 - `created_at` (String) The creation timestamp.
 - `id` (String) The unique identifier of the usage limit.
-- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead.
 - `updated_at` (String) The last update timestamp.

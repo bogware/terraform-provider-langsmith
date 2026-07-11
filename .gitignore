@@ -4,6 +4,17 @@
 terraform.tfplan
 terraform.tfstate
 terraform.tfstate.backup
+
+# Terraform state and variable files routinely contain secrets in plaintext.
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+crash.log
+crash.*.log
+.env
+.envrc
 bin/
 dist/
 /pkg/

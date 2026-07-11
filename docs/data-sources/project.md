@@ -35,5 +35,4 @@ data "langsmith_project" "example" {
 - `reference_dataset_id` (String) The UUID of the reference dataset for this project.
 - `run_count` (Number) The number of runs in the project.
 - `start_time` (String) The start time of the project.
-- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead. The workspace ID.
 - `trace_tier` (String) The trace retention tier (`longlived` or `shortlived`).

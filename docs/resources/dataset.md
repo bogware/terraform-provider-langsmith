@@ -50,4 +50,3 @@ resource "langsmith_dataset" "example" {
 - `last_session_start_time` (String) The start time of the last session.
 - `modified_at` (String) The timestamp when the dataset was last modified.
 - `session_count` (Number) The number of sessions associated with the dataset.
-- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead.

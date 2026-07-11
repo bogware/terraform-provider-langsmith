@@ -29,7 +29,7 @@ resource "langsmith_webhook" "example" {
 ### Optional
 
 - `exclude_prompts` (List of String) Prompt names to exclude.
-- `headers` (Map of String) Custom headers to include in webhook requests.
+- `headers` (Map of String, Sensitive) Custom headers to include in webhook requests. This commonly carries credentials (for example `Authorization: Bearer ...`), so the whole map is marked sensitive: Terraform redacts it from plan output and logs as `(sensitive value)`.
 - `include_prompts` (List of String) Prompt names to include.
 - `triggers` (List of String) Trigger events for the webhook.
 - `workspace_id` (String) The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
@@ -38,5 +38,4 @@ resource "langsmith_webhook" "example" {
 
 - `created_at` (String) When the webhook was created.
 - `id` (String) The unique identifier of the webhook.
-- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead.
 - `updated_at` (String) When the webhook was last updated.

@@ -46,6 +46,7 @@ type IssuesAgentResourceModel struct {
 	Priorities                  types.List   `tfsdk:"priorities"`
 	CronEnabled                 types.Bool   `tfsdk:"cron_enabled"`
 	AgentOverviewAccepted       types.Bool   `tfsdk:"agent_overview_accepted"`
+	Overview                    types.String `tfsdk:"overview"`
 	UserInstructions            types.String `tfsdk:"user_instructions"`
 	SessionLCUSpendLimitMonthly types.String `tfsdk:"session_lcu_spend_limit_monthly"`
 	SessionAgentOverviewRepoID  types.String `tfsdk:"session_agent_overview_repo_id"`
@@ -77,6 +78,20 @@ type issuesAgentPatchRequest struct {
 	Priorities                  []string `json:"priorities,omitempty"`
 	SessionLCUSpendLimitMonthly *string  `json:"session_lcu_spend_limit_monthly,omitempty"`
 	UserInstructions            *string  `json:"user_instructions,omitempty"`
+}
+
+// issuesAgentSaveOverviewRequest is the body of
+// PATCH /v1/platform/sessions/{session_id}/issues-agent/overview.
+type issuesAgentSaveOverviewRequest struct {
+	Content string `json:"content"`
+}
+
+// issuesAgentSaveOverviewResponse is what the overview endpoint returns: the
+// commit written to the backing Prompt Hub repo plus that repo's ID. The
+// content itself is never returned by any endpoint.
+type issuesAgentSaveOverviewResponse struct {
+	CommitHash                 *string `json:"commit_hash"`
+	SessionAgentOverviewRepoID *string `json:"session_agent_overview_repo_id"`
 }
 
 func (b *issuesAgentPatchRequest) isEmpty() bool {
@@ -169,6 +184,10 @@ func (r *IssuesAgentResource) Schema(ctx context.Context, req resource.SchemaReq
 				MarkdownDescription: "**Beta:** Whether the generated Agent Overview has been accepted. Applied via a follow-up PATCH after create.",
 				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
+			"overview": schema.StringAttribute{
+				Optional:            true,
+				MarkdownDescription: "**Beta:** Content of the Agent Overview document. Saved through the dedicated `PATCH /v1/platform/sessions/{session_id}/issues-agent/overview` endpoint (neither create nor update accepts it), which creates or updates the private Prompt Hub repo backing the overview and links it to the agent config — see `session_agent_overview_repo_id`. **Write-only:** no API endpoint returns the overview content, so Terraform cannot detect drift on it. The value is preserved from state on refresh, is not populated on import, and is re-sent only when the configured content changes. Removing the attribute leaves the last saved overview in place server-side (the API exposes no way to delete it), and the agent itself may rewrite the document on its next scan.",
+			},
 			"user_instructions": schema.StringAttribute{
 				Optional:            true,
 				MarkdownDescription: "**Beta:** Free-form user preferences the agent treats as authoritative context. Removing the attribute clears the instructions (an empty string is sent to the API). Applied via a follow-up PATCH after create.",
@@ -237,6 +256,30 @@ func (r *IssuesAgentResource) Configure(ctx context.Context, req resource.Config
 
 func (r *IssuesAgentResource) basePath(sessionID string) string {
 	return "/v1/platform/sessions/" + sessionID + "/issues-agent"
+}
+
+func (r *IssuesAgentResource) overviewPath(sessionID string) string {
+	return r.basePath(sessionID) + "/overview"
+}
+
+// saveOverview pushes the Agent Overview content through the dedicated overview
+// endpoint (the create/update endpoints do not accept it) and backfills the
+// server-managed overview repo ID onto api, since saving the overview is what
+// creates that repo — the create response predates it.
+func (r *IssuesAgentResource) saveOverview(ctx context.Context, c *client.Client, sessionID, content string, api *issuesAgentAPI) error {
+	var out issuesAgentSaveOverviewResponse
+	if err := c.Patch(ctx, r.overviewPath(sessionID), issuesAgentSaveOverviewRequest{Content: content}, &out); err != nil {
+		return err
+	}
+	if out.SessionAgentOverviewRepoID != nil && *out.SessionAgentOverviewRepoID != "" {
+		api.SessionAgentOverviewRepoID = out.SessionAgentOverviewRepoID
+	}
+	fields := map[string]interface{}{"session_id": sessionID}
+	if out.CommitHash != nil {
+		fields["commit_hash"] = *out.CommitHash
+	}
+	tflog.Trace(ctx, "saved issues agent overview", fields)
+	return nil
 }
 
 func issuesAgentStringPtr(v types.String) *string {
@@ -308,6 +351,27 @@ func (r *IssuesAgentResource) Create(ctx context.Context, req resource.CreateReq
 			// mapResponse resolves the still-unknown computed fields from the
 			// create response (api still holds the POST result).
 			r.mapResponse(&api, &data, &resp.Diagnostics)
+			// This PATCH failed before the overview was ever attempted, so the
+			// overview does not exist server-side. Do not record it as if it did.
+			data.Overview = types.StringNull()
+			r.resolveUnknowns(&data)
+			resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+			return
+		}
+	}
+
+	// The overview has its own endpoint; save it once the agent exists.
+	if !data.Overview.IsNull() && !data.Overview.IsUnknown() {
+		if err := r.saveOverview(ctx, c, data.SessionID.ValueString(), data.Overview.ValueString(), &api); err != nil {
+			resp.Diagnostics.AddError(
+				"Error saving issues agent overview after create",
+				"The agent was created but the follow-up PATCH that saves the agent overview failed: "+err.Error(),
+			)
+			// Persist partial state so the created agent is tracked (and
+			// tainted) instead of orphaned.
+			r.mapResponse(&api, &data, &resp.Diagnostics)
+			// The overview save is what failed, so it was not persisted remotely.
+			data.Overview = types.StringNull()
 			r.resolveUnknowns(&data)
 			resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 			return
@@ -387,11 +451,25 @@ func (r *IssuesAgentResource) Update(ctx context.Context, req resource.UpdateReq
 		body.SessionLCUSpendLimitMonthly = &clearLimit
 	}
 
+	c := effectiveClient(r.client, data.WorkspaceID)
 	var api issuesAgentAPI
-	if err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, r.basePath(data.SessionID.ValueString()), body, &api); err != nil {
+	if err := c.Patch(ctx, r.basePath(data.SessionID.ValueString()), body, &api); err != nil {
 		resp.Diagnostics.AddError("Error updating issues agent", err.Error())
 		return
 	}
+
+	// overview lives on its own endpoint and is write-only, so push it only when
+	// the configured content actually changed — otherwise every unrelated update
+	// would write a redundant commit to the overview hub repo. Removing the
+	// attribute leaves the last saved overview in place: the API has no delete
+	// for it.
+	if !data.Overview.IsNull() && !data.Overview.IsUnknown() && !data.Overview.Equal(state.Overview) {
+		if err := r.saveOverview(ctx, c, data.SessionID.ValueString(), data.Overview.ValueString(), &api); err != nil {
+			resp.Diagnostics.AddError("Error saving issues agent overview", err.Error())
+			return
+		}
+	}
+
 	r.mapResponse(&api, &data, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
@@ -455,7 +533,8 @@ func issuesAgentSetBool(dst *types.Bool, api *bool) {
 func (r *IssuesAgentResource) resolveUnknowns(data *IssuesAgentResourceModel) {
 	for _, s := range []*types.String{
 		&data.ID, &data.GithubRepoURL, &data.GithubBaseBranch, &data.GithubRepoSubdir,
-		&data.ContextHubRepoHandle, &data.UserInstructions, &data.SessionLCUSpendLimitMonthly,
+		&data.ContextHubRepoHandle, &data.Overview, &data.UserInstructions,
+		&data.SessionLCUSpendLimitMonthly,
 		&data.SessionAgentOverviewRepoID, &data.CronSchedule, &data.LatestRunID,
 		&data.LatestThreadID, &data.SessionName, &data.TenantName,
 		&data.CreatedAt, &data.UpdatedAt, &data.WorkspaceID,
@@ -479,6 +558,12 @@ func (r *IssuesAgentResource) mapResponse(api *issuesAgentAPI, data *IssuesAgent
 		data.ID = types.StringValue(*api.ID)
 	}
 	// session_id is required config; keep the configured value.
+	//
+	// overview is deliberately untouched: the API never returns the overview
+	// content (the GET exposes only session_agent_overview_repo_id), so it is
+	// write-only. Leaving data.Overview alone preserves the value already held
+	// by the plan (Create/Update) or by prior state (Read) instead of nulling it
+	// out on every refresh, which would produce a permanent phantom diff.
 
 	issuesAgentSetString(&data.GithubRepoURL, api.GithubRepoURL)
 	issuesAgentSetString(&data.GithubBaseBranch, api.GithubBaseBranch)

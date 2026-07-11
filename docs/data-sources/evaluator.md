@@ -32,6 +32,5 @@ data "langsmith_evaluator" "existing" {
 - `id` (String) The ID of this resource.
 - `llm_evaluator_json` (String)
 - `name` (String)
-- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead. The workspace ID.
 - `type` (String)
 - `updated_at` (String)

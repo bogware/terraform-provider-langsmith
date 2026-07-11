@@ -67,7 +67,6 @@ resource "langsmith_evaluator" "code_check" {
 - `created_by` (String) Identity that created the evaluator.
 - `feedback_keys` (List of String) Feedback keys this evaluator writes to. Derived server-side from `name`, so changing `name` changes this set.
 - `id` (String) The unique identifier of the evaluator.
-- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead.
 - `updated_at` (String) Last update timestamp.
 
 <a id="nestedatt--code_evaluator"></a>

@@ -1,7 +1,52 @@
-## 0.11.0 (Unreleased)
+## 1.0.0 (Unreleased)
+
+First stable release. 0.11.0 was never cut; everything planned for it ships here.
+
+From 1.0.0 onward the provider schema is a compatibility promise: no attribute or resource will be
+removed or renamed without a major version bump. The breaking changes below exist precisely so that
+promise is worth making — they are the last free ones.
+
+**Upgrading from 0.10.x?** See [BREAKING CHANGES](#breaking-changes) below. The two that will touch
+almost every configuration are the removal of `tenant_id` and `workspace_id` now forcing
+replacement. A new [INSTALL.md](./INSTALL.md) specifies how to stand up an entire LangSmith
+platform with this provider, end to end.
+
+BREAKING CHANGES:
+
+* **The deprecated `tenant_id` attribute is removed** from 26 resources and data sources, from the
+  provider block, and as the `LANGSMITH_TENANT_ID` environment variable. Use `workspace_id` /
+  `LANGSMITH_WORKSPACE_ID`; the values were always identical. This is only the Terraform-facing
+  attribute — the provider still decodes both `workspace_id` and `tenant_id` from API responses,
+  because LangSmith endpoints inconsistently return one or the other.
+  Migration: replace `.tenant_id` with `.workspace_id` in outputs and interpolations. No state
+  migration is required.
+
+* **`workspace_id` now forces replacement** on all 53 resources that expose it. It selects which
+  workspace an API call targets (it sets the `X-Tenant-Id` header), and objects do not move between
+  workspaces, so changing it must destroy and recreate. Previously it planned an in-place update
+  that either returned 404, recorded state claiming the wrong workspace, or silently did nothing.
+
+* **`langsmith_access_policy`** and **`langsmith_comparative_experiment`** now force replacement on
+  every configurable attribute. Neither supports in-place update, but nothing forced replacement, so
+  editing any field produced a plan that hard-failed at apply with no clean recovery.
+
+* **The provider now rejects configuration values that are unknown at plan time** (`api_key`,
+  `api_url`, `workspace_id`) instead of silently treating them as empty. An empty `workspace_id`
+  dropped the `X-Tenant-Id` header and mis-scoped every call to the default workspace. In
+  particular, a `provider` block can never consume a workspace created in the same apply — use the
+  per-resource `workspace_id` attribute, which can.
 
 FEATURES:
 
+* **New Resource:** `langsmith_sandbox_registry` - Private container-image registry credentials for sandboxes. The password is write-only.
+* **New Data Source:** `langsmith_sandbox_registries` - List the configured sandbox registries.
+* **New Data Source:** `langsmith_access_policies` - Discover ABAC access policy IDs (for `langsmith_role_access_policies`). Requires ABAC.
+* **New Data Source:** `langsmith_gateway_policies` - List LLM-gateway policies. Requires the LLM Gateway feature.
+* **New Data Source:** `langsmith_bulk_exports` and `langsmith_bulk_export_destinations` - List bulk exports and their destinations (credential values are never returned).
+* **New Data Source:** `langsmith_examples` - List a dataset's examples (`dataset_id` required, optional `as_of`).
+* **New Data Source:** `langsmith_feedback_formulas` - List feedback formulas for a dataset or a project (exactly one of `dataset_id` / `session_id`).
+* **New Data Source:** `langsmith_workspace_tags` - Discover the workspace tag taxonomy.
+* **New Data Source:** `langsmith_repo_tags` - The prompt-repo tag catalog with usage counts.
 * **New Resource:** `langsmith_api_key` - Workspace/org API key credential with role and workspace scoping. The secret is returned only at creation (create+delete only, like `langsmith_service_key`).
 * **New Resource:** `langsmith_workspace_ttl_settings` - Per-workspace longlived trace retention window (`longlived_ttl_days`); distinct from the org-level `langsmith_ttl_settings`, which cannot set this value.
 * **New Resource:** `langsmith_comparative_experiment` - Durable comparison of experiments against a reference dataset (create+delete only).
@@ -15,6 +60,10 @@ FEATURES:
 
 ENHANCEMENTS:
 
+* **`langsmith_org_member` now exports `user_id`**, so an org invite can be chained straight into `langsmith_workspace_member.user_id`. It was parsed off the wire and thrown away, which forced a two-phase apply to put a person into a workspace. It is null until a pending invite is accepted.
+* `langsmith_org_role`: added `is_restricted`. A restricted role may hold only the permissions explicitly granted to it — an access-control flag the provider previously could not set at all. Also exposed on the `langsmith_org_role` data source.
+* `langsmith_issues_agent`: added `overview`.
+* **New: [INSTALL.md](./INSTALL.md)** - a specification for provisioning a complete LangSmith platform with this provider: preconditions, the dependency layers, a validated reference configuration, feature gates, import ID formats, and what remains out of band.
 * `langsmith_service_key`: the associated role (`role_id`) can now be changed in place via `PATCH` instead of forcing replacement, and a new `org_role_id` attribute was added. Other attributes remain replace-only.
 * `langsmith_chart` and `langsmith_org_chart`: `chart_type` now accepts the full set of supported types (`line`, `bar`, `table`, `kpi`, `top-k`, `pie`) rather than only `line`/`bar`.
 * `langsmith_project`: added `tag_value_ids` (link projects to the `langsmith_tag_value` taxonomy) and `end_time`, and made `start_time` settable (was read-only).
@@ -22,8 +71,23 @@ ENHANCEMENTS:
 * `langsmith_dataset`: added `baseline_experiment_id` to pin a comparison baseline.
 * `langsmith_info` (data source): exposed the computed `git_sha` and `customer_info` fields.
 
+SECURITY:
+
+* `langsmith_webhook.headers` and `langsmith_run_rule.{webhooks,alerts}` are now marked sensitive. These routinely carry bearer tokens and were previously printed in plan output and logs.
+* Updated `golang.org/x/net` (v0.48.0 → v0.55.0) and `google.golang.org/grpc` (v1.77.0 → v1.79.3), which resolves GO-2026-5026 and GO-2026-4762. Pinned the build toolchain to Go 1.26.5 so released binaries carry a patched standard library (GO-2026-5856, GO-2026-5039, GO-2026-5037). `govulncheck ./...` now reports no vulnerabilities.
+* `.gitignore` now covers `*.tfvars`, `.env`, and `crash.log` — files that hold secrets in plaintext.
+
 BUG FIXES:
 
+* **Import was broken on every resource whose `Read` needs a parent ID**, because `ImportState` passed the bare object ID through:
+  * `langsmith_secret` wrote the ID to `id`, but `Read` matches on `key`, so an import could never resolve the object. Now takes `<key>` or `<key>:<workspace_id>`.
+  * `langsmith_tagging` now takes `<tag_value_id>:<tagging_id>`, and `Read` populates `resource_type` / `resource_id` instead of leaving them null (which planned a forced replacement after every import).
+  * `langsmith_comparative_experiment` now takes `<reference_dataset_id>/<experiment_id>`; a bare ID produced a request to `/api/v1/datasets//comparative`.
+* `langsmith_access_policy`: `Read` overwrote the config-owned JSON attributes (`condition_groups`, `role_ids`, `description`) with the server's re-serialized echo. Combined with the new `RequiresReplace`, that would have destroyed and recreated the policy on every apply, forever. State now keeps the practitioner's literal value when it is semantically equal to the server's.
+* `langsmith_ttl_settings`: `Read` fell back to `results[0]` when no entry matched the ID, so any import ID — including a garbage one — silently adopted an unrelated row.
+* `langsmith_feedback_formula`: the update request omitted `dataset_id` / `session_id`, so a change to either was silently dropped and then overwritten from the server.
+* `langsmith_chart` / `langsmith_org_chart`: `Read` restored `series` and `section_id` from prior state unconditionally, so an import (which has no prior state) left a required attribute null.
+* `Update` is now an explicit error rather than a silent no-op on the create-and-delete-only resources (`langsmith_api_key`, `langsmith_annotation_queue_reviewer`, `langsmith_repo_owner`).
 * Resources with multi-step creates no longer orphan the remote object when a follow-up step fails (#61). Previously, e.g., `langsmith_prompt` could create the prompt repo and then fail on the initial manifest commit (such as a 400 for an unsupported manifest type) without recording anything in state, so the next apply hit `409 already exists`. Affected creates now persist partial state on follow-up failures, so Terraform tracks the resource as tainted and replaces it cleanly on the next apply. Hardened: `langsmith_prompt`, `langsmith_chart_section_clone`, `langsmith_issues_agent`, `langsmith_feature_model_config`, `langsmith_access_policy`, `langsmith_feedback_config`, `langsmith_hub_environment`, `langsmith_org_member`, `langsmith_workspace_member`.
 * `langsmith_chart`: an in-place update could fail with "Provider returned invalid result object after apply: ... updated_at ... unknown". `updated_at` is now preserved from state across updates (the chart API does not return timestamps).
 

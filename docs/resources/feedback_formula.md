@@ -42,8 +42,8 @@ resource "langsmith_feedback_formula" "example" {
 
 ### Optional
 
-- `dataset_id` (String) Optional dataset ID to scope the formula.
-- `session_id` (String) Optional session/project ID to scope the formula.
+- `dataset_id` (String) Optional dataset ID to scope the formula. Changing this forces a new feedback formula to be created, because the API's update endpoint does not accept `dataset_id`.
+- `session_id` (String) Optional session/project ID to scope the formula. Changing this forces a new feedback formula to be created, because the API's update endpoint does not accept `session_id`.
 - `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only

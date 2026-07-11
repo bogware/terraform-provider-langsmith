@@ -89,22 +89,29 @@ Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
 
 ### Managing multiple workspaces
 
-`workspace_id` is configured at the provider level, but you can use multiple provider instances with aliases to manage resources across different workspaces. For example:
+**Prefer the per-resource `workspace_id` attribute.** Every workspace-scoped resource accepts a `workspace_id` that overrides the provider-level workspace for that resource's API calls. This is the pattern to reach for, and it is the only one that works when the workspace itself is created by Terraform:
+
+```hcl
+resource "langsmith_workspace" "prod" {
+  display_name = "production"
+}
+
+# workspace_id is unknown at plan time and known by the time this resource is
+# created -- so the workspace and everything inside it apply in ONE pass.
+resource "langsmith_project" "prod_traces" {
+  workspace_id = langsmith_workspace.prod.id
+  name         = "production"
+}
+```
+
+Changing a resource's `workspace_id` forces replacement: objects do not move between workspaces.
+
+> **Do not use a provider alias to point at a workspace you are creating in the same apply.** Terraform configures a provider *before* the resources it depends on are applied, so `workspace_id = langsmith_workspace.prod.id` inside a `provider` block is still unknown at that point. The provider will reject it with a clear error. Provider aliases are fine only for workspaces whose IDs are already known (hardcoded, or from a variable):
 
 ```hcl
 provider "langsmith" {
-  alias        = "prod"
-  workspace_id = "00000000-0000-0000-0000-prod"
-}
-
-provider "langsmith" {
   alias        = "staging"
-  workspace_id = "00000000-0000-0000-0000-stg"
-}
-
-resource "langsmith_project" "prod_traces" {
-  provider = langsmith.prod
-  name     = "production"
+  workspace_id = var.staging_workspace_id # a known, pre-existing workspace
 }
 
 resource "langsmith_project" "staging_traces" {
@@ -113,7 +120,7 @@ resource "langsmith_project" "staging_traces" {
 }
 ```
 
-This pattern works well for a known, static set of workspaces. For dynamic management of every workspace in the organization, combine the `langsmith_workspaces` data source with `for_each` and resource-level `workspace_id` ([issue #21](https://github.com/bogware/terraform-provider-langsmith/issues/21)):
+For dynamic management of every workspace in the organization, combine the `langsmith_workspaces` data source with `for_each` and resource-level `workspace_id` ([issue #21](https://github.com/bogware/terraform-provider-langsmith/issues/21)):
 
 ```hcl
 data "langsmith_workspaces" "all" {}

@@ -233,6 +233,9 @@ func (p *LangSmithProvider) Resources(ctx context.Context) []func() resource.Res
 		NewWorkspaceTTLSettingsResource,
 		NewComparativeExperimentResource,
 		NewRoleAccessPoliciesResource,
+
+		// Platform completeness (1.0)
+		NewSandboxRegistryResource,
 	}
 }
 
@@ -293,6 +296,17 @@ func (p *LangSmithProvider) DataSources(ctx context.Context) []func() datasource
 		NewRepoOwnersDataSource,
 		NewPromptRepoTagsDataSource,
 		NewRunRuleLogsDataSource,
+
+		// Platform completeness (1.0): discovery data sources
+		NewAccessPoliciesDataSource,
+		NewBulkExportDestinationsDataSource,
+		NewBulkExportsDataSource,
+		NewExamplesDataSource,
+		NewFeedbackFormulasDataSource,
+		NewGatewayPoliciesDataSource,
+		NewRepoTagsDataSource,
+		NewSandboxRegistriesDataSource,
+		NewWorkspaceTagsDataSource,
 	}
 }
 

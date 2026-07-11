@@ -37,5 +37,4 @@ data "langsmith_prompt" "example" {
 - `is_archived` (Boolean) Whether the prompt is archived.
 - `is_public` (Boolean) Whether the prompt is publicly visible.
 - `readme` (String) The readme content.
-- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead. The workspace ID.
 - `updated_at` (String) When the prompt was last updated.

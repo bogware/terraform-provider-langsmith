@@ -44,5 +44,4 @@ data "langsmith_bulk_export" "example" {
 - `session_id` (String) The UUID of the project/session being exported.
 - `start_time` (String) The start time for the export in RFC3339 format.
 - `status` (String) The status of the bulk export.
-- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead.
 - `updated_at` (String) The last update timestamp.

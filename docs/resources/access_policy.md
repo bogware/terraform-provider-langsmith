@@ -4,11 +4,14 @@ page_title: "langsmith_access_policy Resource - langsmith"
 subcategory: ""
 description: |-
   Manages a LangSmith access policy (ABAC). Access policies define fine-grained permissions for roles.
+  The LangSmith API has no update endpoint for access policies, so every configurable attribute forces a replacement (delete + create) when changed.
 ---
 
 # langsmith_access_policy (Resource)
 
 Manages a LangSmith access policy (ABAC). Access policies define fine-grained permissions for roles.
+
+The LangSmith API has no update endpoint for access policies, so **every** configurable attribute forces a replacement (delete + create) when changed.
 
 ## Example Usage
 
@@ -37,14 +40,14 @@ resource "langsmith_access_policy" "example" {
 
 ### Required
 
-- `effect` (String) The policy effect (`allow` or `deny`).
-- `name` (String) The name of the access policy.
+- `effect` (String) The policy effect (`allow` or `deny`). Changing this forces a new access policy to be created.
+- `name` (String) The name of the access policy. Changing this forces a new access policy to be created.
 
 ### Optional
 
-- `condition_groups` (String) JSON-encoded array of condition groups.
-- `description` (String) A description of the access policy.
-- `role_ids` (String) JSON-encoded array of role IDs to attach this policy to.
+- `condition_groups` (String) JSON-encoded array of condition groups. Changing this forces a new access policy to be created.
+- `description` (String) A description of the access policy. Changing this forces a new access policy to be created.
+- `role_ids` (String) JSON-encoded array of role IDs to attach this policy to. Changing this forces a new access policy to be created.
 - `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
