@@ -114,8 +114,19 @@ func (r *AnnotationQueueReviewerResource) Read(ctx context.Context, req resource
 	// No GET endpoint for reviewer pairs; treat state as authoritative.
 }
 
+// Update is unreachable: every configurable attribute (queue_id, identity_id and
+// workspace_id) carries RequiresReplace, and the LangSmith API exposes only
+// add/remove for reviewer pairs — there is nothing to PATCH. It errors loudly
+// rather than silently no-opping so that re-introducing an updatable attribute
+// fails the apply instead of quietly dropping the change.
 func (r *AnnotationQueueReviewerResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	// Both fields are RequiresReplace; this should never be called.
+	resp.Diagnostics.AddError(
+		"Update Not Supported",
+		"Annotation queue reviewers cannot be updated; the API only supports adding and removing a reviewer. "+
+			"All configurable attributes are marked RequiresReplace, so this method should be unreachable — "+
+			"reaching it means an updatable attribute was added to the schema without update support. "+
+			"Please report this as a provider bug.",
+	)
 }
 
 func (r *AnnotationQueueReviewerResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

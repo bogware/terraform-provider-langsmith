@@ -232,11 +232,21 @@ func (r *ChartResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		return
 	}
 
-	// Save values from state that the read endpoint doesn't return.
-	savedCreatedAt := data.CreatedAt
-	savedUpdatedAt := data.UpdatedAt
-	savedSeries := data.Series
-	savedSectionID := data.SectionID
+	// The chart read endpoint is lossy, so hold on to the values we already have:
+	//
+	//   - created_at / updated_at and section_id are not part of the response at all.
+	//   - series *is* returned, but in the server's expanded form: every optional key
+	//     is materialized as null and each entry is given a generated "id". Writing
+	//     that over a configuration-derived value would produce a permanent phantom
+	//     diff, so a prior state value always wins.
+	//
+	// These are only used when they actually hold a value. After an import there is
+	// no prior state, and falling back to the API response is what keeps the required
+	// `series` attribute from landing in state as null (see ImportState).
+	priorCreatedAt := data.CreatedAt
+	priorUpdatedAt := data.UpdatedAt
+	priorSeries := data.Series
+	priorSectionID := data.SectionID
 
 	// Chart read uses POST and requires start_time/end_time.
 	// Use a minimal 1-minute window to avoid server-side aggregation overhead.
@@ -259,11 +269,13 @@ func (r *ChartResource) Read(ctx context.Context, req resource.ReadRequest, resp
 
 	mapChartResponseToState(&data, &result)
 	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.WorkspaceID, result.TenantID), &resp.Diagnostics)
-	// Restore values the read endpoint doesn't return.
-	data.CreatedAt = savedCreatedAt
-	data.UpdatedAt = savedUpdatedAt
-	data.Series = savedSeries
-	data.SectionID = savedSectionID
+	// Prefer what we already knew for the attributes the read endpoint cannot
+	// faithfully reproduce, but only when prior state actually has a value —
+	// otherwise (import) keep whatever the API returned.
+	data.CreatedAt = preferChartPriorState(priorCreatedAt, data.CreatedAt)
+	data.UpdatedAt = preferChartPriorState(priorUpdatedAt, data.UpdatedAt)
+	data.Series = preferChartPriorState(priorSeries, data.Series)
+	data.SectionID = preferChartPriorState(priorSectionID, data.SectionID)
 	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -329,8 +341,39 @@ func (r *ChartResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 	tflog.Trace(ctx, "deleted chart resource", map[string]interface{}{"id": data.ID.ValueString()})
 }
 
+// ImportState imports an existing chart by its ID.
+//
+// Two attributes cannot round-trip through an import, because the LangSmith read
+// endpoint (POST /api/v1/charts/{id}) does not reproduce them:
+//
+//   - section_id is simply not part of the response, so an imported chart always
+//     has section_id null in state even when it does belong to a section. (The
+//     create/update responses do return it; only the read is missing it.)
+//   - series is returned, but expanded: the server materializes every optional key
+//     as null and assigns each entry a generated "id", so the imported value is
+//     semantically the same configuration but not byte-identical to the JSON in a
+//     `series = jsonencode(...)` block.
+//
+// Consequently the first plan after an import shows a diff for these attributes.
+// Applying it re-sends the configured values (an idempotent update) and state
+// converges from then on. The acceptance tests reflect this with
+// ImportStateVerifyIgnore: {"series", "section_id"}. Everything else — title,
+// description, index, chart_type, metadata, common_filters, workspace_id —
+// round-trips.
 func (r *ChartResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+// preferChartPriorState returns the prior state value when it holds one, and the
+// value mapped from the API response otherwise. It exists so Read can protect
+// configuration-derived attributes from the server's lossy/expanded chart
+// representation without blanking those attributes during an import, where there
+// is no prior state to protect.
+func preferChartPriorState(prior, fromAPI types.String) types.String {
+	if prior.IsNull() || prior.IsUnknown() {
+		return fromAPI
+	}
+	return prior
 }
 
 func mapChartResponseToState(data *ChartResourceModel, result *chartAPIResponse) {

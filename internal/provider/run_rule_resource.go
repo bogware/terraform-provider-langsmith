@@ -279,12 +279,14 @@ func (r *RunRuleResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Optional:            true,
 			},
 			"alerts": schema.StringAttribute{
-				MarkdownDescription: "JSON-encoded array of alert configurations.",
+				MarkdownDescription: "JSON-encoded array of alert configurations. These routinely embed credentials (for example PagerDuty routing keys or Slack tokens), so the value is marked sensitive: Terraform redacts it from plan output and logs as `(sensitive value)`.",
 				Optional:            true,
+				Sensitive:           true,
 			},
 			"webhooks": schema.StringAttribute{
-				MarkdownDescription: "JSON-encoded array of webhook configurations.",
+				MarkdownDescription: "JSON-encoded array of webhook configurations. These routinely embed credentials in headers or URLs (for example bearer tokens or signed Slack webhook URLs), so the value is marked sensitive: Terraform redacts it from plan output and logs as `(sensitive value)`.",
 				Optional:            true,
+				Sensitive:           true,
 			},
 			// Computed fields the API sends back -- read-only dispatches from the marshal's office.
 			"session_name": schema.StringAttribute{

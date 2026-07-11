@@ -73,7 +73,9 @@ func (r *AccessPolicyResource) Metadata(ctx context.Context, req resource.Metada
 
 func (r *AccessPolicyResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Manages a LangSmith access policy (ABAC). Access policies define fine-grained permissions for roles.",
+		MarkdownDescription: "Manages a LangSmith access policy (ABAC). Access policies define fine-grained permissions for roles.\n\n" +
+			"The LangSmith API has no update endpoint for access policies, so **every** configurable attribute forces a " +
+			"replacement (delete + create) when changed.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "The unique identifier of the access policy.",
@@ -81,24 +83,29 @@ func (r *AccessPolicyResource) Schema(ctx context.Context, req resource.SchemaRe
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"name": schema.StringAttribute{
-				MarkdownDescription: "The name of the access policy.",
+				MarkdownDescription: "The name of the access policy. Changing this forces a new access policy to be created.",
 				Required:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"description": schema.StringAttribute{
-				MarkdownDescription: "A description of the access policy.",
+				MarkdownDescription: "A description of the access policy. Changing this forces a new access policy to be created.",
 				Optional:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"effect": schema.StringAttribute{
-				MarkdownDescription: "The policy effect (`allow` or `deny`).",
+				MarkdownDescription: "The policy effect (`allow` or `deny`). Changing this forces a new access policy to be created.",
 				Required:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"condition_groups": schema.StringAttribute{
-				MarkdownDescription: "JSON-encoded array of condition groups.",
+				MarkdownDescription: "JSON-encoded array of condition groups. Changing this forces a new access policy to be created.",
 				Optional:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"role_ids": schema.StringAttribute{
-				MarkdownDescription: "JSON-encoded array of role IDs to attach this policy to.",
+				MarkdownDescription: "JSON-encoded array of role IDs to attach this policy to. Changing this forces a new access policy to be created.",
 				Optional:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "Creation timestamp.",
@@ -211,13 +218,17 @@ func (r *AccessPolicyResource) Read(ctx context.Context, req resource.ReadReques
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
+// Update is unreachable: the access policy API has no update endpoint, so every
+// configurable attribute in the schema carries a RequiresReplace plan modifier
+// and Terraform will always plan a destroy + create instead of an in-place
+// update. The hard error below is a defensive backstop — if it ever fires, an
+// attribute was added to the schema without RequiresReplace.
 func (r *AccessPolicyResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	// The access policy API doesn't have an update endpoint.
-	// Changes require delete + create (RequiresReplace could be used, but
-	// keeping Update as a no-op preserves state consistency for now).
 	resp.Diagnostics.AddError(
 		"Update Not Supported",
-		"Access policies cannot be updated in place. Delete and recreate the policy.",
+		"Access policies cannot be updated in place. This is a bug in the provider: "+
+			"every configurable attribute of langsmith_access_policy should force a replacement. "+
+			"Please report it, and work around it by tainting the resource (`terraform apply -replace=...`).",
 	)
 }
 
@@ -248,16 +259,59 @@ func mapAccessPolicyResponseToState(data *AccessPolicyResourceModel, result *acc
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 
+	// description, condition_groups and role_ids are Optional (config-owned) and
+	// carry RequiresReplace. Overwriting them with the server's echo would make
+	// state differ from config whenever the two are merely formatted differently
+	// -- and with RequiresReplace that is not a one-off diff but a destroy/create
+	// loop that never converges. So only adopt the server value when it differs
+	// SEMANTICALLY from what the practitioner wrote; otherwise keep their literal.
 	if result.Description != "" {
 		data.Description = types.StringValue(result.Description)
+	} else if !data.Description.IsNull() && data.Description.ValueString() == "" {
+		// The practitioner explicitly wrote description = ""; the API echoes ""
+		// back. Preserve the empty string rather than collapsing it to null.
+		data.Description = types.StringValue("")
 	} else {
 		data.Description = types.StringNull()
 	}
-	data.ConditionGroups = jsonStringValue(result.ConditionGroups)
+
+	data.ConditionGroups = preserveEquivalentJSON(data.ConditionGroups, jsonStringValue(result.ConditionGroups))
+
+	roleIDs := types.StringNull()
 	if len(result.RoleIDs) > 0 {
 		roleIDsJSON, _ := json.Marshal(result.RoleIDs)
-		data.RoleIDs = types.StringValue(normalizeJSON(string(roleIDsJSON)))
-	} else {
-		data.RoleIDs = types.StringNull()
+		roleIDs = types.StringValue(normalizeJSON(string(roleIDsJSON)))
+	}
+	data.RoleIDs = preserveEquivalentJSON(data.RoleIDs, roleIDs)
+}
+
+// preserveEquivalentJSON returns prior when prior and next are the same JSON
+// document (ignoring key order and whitespace), and next otherwise. It keeps a
+// practitioner's literal formatting in state when nothing actually changed,
+// which prevents phantom diffs on config-owned JSON-string attributes.
+func preserveEquivalentJSON(prior, next types.String) types.String {
+	if prior.IsNull() || prior.IsUnknown() {
+		return next
+	}
+	if comparableJSON(prior) == comparableJSON(next) {
+		return prior
+	}
+	return next
+}
+
+// comparableJSON reduces a JSON-string attribute to a form suitable for
+// equality checks: key order and whitespace are normalized away, and the
+// several spellings of "nothing configured" (null, "", [], {}) all collapse to
+// the same value. Without that last part, a practitioner who writes `[]` where
+// the API reports no entries would see an endless diff against a null state.
+func comparableJSON(v types.String) string {
+	if v.IsNull() || v.IsUnknown() {
+		return ""
+	}
+	switch n := normalizeJSON(v.ValueString()); n {
+	case "[]", "{}", "null":
+		return ""
+	default:
+		return n
 	}
 }

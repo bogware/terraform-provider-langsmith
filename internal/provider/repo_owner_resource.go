@@ -179,8 +179,19 @@ func (r *RepoOwnerResource) Read(ctx context.Context, req resource.ReadRequest, 
 	resp.State.RemoveResource(ctx)
 }
 
+// Update is unreachable: every configurable attribute (owner, repo, email and
+// workspace_id) carries RequiresReplace, and the LangSmith API exposes only
+// add/remove for repo owners — there is nothing to PATCH. It errors loudly
+// rather than silently no-opping so that re-introducing an updatable attribute
+// fails the apply instead of quietly dropping the change.
 func (r *RepoOwnerResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	// All inputs are RequiresReplace; no Update.
+	resp.Diagnostics.AddError(
+		"Update Not Supported",
+		"Repo owners cannot be updated; the API only supports adding and removing an owner. "+
+			"All configurable attributes are marked RequiresReplace, so this method should be unreachable — "+
+			"reaching it means an updatable attribute was added to the schema without update support. "+
+			"Please report this as a provider bug.",
+	)
 }
 
 func (r *RepoOwnerResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

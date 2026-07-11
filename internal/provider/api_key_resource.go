@@ -341,19 +341,20 @@ func (r *APIKeyResource) Read(ctx context.Context, req resource.ReadRequest, res
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-// Update is unreachable in practice: every input attribute — including
-// workspace_id — carries RequiresReplace, and the key itself is immutable, so
-// any change plans as a replacement. It is retained to satisfy resource.Resource
-// and, defensively, persists the planned state without contacting the API so a
-// no-op update can never rotate the secret.
+// Update is unreachable: every configurable attribute — description, expires_at,
+// workspaces, role_id, org_role_id and workspace_id — carries RequiresReplace,
+// and the LangSmith API exposes no update endpoint for API keys, so any change
+// plans as a replacement. It errors loudly rather than silently accepting the
+// plan, so that re-introducing an updatable attribute fails the apply instead of
+// writing a changed value to state that was never sent to the API.
 func (r *APIKeyResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data apiKeyResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	finalizeWorkspaceID(&data.WorkspaceID, effectiveClient(r.client, data.WorkspaceID), "", &resp.Diagnostics)
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.AddError(
+		"Update Not Supported",
+		"API keys cannot be updated; the LangSmith API exposes no update endpoint for them. "+
+			"All configurable attributes are marked RequiresReplace, so this method should be unreachable — "+
+			"reaching it means an updatable attribute was added to the schema without update support. "+
+			"Please report this as a provider bug.",
+	)
 }
 
 func (r *APIKeyResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

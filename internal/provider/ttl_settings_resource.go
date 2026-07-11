@@ -62,16 +62,19 @@ type ttlSettingsUpsertRequest struct {
 }
 
 // ttlSettingsAPIResponse is what the API returns when you ask about TTL settings.
+// LangSmith is inconsistent about whether it names the workspace `workspace_id`
+// or `tenant_id`, so we decode both and let firstNonEmpty sort it out.
 type ttlSettingsAPIResponse struct {
-	ID                 string  `json:"id"`
-	TenantID           *string `json:"tenant_id"`
-	DefaultTraceTier   string  `json:"default_trace_tier"`
-	ApplyToAllProjects bool    `json:"apply_to_all_projects"`
-	OrganizationID     string  `json:"organization_id"`
-	CreatedAt          string  `json:"created_at"`
-	UpdatedAt          string  `json:"updated_at"`
-	ConfiguredBy       string  `json:"configured_by"`
-	LonglivedTTLDays   *int64  `json:"longlived_ttl_days"`
+	ID                 string `json:"id"`
+	WorkspaceID        string `json:"workspace_id"`
+	TenantID           string `json:"tenant_id"`
+	DefaultTraceTier   string `json:"default_trace_tier"`
+	ApplyToAllProjects bool   `json:"apply_to_all_projects"`
+	OrganizationID     string `json:"organization_id"`
+	CreatedAt          string `json:"created_at"`
+	UpdatedAt          string `json:"updated_at"`
+	ConfiguredBy       string `json:"configured_by"`
+	LonglivedTTLDays   *int64 `json:"longlived_ttl_days"`
 }
 
 func (r *TTLSettingsResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -152,6 +155,12 @@ func (r *TTLSettingsResource) Configure(ctx context.Context, req resource.Config
 	r.client = c
 }
 
+// Create upserts the org's TTL settings. This is intentionally adoption-friendly:
+// TTL settings are a singleton that always exists server-side, so PUT is an
+// upsert and "creating" this resource really means taking ownership of the row
+// the org already has. The API performs that reconciliation and returns the
+// authoritative row (including its ID), so adoption happens here, explicitly,
+// against a row the caller actually asked for -- never by guessing in Read.
 func (r *TTLSettingsResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data TTLSettingsResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
@@ -242,8 +251,20 @@ func (r *TTLSettingsResource) ImportState(ctx context.Context, req resource.Impo
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-// readTTLSettings fetches the current TTL settings from the API. The GET
-// endpoint returns a list, so we find the matching entry by ID.
+// readTTLSettings fetches the current TTL settings from the API and refreshes
+// data from the entry whose ID matches the one already in state. The GET
+// endpoint returns a list, so we have to search it by ID.
+//
+// When no entry matches, that is a genuine not-found: data.ID is set to null so
+// the caller drops the resource from state. We deliberately do NOT fall back to
+// results[0]. Adopting an arbitrary row would make *any* ID -- including a
+// garbage import ID -- appear to succeed while silently binding the resource to
+// unrelated settings, and would mask real drift (a row deleted out from under
+// us would quietly become a different row).
+//
+// Adopting a pre-existing row is Create's job, not Read's: Create PUTs to the
+// upsert endpoint, so the API itself reconciles against whatever already exists
+// and hands back the authoritative row. See Create.
 func (r *TTLSettingsResource) readTTLSettings(ctx context.Context, data *TTLSettingsResourceModel, diags *diag.Diagnostics) {
 	var results []ttlSettingsAPIResponse
 	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/orgs/ttl-settings", nil, &results)
@@ -256,25 +277,21 @@ func (r *TTLSettingsResource) readTTLSettings(ctx context.Context, data *TTLSett
 		return
 	}
 
-	if len(results) == 0 {
-		diags.AddError("Error reading TTL settings", "No TTL settings found")
-		return
-	}
-
-	// Find the matching entry by ID, or fall back to the first entry
-	// for singleton-style usage.
-	var found *ttlSettingsAPIResponse
-	for i := range results {
-		if results[i].ID == data.ID.ValueString() {
-			found = &results[i]
-			break
+	if id := data.ID.ValueString(); id != "" {
+		for i := range results {
+			if results[i].ID == id {
+				mapTTLSettingsResponseToState(data, &results[i], diags)
+				return
+			}
 		}
 	}
-	if found == nil {
-		found = &results[0]
-	}
 
-	mapTTLSettingsResponseToState(data, found, diags)
+	// No entry with our ID. Signal not-found to the caller.
+	tflog.Debug(ctx, "TTL settings entry not found; removing from state", map[string]interface{}{
+		"id":            data.ID.ValueString(),
+		"entries_found": len(results),
+	})
+	data.ID = types.StringNull()
 }
 
 // mapTTLSettingsResponseToState brands the Terraform state with values from the
@@ -288,11 +305,7 @@ func mapTTLSettingsResponseToState(data *TTLSettingsResourceModel, result *ttlSe
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 
-	apiWorkspaceID := ""
-	if result.TenantID != nil {
-		apiWorkspaceID = *result.TenantID
-	}
-	reconcileWorkspaceID(&data.WorkspaceID, apiWorkspaceID, diags)
+	reconcileWorkspaceID(&data.WorkspaceID, firstNonEmpty(result.WorkspaceID, result.TenantID), diags)
 
 	if result.LonglivedTTLDays != nil {
 		data.LonglivedTTLDays = types.Int64Value(*result.LonglivedTTLDays)

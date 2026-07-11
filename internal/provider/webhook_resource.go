@@ -88,8 +88,9 @@ func (r *WebhookResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Required:            true,
 			},
 			"headers": schema.MapAttribute{
-				MarkdownDescription: "Custom headers to include in webhook requests.",
+				MarkdownDescription: "Custom headers to include in webhook requests. This commonly carries credentials (for example `Authorization: Bearer ...`), so the whole map is marked sensitive: Terraform redacts it from plan output and logs as `(sensitive value)`.",
 				Optional:            true,
+				Sensitive:           true,
 				ElementType:         types.StringType,
 			},
 			"triggers": schema.ListAttribute{

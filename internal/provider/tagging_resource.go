@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -81,6 +82,30 @@ type taggingResourceItem struct {
 	TaggingID    string `json:"tagging_id"`
 	ResourceName string `json:"resource_name"`
 	ResourceID   string `json:"resource_id"`
+}
+
+// byResourceType flattens the grouped resources into (resource_type, items)
+// pairs. The resource_type strings are the singular forms accepted by the
+// create API and the `resource_type` schema attribute, so a lookup hit tells us
+// which type the tagging targets -- this is the only way to recover
+// resource_type on import, since the list endpoint expresses it structurally.
+func (r taggingResourcesByType) byResourceType() []struct {
+	resourceType string
+	items        []taggingResourceItem
+} {
+	return []struct {
+		resourceType string
+		items        []taggingResourceItem
+	}{
+		{"alert", r.Alerts},
+		{"dashboard", r.Dashboards},
+		{"dataset", r.Datasets},
+		{"deployment", r.Deployments},
+		{"experiment", r.Experiments},
+		{"project", r.Projects},
+		{"prompt", r.Prompts},
+		{"queue", r.Queues},
+	}
 }
 
 func (r *TaggingResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -182,32 +207,51 @@ func (r *TaggingResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
+	// tag_value_id is always present: Create writes it from the API response and
+	// ImportState parses it out of the composite import ID.
+	tagValueID := data.TagValueID.ValueString()
+	if tagValueID == "" {
+		resp.Diagnostics.AddError(
+			"Missing tag_value_id",
+			"Cannot read a tagging without a tag_value_id. If this resource was imported, use the import ID format \"<tag_value_id>:<tagging_id>\".",
+		)
+		return
+	}
+
 	// The tagging list API returns a nested response grouped by tag value and
 	// resource type. Filter by tag_value_id for efficiency.
 	query := url.Values{}
-	query.Set("tag_value_id", data.TagValueID.ValueString())
+	query.Set("tag_value_id", tagValueID)
 
 	c := effectiveClient(r.client, data.WorkspaceID)
 	var results []taggingListResponse
 	err := c.Get(ctx, "/api/v1/workspaces/current/taggings", query, &results)
 	if err != nil {
+		if client.IsNotFound(err) {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError("Error reading taggings", err.Error())
 		return
 	}
 
-	// Search through the nested response for our tagging ID.
-	found := false
+	// Search the nested response for our tagging ID. The resource type is
+	// encoded in *which* slice the hit lands in, and resource_id comes from the
+	// item itself -- both must be written back to state so that an imported
+	// resource round-trips without a spurious forced replacement (both are
+	// Required + RequiresReplace).
+	var (
+		found        bool
+		resourceType string
+		resourceID   string
+	)
 	for _, group := range results {
-		allItems := [][]taggingResourceItem{
-			group.Resources.Alerts, group.Resources.Dashboards,
-			group.Resources.Datasets, group.Resources.Deployments,
-			group.Resources.Experiments, group.Resources.Projects,
-			group.Resources.Prompts, group.Resources.Queues,
-		}
-		for _, items := range allItems {
-			for _, item := range items {
+		for _, bucket := range group.Resources.byResourceType() {
+			for _, item := range bucket.items {
 				if item.TaggingID == data.ID.ValueString() {
 					found = true
+					resourceType = bucket.resourceType
+					resourceID = item.ResourceID
 					break
 				}
 			}
@@ -216,6 +260,7 @@ func (r *TaggingResource) Read(ctx context.Context, req resource.ReadRequest, re
 			}
 		}
 		if found {
+			data.TagValueID = types.StringValue(firstNonEmpty(group.TagValueID, tagValueID))
 			break
 		}
 	}
@@ -225,8 +270,15 @@ func (r *TaggingResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	// State is already populated from the prior apply; the list endpoint
-	// doesn't return created_at, so we keep it from state.
+	// resource_type and resource_id are Required + RequiresReplace. Fall back to
+	// the value already in state if the list endpoint omits one: writing an empty
+	// string into a RequiresReplace attribute would plan a forced replacement on
+	// every apply. On import there is no prior state, so the API value is used.
+	data.ResourceType = types.StringValue(firstNonEmpty(resourceType, data.ResourceType.ValueString()))
+	data.ResourceID = types.StringValue(firstNonEmpty(resourceID, data.ResourceID.ValueString()))
+
+	// The list endpoint doesn't return created_at, so we keep it from state
+	// (it is null on a fresh import).
 	finalizeWorkspaceID(&data.WorkspaceID, c, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -254,6 +306,23 @@ func (r *TaggingResource) Delete(ctx context.Context, req resource.DeleteRequest
 	tflog.Trace(ctx, "deleted tagging resource", map[string]interface{}{"id": data.ID.ValueString()})
 }
 
+// ImportState handles importing a tagging resource.
+// The import ID format is "<tag_value_id>:<tagging_id>", e.g.
+//
+//	terraform import langsmith_tagging.example 6f1a...:9c2b...
+//
+// Both halves are required: the tagging list endpoint is only queryable by
+// tag_value_id, so the tagging ID alone is not enough to find the record. Read
+// then recovers resource_type and resource_id from the API response.
 func (r *TaggingResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	parts := strings.SplitN(req.ID, ":", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		resp.Diagnostics.AddError(
+			"Invalid import ID",
+			fmt.Sprintf("Expected import ID in the format \"<tag_value_id>:<tagging_id>\", got: %q", req.ID),
+		)
+		return
+	}
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("tag_value_id"), parts[0])...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), parts[1])...)
 }

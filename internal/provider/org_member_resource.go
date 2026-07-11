@@ -34,6 +34,7 @@ type OrgMemberResource struct {
 
 type OrgMemberResourceModel struct {
 	ID             types.String `tfsdk:"id"`
+	UserID         types.String `tfsdk:"user_id"`
 	Email          types.String `tfsdk:"email"`
 	RoleID         types.String `tfsdk:"role_id"`
 	FullName       types.String `tfsdk:"full_name"`
@@ -81,6 +82,22 @@ type orgMemberPending struct {
 	RoleID    *string `json:"role_id"`
 	FullName  *string `json:"full_name"`
 	CreatedAt string  `json:"created_at"`
+	// A pending (unaccepted) invitation usually has no backing user yet, so the
+	// API commonly omits user_id here. Decode it anyway: if the invite is for an
+	// existing LangSmith user the ID is present, and it is strictly better to
+	// surface it than to force a second apply.
+	UserID string `json:"user_id"`
+}
+
+// orgMemberNullableString converts an API string into a Terraform value, mapping
+// the empty string to null. The org members endpoint returns "" (not a missing
+// key) for a user_id it cannot resolve, and "" would be a lie: it is not a
+// usable langsmith_workspace_member.user_id.
+func orgMemberNullableString(s string) types.String {
+	if s == "" {
+		return types.StringNull()
+	}
+	return types.StringValue(s)
 }
 
 func (r *OrgMemberResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -95,6 +112,16 @@ func (r *OrgMemberResource) Schema(ctx context.Context, req resource.SchemaReque
 				MarkdownDescription: "The unique identifier of the member/invitation.",
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"user_id": schema.StringAttribute{
+				MarkdownDescription: "The user ID backing this membership. This is the value to feed into " +
+					"`langsmith_workspace_member.user_id` to grant the member access to a workspace.\n\n" +
+					"This is `null` while the invitation is still pending: an invited user who has not yet " +
+					"accepted may not have a resolvable user ID. It is populated on the next refresh once the " +
+					"invitation is accepted, so a `langsmith_workspace_member` chained off a brand-new invite " +
+					"may require a second apply.",
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"email": schema.StringAttribute{
 				MarkdownDescription: "The email address of the member to invite.",
@@ -166,13 +193,18 @@ func (r *OrgMemberResource) Create(ctx context.Context, req resource.CreateReque
 		data.FullName = types.StringValue(*result.FullName)
 	}
 
-	// Read back to get organization_id.
+	// Read back to get organization_id and user_id.
 	found := r.refreshMemberData(ctx, &data, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		// Persist partial state so the created invitation is tracked (and
-		// tainted) instead of orphaned when the read-back fails.
+		// tainted) instead of orphaned when the read-back fails. The read-back
+		// is what populates these, so null out anything still unknown --
+		// Terraform hard-fails on an unknown value after apply.
 		if data.OrganizationID.IsUnknown() {
 			data.OrganizationID = types.StringNull()
+		}
+		if data.UserID.IsUnknown() {
+			data.UserID = types.StringNull()
 		}
 		resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 		return
@@ -181,6 +213,9 @@ func (r *OrgMemberResource) Create(ctx context.Context, req resource.CreateReque
 		resp.Diagnostics.AddError("Error reading org member", "Member not found after creation.")
 		// Persist partial state so the created invitation is tracked (and
 		// tainted) instead of orphaned.
+		if data.UserID.IsUnknown() {
+			data.UserID = types.StringNull()
+		}
 		resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 		return
 	}
@@ -219,9 +254,14 @@ func (r *OrgMemberResource) refreshMemberData(ctx context.Context, data *OrgMemb
 
 	data.OrganizationID = types.StringValue(listResult.OrganizationID)
 
+	// Default user_id to null. A pending invite may have no resolvable user yet,
+	// and the framework hard-fails on an attribute left unknown after apply.
+	data.UserID = types.StringNull()
+
 	// Search active members first.
 	for _, m := range listResult.Members {
 		if m.ID == data.ID.ValueString() {
+			data.UserID = orgMemberNullableString(m.UserID)
 			if m.Email != nil {
 				data.Email = types.StringValue(*m.Email)
 			}
@@ -240,9 +280,11 @@ func (r *OrgMemberResource) refreshMemberData(ctx context.Context, data *OrgMemb
 		}
 	}
 
-	// Search pending members.
+	// Search pending members. An unaccepted invite typically has no user_id;
+	// orgMemberNullableString keeps it null rather than "" in that case.
 	for _, p := range listResult.Pending {
 		if p.ID == data.ID.ValueString() {
+			data.UserID = orgMemberNullableString(p.UserID)
 			data.Email = types.StringValue(p.Email)
 			if p.RoleID != nil {
 				data.RoleID = types.StringValue(*p.RoleID)
