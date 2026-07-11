@@ -1,3 +1,9 @@
+## 0.10.1 (Unreleased)
+
+BUG FIXES:
+
+* Resources with multi-step creates no longer orphan the remote object when a follow-up step fails (#61). Previously, e.g., `langsmith_prompt` could create the prompt repo and then fail on the initial manifest commit (such as a 400 for an unsupported manifest type) without recording anything in state, so the next apply hit `409 already exists`. Affected creates now persist partial state on follow-up failures, so Terraform tracks the resource as tainted and replaces it cleanly on the next apply. Hardened: `langsmith_prompt`, `langsmith_chart_section_clone`, `langsmith_issues_agent`, `langsmith_feature_model_config`, `langsmith_access_policy`, `langsmith_feedback_config`, `langsmith_hub_environment`, `langsmith_org_member`, `langsmith_workspace_member`.
+
 ## 0.10.0 (June 2026)
 
 BUG FIXES:

@@ -5,6 +5,7 @@ package provider
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -51,6 +52,98 @@ func TestAccPromptResource_basic(t *testing.T) {
 			},
 		},
 	})
+}
+
+// TestAccPromptResource_partialCreateRecovery is a regression test for issue
+// #61: the repo POST succeeds but the follow-up commit POST fails (unsupported
+// manifest type). The provider must persist partial state so the repo is
+// tracked (tainted) and replaced on the next apply, instead of being orphaned
+// remotely and causing a 409 "already exists" on the retry.
+func TestAccPromptResource_partialCreateRecovery(t *testing.T) {
+	handle := strings.ToLower(fmt.Sprintf("tf-prompt-%s", acctest.RandStringFromCharSet(8, acctest.CharSetAlpha)))
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Step 1: RunnableSequence manifests are rejected by the commit
+			// endpoint with 400 "Manifest type ... is not supported", after the
+			// repo itself has already been created.
+			{
+				Config:      testAccPromptResourceConfigUnsupportedManifest(handle),
+				ExpectError: regexp.MustCompile("is not supported"),
+			},
+			// Step 2: same resource address with a valid ChatPromptTemplate
+			// manifest. The tainted repo from step 1 is destroyed and
+			// recreated; this must apply cleanly with no 409 conflict.
+			{
+				Config: testAccPromptResourceConfigValidManifest(handle),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("langsmith_prompt.test", "id"),
+					resource.TestCheckResourceAttr("langsmith_prompt.test", "repo_handle", handle),
+					resource.TestCheckResourceAttrSet("langsmith_prompt.test", "commit_hash"),
+				),
+			},
+		},
+	})
+}
+
+func testAccPromptResourceConfigUnsupportedManifest(handle string) string {
+	return fmt.Sprintf(`
+resource "langsmith_prompt" "test" {
+  repo_handle = %[1]q
+  is_public   = false
+  description = "partial create recovery test"
+
+  manifest = jsonencode({
+    lc     = 1
+    type   = "constructor"
+    id     = ["langchain", "schema", "runnable", "RunnableSequence"]
+    kwargs = {}
+  })
+}
+`, handle)
+}
+
+func testAccPromptResourceConfigValidManifest(handle string) string {
+	return fmt.Sprintf(`
+resource "langsmith_prompt" "test" {
+  repo_handle = %[1]q
+  is_public   = false
+  description = "partial create recovery test"
+  # The server auto-tags the repo with the manifest type on commit; declare
+  # it so the post-apply refresh plan is empty.
+  tags = ["ChatPromptTemplate"]
+
+  manifest = jsonencode({
+    lc   = 1
+    type = "constructor"
+    id   = ["langchain", "prompts", "chat", "ChatPromptTemplate"]
+    kwargs = {
+      input_variables = ["question"]
+      messages = [
+        {
+          lc   = 1
+          type = "constructor"
+          id   = ["langchain", "prompts", "chat", "HumanMessagePromptTemplate"]
+          kwargs = {
+            prompt = {
+              lc   = 1
+              type = "constructor"
+              id   = ["langchain", "prompts", "prompt", "PromptTemplate"]
+              kwargs = {
+                input_variables = ["question"]
+                template        = "{question}"
+                template_format = "f-string"
+              }
+            }
+          }
+        }
+      ]
+    }
+  })
+}
+`, handle)
 }
 
 func testAccPromptResourceConfig(handle string, isPublic bool, description string) string {

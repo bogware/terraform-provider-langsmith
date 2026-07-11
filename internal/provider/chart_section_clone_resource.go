@@ -176,6 +176,27 @@ func (r *ChartSectionCloneResource) Create(ctx context.Context, req resource.Cre
 		var patched chartSectionAPIResponse
 		if err := c.Patch(ctx, "/api/v1/charts/section/"+cloned.ID, patchBody, &patched); err != nil {
 			resp.Diagnostics.AddError("Error applying post-clone updates", err.Error())
+			// Persist partial state so the cloned section is tracked (and
+			// tainted) instead of orphaned when the follow-up PATCH fails.
+			// Resolve every still-unknown computed field to a known value first.
+			data.ID = types.StringValue(cloned.ID)
+			if data.Title.IsUnknown() {
+				data.Title = types.StringValue(cloned.Title)
+			}
+			if data.Description.IsUnknown() {
+				setStateOptionalString(&data.Description, cloned.Description)
+			}
+			if data.Index.IsUnknown() {
+				if cloned.Index != nil {
+					data.Index = types.Int64Value(*cloned.Index)
+				} else {
+					data.Index = types.Int64Null()
+				}
+			}
+			setStateOptionalString(&data.CreatedAt, cloned.CreatedAt)
+			setStateOptionalString(&data.UpdatedAt, cloned.ModifiedAt)
+			finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(cloned.WorkspaceID, cloned.TenantID), &resp.Diagnostics)
+			resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 			return
 		}
 		final = patched

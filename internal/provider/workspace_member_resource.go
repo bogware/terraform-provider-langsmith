@@ -184,6 +184,9 @@ func (r *WorkspaceMemberResource) Create(ctx context.Context, req resource.Creat
 	err = effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/workspaces/current/members", nil, &listResult)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading workspace member after create", err.Error())
+		// Persist partial state so the created member is tracked (and
+		// tainted) instead of orphaned when the read-back fails.
+		r.persistPartialCreateState(ctx, &data, resp)
 		return
 	}
 
@@ -200,6 +203,9 @@ func (r *WorkspaceMemberResource) Create(ctx context.Context, req resource.Creat
 			"Error reading workspace member after create",
 			fmt.Sprintf("Member with id %s not found in workspace roster after creation -- vanished like a ghost rider.", createResult.ID),
 		)
+		// Persist partial state so the created member is tracked (and
+		// tainted) instead of orphaned.
+		r.persistPartialCreateState(ctx, &data, resp)
 		return
 	}
 
@@ -217,6 +223,30 @@ func (r *WorkspaceMemberResource) Create(ctx context.Context, req resource.Creat
 	tflog.Trace(ctx, "created workspace member resource", map[string]interface{}{"id": createResult.ID})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+// persistPartialCreateState resolves any still-unknown computed fields to
+// null (or the effective workspace) and saves partial state so a member that
+// was created remotely is tracked -- and tainted -- rather than orphaned when
+// a post-create step fails.
+func (r *WorkspaceMemberResource) persistPartialCreateState(ctx context.Context, data *WorkspaceMemberResourceModel, resp *resource.CreateResponse) {
+	if data.Email.IsUnknown() {
+		data.Email = types.StringNull()
+	}
+	if data.FullName.IsUnknown() {
+		data.FullName = types.StringNull()
+	}
+	if data.CreatedAt.IsUnknown() {
+		data.CreatedAt = types.StringNull()
+	}
+	if data.WorkspaceID.IsNull() || data.WorkspaceID.IsUnknown() {
+		if ws := effectiveClient(r.client, data.WorkspaceID).WorkspaceID; ws != "" {
+			data.WorkspaceID = types.StringValue(ws)
+		} else {
+			data.WorkspaceID = types.StringNull()
+		}
+	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, data)...)
 }
 
 func (r *WorkspaceMemberResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {

@@ -143,8 +143,14 @@ func (r *HubEnvironmentResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 	data.ID = types.StringValue(api.ID)
+	planEnvironments := data.Environments
 	data.Environments = buildHubEnvList(api.Environments, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
+		// Persist partial state so the created hub environment record is
+		// tracked (and tainted) instead of orphaned when mapping fails.
+		data.Environments = planEnvironments
+		reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
+		resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 		return
 	}
 	tflog.Trace(ctx, "created hub environments", map[string]interface{}{"id": api.ID})

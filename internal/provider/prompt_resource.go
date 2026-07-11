@@ -284,6 +284,14 @@ func (r *PromptResource) Create(ctx context.Context, req resource.CreateRequest,
 		err := c.Post(ctx, fmt.Sprintf("/commits/-/%s", data.RepoHandle.ValueString()), commitBody, &commitResult)
 		if err != nil {
 			resp.Diagnostics.AddError("Error creating prompt commit", err.Error())
+			// Persist partial state so the created repo is tracked (and tainted)
+			// instead of orphaned when the follow-up commit fails. Resolve every
+			// still-unknown computed field to a known value first.
+			data.CommitHash = types.StringNull()
+			data.IsArchived = types.BoolValue(result.Repo.IsArchived)
+			finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.Repo.WorkspaceID, result.Repo.TenantID), &resp.Diagnostics)
+			data.TenantID = data.WorkspaceID
+			resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 			return
 		}
 		data.CommitHash = types.StringValue(commitResult.Commit.CommitHash)

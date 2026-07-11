@@ -169,10 +169,19 @@ func (r *OrgMemberResource) Create(ctx context.Context, req resource.CreateReque
 	// Read back to get organization_id.
 	found := r.refreshMemberData(ctx, &data, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
+		// Persist partial state so the created invitation is tracked (and
+		// tainted) instead of orphaned when the read-back fails.
+		if data.OrganizationID.IsUnknown() {
+			data.OrganizationID = types.StringNull()
+		}
+		resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 		return
 	}
 	if !found {
 		resp.Diagnostics.AddError("Error reading org member", "Member not found after creation.")
+		// Persist partial state so the created invitation is tracked (and
+		// tainted) instead of orphaned.
+		resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 		return
 	}
 

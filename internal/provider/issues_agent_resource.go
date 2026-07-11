@@ -306,12 +306,23 @@ func (r *IssuesAgentResource) Create(ctx context.Context, req resource.CreateReq
 				"Error applying issues agent settings after create",
 				"The agent was created but the follow-up PATCH for cron/overview/instructions/spend-limit settings failed: "+err.Error(),
 			)
+			// Persist partial state so the created agent is tracked (and
+			// tainted) instead of orphaned when the follow-up PATCH fails.
+			// mapResponse resolves the still-unknown computed fields from the
+			// create response (api still holds the POST result).
+			r.mapResponse(&api, &data, &resp.Diagnostics)
+			r.resolveUnknowns(&data)
+			resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 			return
 		}
 	}
 
 	r.mapResponse(&api, &data, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
+		// Persist partial state so the created agent is tracked (and tainted)
+		// instead of orphaned when response mapping fails.
+		r.resolveUnknowns(&data)
+		resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 		return
 	}
 	tflog.Trace(ctx, "created issues agent", map[string]interface{}{"session_id": data.SessionID.ValueString()})
@@ -438,6 +449,31 @@ func issuesAgentSetBool(dst *types.Bool, api *bool) {
 	}
 	if dst.IsUnknown() {
 		*dst = types.BoolValue(false)
+	}
+}
+
+// resolveUnknowns nulls every model field that is still unknown, so partial
+// state persisted on a create error path never contains unknown values
+// (Terraform rejects unknown values in state).
+func (r *IssuesAgentResource) resolveUnknowns(data *IssuesAgentResourceModel) {
+	for _, s := range []*types.String{
+		&data.ID, &data.GithubRepoURL, &data.GithubBaseBranch, &data.GithubRepoSubdir,
+		&data.ContextHubRepoHandle, &data.UserInstructions, &data.SessionLCUSpendLimitMonthly,
+		&data.SessionAgentOverviewRepoID, &data.CronSchedule, &data.LatestRunID,
+		&data.LatestThreadID, &data.SessionName, &data.TenantID, &data.TenantName,
+		&data.CreatedAt, &data.UpdatedAt, &data.WorkspaceID,
+	} {
+		if s.IsUnknown() {
+			*s = types.StringNull()
+		}
+	}
+	for _, b := range []*types.Bool{&data.CronEnabled, &data.AgentOverviewAccepted} {
+		if b.IsUnknown() {
+			*b = types.BoolNull()
+		}
+	}
+	if data.Priorities.IsUnknown() {
+		data.Priorities = types.ListNull(types.StringType)
 	}
 }
 
