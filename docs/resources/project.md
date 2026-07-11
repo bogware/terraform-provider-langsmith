@@ -13,9 +13,23 @@ Manages a LangSmith project (tracer session).
 ## Example Usage
 
 ```terraform
+resource "langsmith_tag_key" "environment" {
+  key         = "environment"
+  description = "Deployment environment tag"
+}
+
+resource "langsmith_tag_value" "production" {
+  tag_key_id  = langsmith_tag_key.environment.id
+  value       = "production"
+  description = "Production environment"
+}
+
 resource "langsmith_project" "example" {
   name        = "my-project"
   description = "A project for tracing LLM runs"
+
+  # Associate tag values with the project (see langsmith_tag_value).
+  tag_value_ids = [langsmith_tag_value.production.id]
 }
 ```
 
@@ -30,13 +44,15 @@ resource "langsmith_project" "example" {
 
 - `default_dataset_id` (String) The UUID of the default dataset for this project.
 - `description` (String) A description of the project.
+- `end_time` (String) The end time of the project, as an RFC 3339 / ISO 8601 timestamp.
 - `extra` (String) JSON string containing extra metadata for the project.
 - `reference_dataset_id` (String) The UUID of the reference dataset for this project.
+- `start_time` (String) The start time of the project, as an RFC 3339 / ISO 8601 timestamp. If unset, the server assigns the creation time.
+- `tag_value_ids` (List of String) A list of tag value UUIDs (see `langsmith_tag_value`) to associate with the project. The LangSmith API does not echo these values back on read, so the configured value is preserved in state.
 - `trace_tier` (String) The trace retention tier for the project. Valid values: `longlived`, `shortlived`.
 - `workspace_id` (String) The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
 
 - `id` (String) The unique identifier of the project.
-- `start_time` (String) The start time of the project.
 - `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead.

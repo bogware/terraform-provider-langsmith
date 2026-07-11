@@ -36,17 +36,21 @@ type InfoDataSource struct {
 type InfoDataSourceModel struct {
 	ID                    types.String `tfsdk:"id"`
 	Version               types.String `tfsdk:"version"`
+	GitSHA                types.String `tfsdk:"git_sha"`
 	LicenseExpirationTime types.String `tfsdk:"license_expiration_time"`
 	BatchIngestConfig     types.String `tfsdk:"batch_ingest_config"`
 	InstanceFlags         types.String `tfsdk:"instance_flags"`
+	CustomerInfo          types.String `tfsdk:"customer_info"`
 }
 
 // infoDataSourceAPIResponse is the API response for the info endpoint.
 type infoDataSourceAPIResponse struct {
 	Version               string          `json:"version"`
+	GitSHA                *string         `json:"git_sha"`
 	LicenseExpirationTime *string         `json:"license_expiration_time"`
 	BatchIngestConfig     json.RawMessage `json:"batch_ingest_config"`
 	InstanceFlags         json.RawMessage `json:"instance_flags"`
+	CustomerInfo          json.RawMessage `json:"customer_info"`
 }
 
 func (d *InfoDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -65,6 +69,10 @@ func (d *InfoDataSource) Schema(ctx context.Context, req datasource.SchemaReques
 				MarkdownDescription: "The LangSmith server version.",
 				Computed:            true,
 			},
+			"git_sha": schema.StringAttribute{
+				MarkdownDescription: "The Git commit SHA the LangSmith server was built from.",
+				Computed:            true,
+			},
 			"license_expiration_time": schema.StringAttribute{
 				MarkdownDescription: "The license expiration time of the LangSmith instance.",
 				Computed:            true,
@@ -75,6 +83,10 @@ func (d *InfoDataSource) Schema(ctx context.Context, req datasource.SchemaReques
 			},
 			"instance_flags": schema.StringAttribute{
 				MarkdownDescription: "JSON string of instance feature flags.",
+				Computed:            true,
+			},
+			"customer_info": schema.StringAttribute{
+				MarkdownDescription: "JSON string of customer information for the LangSmith instance.",
 				Computed:            true,
 			},
 		},
@@ -115,6 +127,12 @@ func (d *InfoDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	data.ID = types.StringValue("info")
 	data.Version = types.StringValue(result.Version)
 
+	if result.GitSHA != nil {
+		data.GitSHA = types.StringValue(*result.GitSHA)
+	} else {
+		data.GitSHA = types.StringNull()
+	}
+
 	if result.LicenseExpirationTime != nil {
 		data.LicenseExpirationTime = types.StringValue(*result.LicenseExpirationTime)
 	} else {
@@ -131,6 +149,12 @@ func (d *InfoDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		data.InstanceFlags = types.StringValue(string(result.InstanceFlags))
 	} else {
 		data.InstanceFlags = types.StringNull()
+	}
+
+	if len(result.CustomerInfo) > 0 && string(result.CustomerInfo) != "null" {
+		data.CustomerInfo = types.StringValue(string(result.CustomerInfo))
+	} else {
+		data.CustomerInfo = types.StringNull()
 	}
 
 	tflog.Trace(ctx, "read info data source")

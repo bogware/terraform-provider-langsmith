@@ -63,9 +63,9 @@ func (r *OrgChartResource) Schema(ctx context.Context, req resource.SchemaReques
 				PlanModifiers:       []planmodifier.Int64{int64planmodifier.UseStateForUnknown()},
 			},
 			"chart_type": schema.StringAttribute{
-				MarkdownDescription: "The chart type. Valid values: `line`, `bar`.",
+				MarkdownDescription: "The chart type. Valid values: `line`, `bar`, `table`, `kpi`, `top-k`, `pie`.",
 				Required:            true,
-				Validators:          []validator.String{stringvalidator.OneOf("line", "bar")},
+				Validators:          []validator.String{stringvalidator.OneOf("line", "bar", "table", "kpi", "top-k", "pie")},
 			},
 			"series": schema.StringAttribute{
 				MarkdownDescription: "JSON-encoded array of chart series configurations.",

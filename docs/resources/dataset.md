@@ -17,6 +17,9 @@ resource "langsmith_dataset" "example" {
   name        = "my-dataset"
   description = "A dataset for evaluation"
   data_type   = "kv"
+
+  # Optionally pin an experiment as the comparison baseline for this dataset.
+  # baseline_experiment_id = "00000000-0000-0000-0000-000000000000"
 }
 ```
 
@@ -29,6 +32,7 @@ resource "langsmith_dataset" "example" {
 
 ### Optional
 
+- `baseline_experiment_id` (String) The ID of the experiment to pin as the comparison baseline for this dataset.
 - `data_type` (String) The data type of the dataset. One of `kv`, `llm`, or `chat`.
 - `description` (String) A description of the dataset.
 - `externally_managed` (Boolean) Whether the dataset is externally managed.

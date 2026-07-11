@@ -22,6 +22,8 @@ data "langsmith_info" "example" {}
 ### Read-Only
 
 - `batch_ingest_config` (String) JSON string of the batch ingest configuration.
+- `customer_info` (String) JSON string of customer information for the LangSmith instance.
+- `git_sha` (String) The Git commit SHA the LangSmith server was built from.
 - `id` (String) Placeholder identifier, always set to `info`.
 - `instance_flags` (String) JSON string of instance feature flags.
 - `license_expiration_time` (String) The license expiration time of the LangSmith instance.

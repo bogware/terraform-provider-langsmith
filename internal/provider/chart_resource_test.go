@@ -40,6 +40,13 @@ func TestAccChartResource_basic(t *testing.T) {
 				ImportStateVerify:       true,
 				ImportStateVerifyIgnore: []string{"series", "section_id"},
 			},
+			{
+				Config: testAccChartResourceConfigKPI(projectName, sectionTitle, chartTitle),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("langsmith_chart.test", "id"),
+					resource.TestCheckResourceAttr("langsmith_chart.test", "chart_type", "kpi"),
+				),
+			},
 		},
 	})
 }
@@ -57,6 +64,35 @@ resource "langsmith_chart_section" "test" {
 resource "langsmith_chart" "test" {
   title      = %[3]q
   chart_type = "line"
+  section_id = langsmith_chart_section.test.id
+  series     = jsonencode([
+    {
+      name   = "Run Count"
+      metric = "run_count"
+      filters = {
+        session = [langsmith_project.test.id]
+      }
+    }
+  ])
+}
+`, projectName, sectionTitle, chartTitle)
+}
+
+// testAccChartResourceConfigKPI updates the chart to a "kpi" chart type to
+// exercise the widened CustomChartType enum (line, bar, table, kpi, top-k, pie).
+func testAccChartResourceConfigKPI(projectName, sectionTitle, chartTitle string) string {
+	return fmt.Sprintf(`
+resource "langsmith_project" "test" {
+  name = %[1]q
+}
+
+resource "langsmith_chart_section" "test" {
+  title = %[2]q
+}
+
+resource "langsmith_chart" "test" {
+  title      = %[3]q
+  chart_type = "kpi"
   section_id = langsmith_chart_section.test.id
   series     = jsonencode([
     {

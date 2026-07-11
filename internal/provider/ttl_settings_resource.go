@@ -124,7 +124,7 @@ func (r *TTLSettingsResource) Schema(ctx context.Context, req resource.SchemaReq
 				Computed:            true,
 			},
 			"longlived_ttl_days": schema.Int64Attribute{
-				MarkdownDescription: "The number of days longlived traces are retained.",
+				MarkdownDescription: "The number of days longlived traces are retained. Read-only at the organization level: this value cannot be set via the org TTL settings endpoint. To manage the per-workspace retention window, use the `langsmith_workspace_ttl_settings` resource.",
 				Computed:            true,
 			},
 			"created_at": schema.StringAttribute{

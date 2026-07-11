@@ -3,12 +3,12 @@
 page_title: "langsmith_service_key Resource - langsmith"
 subcategory: ""
 description: |-
-  Manages a LangSmith service key (API key). Service keys cannot be updated; changing any mutable attribute will force recreation. The full API key is only available at creation time.
+  Manages a LangSmith service key (API key). The key's role_id and org_role_id can be updated in place without rotating the key; changing description, read_only, expires_at, or default_workspace_id forces recreation. The full API key is only available at creation time. In-place role updates require organization admin permissions (ORGANIZATION_MANAGE).
 ---
 
 # langsmith_service_key (Resource)
 
-Manages a LangSmith service key (API key). Service keys cannot be updated; changing any mutable attribute will force recreation. The full API key is only available at creation time.
+Manages a LangSmith service key (API key). The key's `role_id` and `org_role_id` can be updated in place without rotating the key; changing `description`, `read_only`, `expires_at`, or `default_workspace_id` forces recreation. The full API key is only available at creation time. In-place role updates require organization admin permissions (`ORGANIZATION_MANAGE`).
 
 ## Example Usage
 
@@ -16,6 +16,10 @@ Manages a LangSmith service key (API key). Service keys cannot be updated; chang
 resource "langsmith_service_key" "example" {
   description = "API key for CI/CD pipeline"
   read_only   = false
+
+  # role_id and org_role_id can be changed in place (without rotating the key).
+  # Updating either requires organization admin permissions.
+  role_id = "00000000-0000-0000-0000-000000000000"
 }
 ```
 
@@ -27,8 +31,9 @@ resource "langsmith_service_key" "example" {
 - `default_workspace_id` (String) The default workspace ID for the service key.
 - `description` (String) A description for the service key.
 - `expires_at` (String) ISO 8601 timestamp when the service key expires.
+- `org_role_id` (String) The org-level role ID to assign to the service key. Only valid for org-scoped keys (those created without a `default_workspace_id`). Can be updated in place (requires organization admin permissions).
 - `read_only` (Boolean) Whether the service key is read-only.
-- `role_id` (String) The role ID to assign to the service key.
+- `role_id` (String) The workspace-level role ID to assign to the service key. Can be updated in place (requires organization admin permissions).
 - `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
