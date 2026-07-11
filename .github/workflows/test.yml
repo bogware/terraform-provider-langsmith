@@ -32,11 +32,12 @@ jobs:
       - run: go mod download
       - run: go build -v .
       - name: Run linters
-        uses: golangci/golangci-lint-action@55c2c1448f86e01eaae002a5a3a9624417608d84 # v6.5.2
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
-          # Pinned: the repo's .golangci.yml uses the v1 config schema, so an
-          # unpinned "latest" (now golangci-lint v2.x) would fail to parse it.
-          version: v1.64.8
+          # golangci-lint v2: v1 is EOL and its last build (v1.64.8, built with
+          # go1.24) refuses to lint this module, which targets a newer Go via the
+          # go.mod toolchain pin. Config is the migrated v2 schema (.golangci.yml).
+          version: v2.12.2
 
   generate:
     name: Verify Generated Files
