@@ -82,7 +82,6 @@ type RunRuleResourceModel struct {
 	BackfillCompletedAt          types.String  `tfsdk:"backfill_completed_at"`
 	BackfillError                types.String  `tfsdk:"backfill_error"`
 	WorkspaceID                  types.String  `tfsdk:"workspace_id"`
-	TenantID                     types.String  `tfsdk:"tenant_id"`
 	CreatedAt                    types.String  `tfsdk:"created_at"`
 	UpdatedAt                    types.String  `tfsdk:"updated_at"`
 }
@@ -342,12 +341,10 @@ func (r *RunRuleResource) Schema(ctx context.Context, req resource.SchemaRequest
 				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
-				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
-				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "When the rule was created.",
@@ -655,7 +652,6 @@ func (r *RunRuleResource) mapResponseToModel(result *runRuleAPIResponse, data *R
 	data.SamplingRate = types.Float64Value(result.SamplingRate)
 	data.IsEnabled = types.BoolValue(result.IsEnabled)
 	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, diags)
-	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 

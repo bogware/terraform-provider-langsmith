@@ -56,7 +56,6 @@ type PromptResourceModel struct {
 	FullName       types.String `tfsdk:"full_name"`
 	CommitHash     types.String `tfsdk:"commit_hash"`
 	WorkspaceID    types.String `tfsdk:"workspace_id"`
-	TenantID       types.String `tfsdk:"tenant_id"`
 	CreatedAt      types.String `tfsdk:"created_at"`
 	UpdatedAt      types.String `tfsdk:"updated_at"`
 }
@@ -214,13 +213,10 @@ func (r *PromptResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
-				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
-				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "When the prompt was created.",
@@ -320,7 +316,6 @@ func (r *PromptResource) Create(ctx context.Context, req resource.CreateRequest,
 			data.IsArchived = types.BoolValue(result.Repo.IsArchived)
 			data.RestrictedMode = types.BoolValue(result.Repo.RestrictedMode)
 			finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.Repo.WorkspaceID, result.Repo.TenantID), &resp.Diagnostics)
-			data.TenantID = data.WorkspaceID
 			resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 			return
 		}
@@ -334,7 +329,6 @@ func (r *PromptResource) Create(ctx context.Context, req resource.CreateRequest,
 	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
 	data.RestrictedMode = types.BoolValue(result.Repo.RestrictedMode)
 	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.Repo.WorkspaceID, result.Repo.TenantID), &resp.Diagnostics)
-	data.TenantID = data.WorkspaceID
 
 	tflog.Trace(ctx, "created prompt resource", map[string]interface{}{"id": result.Repo.ID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -381,7 +375,6 @@ func (r *PromptResource) Read(ctx context.Context, req resource.ReadRequest, res
 	}
 	data.FullName = types.StringValue(result.Repo.FullName)
 	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.Repo.WorkspaceID, result.Repo.TenantID), &resp.Diagnostics)
-	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.Repo.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.Repo.UpdatedAt)
 
@@ -517,7 +510,6 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 	data.IsArchived = types.BoolValue(result.Repo.IsArchived)
 	data.RestrictedMode = types.BoolValue(result.Repo.RestrictedMode)
 	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.Repo.WorkspaceID, result.Repo.TenantID), &resp.Diagnostics)
-	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.Repo.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.Repo.UpdatedAt)
 

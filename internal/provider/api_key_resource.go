@@ -204,7 +204,10 @@ func (r *APIKeyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource. Used for request routing only; it does not bind the key to a workspace (use `workspaces` for that).",
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 		},
 	}
@@ -338,11 +341,11 @@ func (r *APIKeyResource) Read(ctx context.Context, req resource.ReadRequest, res
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-// Update only ever runs for a change to workspace_id, the lone non-RequiresReplace
-// attribute (a request-routing override that does not rebind the key). Every
-// other input forces replacement, and the key itself is immutable, so this
-// persists the planned state without contacting the API — changing the routing
-// header alone must not rotate the secret.
+// Update is unreachable in practice: every input attribute — including
+// workspace_id — carries RequiresReplace, and the key itself is immutable, so
+// any change plans as a replacement. It is retained to satisfy resource.Resource
+// and, defensively, persists the planned state without contacting the API so a
+// no-op update can never rotate the secret.
 func (r *APIKeyResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data apiKeyResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)

@@ -17,7 +17,7 @@ func TestAccWorkspaceStatsDataSource_basic(t *testing.T) {
 			{
 				Config: `data "langsmith_workspace_stats" "test" {}`,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttrSet("data.langsmith_workspace_stats.test", "tenant_id"),
+					resource.TestCheckResourceAttrSet("data.langsmith_workspace_stats.test", "workspace_id"),
 					resource.TestCheckResourceAttrSet("data.langsmith_workspace_stats.test", "dataset_count"),
 					resource.TestCheckResourceAttrSet("data.langsmith_workspace_stats.test", "tracer_session_count"),
 					resource.TestCheckResourceAttrSet("data.langsmith_workspace_stats.test", "repo_count"),

@@ -49,7 +49,6 @@ type ComparativeExperimentResourceModel struct {
 	CreatedAt          types.String `tfsdk:"created_at"`
 	ModifiedAt         types.String `tfsdk:"modified_at"`
 	WorkspaceID        types.String `tfsdk:"workspace_id"`
-	TenantID           types.String `tfsdk:"tenant_id"`
 }
 
 // comparativeExperimentCreateRequest is sent to POST /api/v1/datasets/comparative.
@@ -132,13 +131,10 @@ func (r *ComparativeExperimentResource) Schema(ctx context.Context, req resource
 				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
-				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
-				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 		},
 	}
@@ -293,5 +289,4 @@ func (r *ComparativeExperimentResource) mapResponseToModel(api *comparativeExper
 	data.ModifiedAt = types.StringValue(api.ModifiedAt)
 
 	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(api.WorkspaceID, api.TenantID), diags)
-	data.TenantID = data.WorkspaceID
 }

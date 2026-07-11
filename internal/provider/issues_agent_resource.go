@@ -53,7 +53,6 @@ type IssuesAgentResourceModel struct {
 	LatestRunID                 types.String `tfsdk:"latest_run_id"`
 	LatestThreadID              types.String `tfsdk:"latest_thread_id"`
 	SessionName                 types.String `tfsdk:"session_name"`
-	TenantID                    types.String `tfsdk:"tenant_id"`
 	TenantName                  types.String `tfsdk:"tenant_name"`
 	CreatedAt                   types.String `tfsdk:"created_at"`
 	UpdatedAt                   types.String `tfsdk:"updated_at"`
@@ -198,11 +197,6 @@ func (r *IssuesAgentResource) Schema(ctx context.Context, req resource.SchemaReq
 				Computed:            true,
 				MarkdownDescription: "**Beta:** Name of the tracing project, resolved server-side.",
 			},
-			"tenant_id": schema.StringAttribute{
-				Computed:            true,
-				MarkdownDescription: "**Beta:** Workspace (tenant) UUID that owns the session.",
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
 			"tenant_name": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "**Beta:** Workspace (tenant) display name, resolved server-side.",
@@ -220,7 +214,10 @@ func (r *IssuesAgentResource) Schema(ctx context.Context, req resource.SchemaReq
 				MarkdownDescription: "**Beta:** If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 		},
 	}
@@ -460,7 +457,7 @@ func (r *IssuesAgentResource) resolveUnknowns(data *IssuesAgentResourceModel) {
 		&data.ID, &data.GithubRepoURL, &data.GithubBaseBranch, &data.GithubRepoSubdir,
 		&data.ContextHubRepoHandle, &data.UserInstructions, &data.SessionLCUSpendLimitMonthly,
 		&data.SessionAgentOverviewRepoID, &data.CronSchedule, &data.LatestRunID,
-		&data.LatestThreadID, &data.SessionName, &data.TenantID, &data.TenantName,
+		&data.LatestThreadID, &data.SessionName, &data.TenantName,
 		&data.CreatedAt, &data.UpdatedAt, &data.WorkspaceID,
 	} {
 		if s.IsUnknown() {
@@ -535,7 +532,6 @@ func (r *IssuesAgentResource) mapResponse(api *issuesAgentAPI, data *IssuesAgent
 	data.LatestRunID = issuesAgentComputedString(api.LatestRunID)
 	data.LatestThreadID = issuesAgentComputedString(api.LatestThreadID)
 	data.SessionName = issuesAgentComputedString(api.SessionName)
-	data.TenantID = issuesAgentComputedString(api.TenantID)
 	data.TenantName = issuesAgentComputedString(api.TenantName)
 	data.CreatedAt = issuesAgentComputedString(api.CreatedAt)
 	data.UpdatedAt = issuesAgentComputedString(api.UpdatedAt)

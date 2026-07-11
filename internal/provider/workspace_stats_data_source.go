@@ -27,7 +27,6 @@ type WorkspaceStatsDataSource struct {
 }
 
 type WorkspaceStatsDataSourceModel struct {
-	TenantID             types.String `tfsdk:"tenant_id"`
 	TagValueIDs          types.List   `tfsdk:"tag_value_ids"`
 	DatasetCount         types.Int64  `tfsdk:"dataset_count"`
 	TracerSessionCount   types.Int64  `tfsdk:"tracer_session_count"`
@@ -59,10 +58,6 @@ func (d *WorkspaceStatsDataSource) Schema(ctx context.Context, req datasource.Sc
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Returns object counts (datasets, tracing projects, prompt repos, etc.) for the current LangSmith workspace.",
 		Attributes: map[string]schema.Attribute{
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "The UUID of the workspace (tenant) the stats belong to.",
-				Computed:            true,
-			},
 			"tag_value_ids": schema.ListAttribute{
 				MarkdownDescription: "Optional list of tag value UUIDs to filter the counts to resources carrying those tags.",
 				Optional:            true,
@@ -97,8 +92,9 @@ func (d *WorkspaceStatsDataSource) Schema(ctx context.Context, req datasource.Sc
 				Computed:            true,
 			},
 			"workspace_id": schema.StringAttribute{
-				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this data source.",
+				MarkdownDescription: "The UUID of the workspace the stats belong to. If set, overrides the provider-level `workspace_id` for all API calls made by this data source.",
 				Optional:            true,
+				Computed:            true,
 			},
 		},
 	}
@@ -135,13 +131,14 @@ func (d *WorkspaceStatsDataSource) Read(ctx context.Context, req datasource.Read
 		}
 	}
 
+	c := effectiveClient(d.client, data.WorkspaceID)
 	var result workspaceStatsAPIResponse
-	if err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/workspaces/current/stats", query, &result); err != nil {
+	if err := c.Get(ctx, "/api/v1/workspaces/current/stats", query, &result); err != nil {
 		resp.Diagnostics.AddError("Error reading workspace stats", err.Error())
 		return
 	}
 
-	data.TenantID = types.StringValue(result.TenantID)
+	finalizeWorkspaceID(&data.WorkspaceID, c, result.TenantID, &resp.Diagnostics)
 	data.DatasetCount = types.Int64Value(result.DatasetCount)
 	data.TracerSessionCount = types.Int64Value(result.TracerSessionCount)
 	data.RepoCount = types.Int64Value(result.RepoCount)

@@ -43,7 +43,6 @@ type ToolResourceModel struct {
 	Metadata    types.String `tfsdk:"metadata"`
 	Enabled     types.Bool   `tfsdk:"enabled"`
 	WorkspaceID types.String `tfsdk:"workspace_id"`
-	TenantID    types.String `tfsdk:"tenant_id"`
 	CreatedAt   types.String `tfsdk:"created_at"`
 	UpdatedAt   types.String `tfsdk:"updated_at"`
 }
@@ -118,13 +117,10 @@ func (r *ToolResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
-				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
-				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"created_at": schema.StringAttribute{Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"updated_at": schema.StringAttribute{Computed: true},
@@ -293,7 +289,6 @@ func (r *ToolResource) mapResponse(api *toolAPI, data *ToolResourceModel, c *cli
 	}
 	data.Enabled = types.BoolValue(api.Enabled)
 	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(api.WorkspaceID, api.TenantID), diags)
-	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(api.CreatedAt)
 	data.UpdatedAt = types.StringValue(api.UpdatedAt)
 }

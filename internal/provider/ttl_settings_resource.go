@@ -47,7 +47,6 @@ type TTLSettingsResourceModel struct {
 	DefaultTraceTier   types.String `tfsdk:"default_trace_tier"`
 	ApplyToAllProjects types.Bool   `tfsdk:"apply_to_all_projects"`
 	WorkspaceID        types.String `tfsdk:"workspace_id"`
-	TenantID           types.String `tfsdk:"tenant_id"`
 	OrganizationID     types.String `tfsdk:"organization_id"`
 	ConfiguredBy       types.String `tfsdk:"configured_by"`
 	LonglivedTTLDays   types.Int64  `tfsdk:"longlived_ttl_days"`
@@ -105,14 +104,10 @@ func (r *TTLSettingsResource) Schema(ctx context.Context, req resource.SchemaReq
 				MarkdownDescription: "The workspace ID to scope the TTL settings to. If omitted, applies at the org level.",
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
-				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
-				Optional:            true,
-				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"organization_id": schema.StringAttribute{
 				MarkdownDescription: "The organization ID that owns these TTL settings.",
@@ -164,21 +159,6 @@ func (r *TTLSettingsResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	// Resolve deprecated tenant_id / workspace_id aliases.
-	if !data.TenantID.IsNull() && !data.TenantID.IsUnknown() {
-		if !data.WorkspaceID.IsNull() && !data.WorkspaceID.IsUnknown() &&
-			data.WorkspaceID.ValueString() != data.TenantID.ValueString() {
-			resp.Diagnostics.AddError(
-				"Conflicting workspace_id and tenant_id",
-				"Only one of workspace_id or tenant_id may be set at a time. Use workspace_id; tenant_id is deprecated.",
-			)
-			return
-		}
-		if data.WorkspaceID.IsNull() || data.WorkspaceID.IsUnknown() {
-			data.WorkspaceID = data.TenantID
-		}
-	}
-
 	body := ttlSettingsUpsertRequest{
 		DefaultTraceTier:   data.DefaultTraceTier.ValueString(),
 		ApplyToAllProjects: data.ApplyToAllProjects.ValueBool(),
@@ -227,21 +207,6 @@ func (r *TTLSettingsResource) Update(ctx context.Context, req resource.UpdateReq
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
-	}
-
-	// Resolve deprecated tenant_id / workspace_id aliases.
-	if !data.TenantID.IsNull() && !data.TenantID.IsUnknown() {
-		if !data.WorkspaceID.IsNull() && !data.WorkspaceID.IsUnknown() &&
-			data.WorkspaceID.ValueString() != data.TenantID.ValueString() {
-			resp.Diagnostics.AddError(
-				"Conflicting workspace_id and tenant_id",
-				"Only one of workspace_id or tenant_id may be set at a time. Use workspace_id; tenant_id is deprecated.",
-			)
-			return
-		}
-		if data.WorkspaceID.IsNull() || data.WorkspaceID.IsUnknown() {
-			data.WorkspaceID = data.TenantID
-		}
 	}
 
 	body := ttlSettingsUpsertRequest{
@@ -328,7 +293,6 @@ func mapTTLSettingsResponseToState(data *TTLSettingsResourceModel, result *ttlSe
 		apiWorkspaceID = *result.TenantID
 	}
 	reconcileWorkspaceID(&data.WorkspaceID, apiWorkspaceID, diags)
-	data.TenantID = data.WorkspaceID
 
 	if result.LonglivedTTLDays != nil {
 		data.LonglivedTTLDays = types.Int64Value(*result.LonglivedTTLDays)

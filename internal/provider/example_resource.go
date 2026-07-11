@@ -148,7 +148,10 @@ func (r *ExampleResource) Schema(ctx context.Context, req resource.SchemaRequest
 				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 		},
 	}

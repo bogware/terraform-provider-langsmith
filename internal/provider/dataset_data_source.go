@@ -44,7 +44,6 @@ type DatasetDataSourceModel struct {
 	Transformations         types.String `tfsdk:"transformations"`
 	Metadata                types.String `tfsdk:"metadata"`
 	WorkspaceID             types.String `tfsdk:"workspace_id"`
-	TenantID                types.String `tfsdk:"tenant_id"`
 	CreatedAt               types.String `tfsdk:"created_at"`
 	ModifiedAt              types.String `tfsdk:"modified_at"`
 	ExampleCount            types.Int64  `tfsdk:"example_count"`
@@ -122,11 +121,6 @@ func (d *DatasetDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 				MarkdownDescription: "The workspace ID. If set, overrides the provider-level `workspace_id` for all API calls made by this data source.",
 				Optional:            true,
 				Computed:            true,
-			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Deprecated: use `workspace_id` instead. The workspace ID.",
-				Computed:            true,
-				DeprecationMessage:  "Use 'workspace_id' instead. This attribute will be removed in a future version.",
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "The creation timestamp of the dataset.",
@@ -260,7 +254,6 @@ func (d *DatasetDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	}
 
 	finalizeWorkspaceID(&data.WorkspaceID, apiClient, firstNonEmpty(result.WorkspaceID, result.TenantID), &resp.Diagnostics)
-	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.ModifiedAt = types.StringValue(result.ModifiedAt)
 	data.ExampleCount = types.Int64Value(result.ExampleCount)
