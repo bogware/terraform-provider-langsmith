@@ -85,7 +85,24 @@ curl -s -H "X-API-Key: $LANGSMITH_API_KEY" \
 
 ### Self-Hosted Instances
 
-Override the API URL via `api_url` attribute or `LANGSMITH_API_URL` env var.
+Point the provider at your instance with the `api_url` attribute (or `LANGSMITH_API_URL`), and set
+`self_hosted = true` (or `LANGSMITH_SELF_HOSTED=true`):
+
+```hcl
+provider "langsmith" {
+  api_key      = var.langsmith_api_key
+  api_url      = "https://langsmith.internal.example.com"
+  workspace_id = var.langsmith_workspace_id
+  self_hosted  = true
+}
+```
+
+`self_hosted` is required for a self-hosted instance because self-hosted deployments serve the API
+under a `/api` path prefix, whereas Cloud serves it at the root of the `api.` subdomain. Without it,
+the platform resources (`langsmith_evaluator`, `langsmith_tool`, and others that use
+`/v1/platform/...` endpoints) request a path that falls through to the frontend web app instead of
+the API and fail. When enabled, the provider rewrites those `/v1/platform/...` calls to
+`/api/v1/platform/...`. Leave `self_hosted` unset for LangSmith Cloud.
 
 ### Managing multiple workspaces
 

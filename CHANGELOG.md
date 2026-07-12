@@ -1,3 +1,14 @@
+## 1.1.0 (Unreleased)
+
+BUG FIXES:
+
+* Self-hosted instances: resources that use the platform API family (`langsmith_evaluator`, `langsmith_tool`, `langsmith_gateway_policy`, `langsmith_mcp_vendor_settings`, `langsmith_access_policy`, `langsmith_feature_model_config`, `langsmith_experiment_view_override`, `langsmith_role_access_policies`, and the other `/v1/platform/...` resources and data sources) were broken on self-hosted LangSmith. Self-hosted serves the API under a `/api` path prefix, while Cloud serves it at the root of the `api.` subdomain, so these `/v1/platform/...` paths fell through to the frontend web app (HTTP 200 with SPA HTML, or 405) instead of reaching the API. Set the new provider attribute `self_hosted = true` (or `LANGSMITH_SELF_HOSTED=true`) and the provider rewrites `/v1/platform/...` to `/api/v1/platform/...`. This matches the routing in the official `langchain-ai/helm` chart. Cloud behavior is unchanged (`self_hosted` defaults to `false`). ([#64](https://github.com/bogware/terraform-provider-langsmith/issues/64))
+    * Note: a few non-platform resources also use root-mounted paths on Cloud (`langsmith_prompt`/`langsmith_prompt_tag` via `/commits/...`, `langsmith_sandbox_registry` via `/v2/sandboxes/...`, `langsmith_agent_builder_integrations` via `/v1/agent-builder/...`, and `langsmith_workspace_ttl_settings`). Their self-hosted routing is not yet confirmed, so they are intentionally left unchanged for now. Please open an issue if you need one of these on self-hosted.
+
+FEATURES:
+
+* Added the provider-level `self_hosted` attribute (and `LANGSMITH_SELF_HOSTED` environment variable) for self-hosted deployments.
+
 ## 1.0.0 (July 2026)
 
 First stable release. 0.11.0 was never cut; everything planned for it ships here.

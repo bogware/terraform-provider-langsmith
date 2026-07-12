@@ -15,11 +15,74 @@ import (
 )
 
 func newTestClient(srv *httptest.Server) *Client {
-	c := NewClient(srv.URL, "test-key", "workspace-123", "test-ua/1.0")
+	c := NewClient(srv.URL, "test-key", "workspace-123", "test-ua/1.0", false)
 	// Keep tests fast: cap retries and shorten the HTTP timeout.
 	c.MaxRetries = 3
 	c.HTTPClient.Timeout = 5 * time.Second
 	return c
+}
+
+// TestResolvePath covers the cloud-vs-self-hosted routing rewrite in isolation.
+func TestResolvePath(t *testing.T) {
+	cases := []struct {
+		name       string
+		selfHosted bool
+		in         string
+		want       string
+	}{
+		// Cloud: every path is sent verbatim.
+		{"cloud legacy", false, "/api/v1/sessions", "/api/v1/sessions"},
+		{"cloud platform", false, "/v1/platform/evaluators", "/v1/platform/evaluators"},
+
+		// Self-hosted: the platform family gains the /api prefix
+		// (/v1/platform/X -> /api/v1/platform/X, confirmed by the helm nginx config).
+		{"selfhosted platform prefixed", true, "/v1/platform/evaluators", "/api/v1/platform/evaluators"},
+		{"selfhosted platform with id", true, "/v1/platform/tools/my-tool", "/api/v1/platform/tools/my-tool"},
+
+		// Self-hosted: legacy /api/v1 paths already carry /api and must not be doubled.
+		{"selfhosted legacy unchanged", true, "/api/v1/sessions", "/api/v1/sessions"},
+
+		// Self-hosted: non-platform families are left ALONE. Agent builder and
+		// sandboxes are fleet features served at their own root (not under /api),
+		// so prefixing would break them; the others are unconfirmed. Leaving them
+		// unchanged is the safe default until verified on a real self-hosted host.
+		{"selfhosted agent-builder untouched", true, "/v1/agent-builder/integrations", "/v1/agent-builder/integrations"},
+		{"selfhosted sandboxes untouched", true, "/v2/sandboxes/registries", "/v2/sandboxes/registries"},
+		{"selfhosted commits untouched", true, "/commits/-/my-repo", "/commits/-/my-repo"},
+		{"selfhosted ttl untouched", true, "/workspaces/current/ttl-settings", "/workspaces/current/ttl-settings"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &Client{SelfHosted: tc.selfHosted}
+			if got := c.resolvePath(tc.in); got != tc.want {
+				t.Fatalf("resolvePath(%q) selfHosted=%v = %q, want %q", tc.in, tc.selfHosted, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestSelfHostedPrefixOnWire confirms the rewrite reaches the actual request URL
+// (not just resolvePath), and that a workspace-scoped copy keeps the setting.
+func TestSelfHostedPrefixOnWire(t *testing.T) {
+	var gotPath atomic.Value
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath.Store(r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL, "k", "ws", "ua", true)
+	c.MaxRetries = 0
+	// A workspace-scoped copy must inherit SelfHosted (shallow struct copy).
+	scoped := c.WithWorkspaceID("other-ws")
+
+	if err := scoped.Get(context.Background(), "/v1/platform/evaluators", nil, &struct{}{}); err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	if got := gotPath.Load(); got != "/api/v1/platform/evaluators" {
+		t.Fatalf("server saw path %q, want /api/v1/platform/evaluators (self-hosted prefix not applied)", got)
+	}
 }
 
 func TestAPIError_Error_WithMethodAndPath(t *testing.T) {
