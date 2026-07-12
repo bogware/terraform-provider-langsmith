@@ -1,4 +1,4 @@
-## 1.1.0 (Unreleased)
+## 1.1.0 (July 2026)
 
 BUG FIXES:
 
@@ -8,6 +8,10 @@ BUG FIXES:
 FEATURES:
 
 * Added the provider-level `self_hosted` attribute (and `LANGSMITH_SELF_HOSTED` environment variable) for self-hosted deployments.
+
+DEPENDENCIES:
+
+* Bumped `terraform-plugin-framework` (1.17.0 → 1.19.0), `terraform-plugin-go` (0.29.0 → 0.31.0), and `terraform-plugin-testing` (1.14.0 → 1.16.0). ([#71](https://github.com/bogware/terraform-provider-langsmith/pull/71))
 
 ## 1.0.0 (July 2026)
 
