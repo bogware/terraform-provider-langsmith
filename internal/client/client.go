@@ -31,17 +31,22 @@ type Client struct {
 	APIKey      string
 	WorkspaceID string
 	UserAgent   string
-	HTTPClient  *http.Client
-	MaxRetries  int
+	// SelfHosted routes requests for a self-hosted LangSmith instance, which
+	// mounts the entire API under a /api path prefix rather than at the root of
+	// the cloud api. subdomain. See doRequest for the exact rewrite.
+	SelfHosted bool
+	HTTPClient *http.Client
+	MaxRetries int
 }
 
 // NewClient creates a new LangSmith API client.
-func NewClient(baseURL, apiKey, workspaceID, userAgent string) *Client {
+func NewClient(baseURL, apiKey, workspaceID, userAgent string, selfHosted bool) *Client {
 	return &Client{
 		BaseURL:     baseURL,
 		APIKey:      apiKey,
 		WorkspaceID: workspaceID,
 		UserAgent:   userAgent,
+		SelfHosted:  selfHosted,
 		HTTPClient: &http.Client{
 			Timeout:       120 * time.Second,
 			CheckRedirect: dropAuthOnCrossHostRedirect,
@@ -86,6 +91,8 @@ func (c *Client) doRequest(ctx context.Context, method, path string, query url.V
 	if strings.ContainsAny(path, "?#") {
 		return fmt.Errorf("invalid request path %q: contains a '?' or '#'; a path segment (such as a name, handle, or key) must not contain these characters", path)
 	}
+
+	path = c.resolvePath(path)
 
 	reqURL := c.BaseURL + path
 	if len(query) > 0 {
@@ -267,6 +274,25 @@ func (c *Client) WithWorkspaceID(workspaceID string) *Client {
 	clientCopy := *c
 	clientCopy.WorkspaceID = workspaceID
 	return &clientCopy
+}
+
+// resolvePath adapts a request path to the target deployment.
+//
+// LangSmith Cloud serves the API at the root of the api. subdomain, where legacy
+// endpoints live under /api/v1/... and the newer platform endpoints live under
+// /v1/platform/... (no /api). A self-hosted instance instead mounts the whole
+// API under a single /api path prefix, with anything else falling through to the
+// frontend SPA. Legacy paths already begin with /api and work in both places;
+// every other path (/v1/platform/..., /v2/..., /commits/..., /workspaces/...)
+// must gain the /api prefix on self-hosted or it silently hits the SPA.
+//
+// So on self-hosted we prefix /api to any path that does not already have it;
+// on cloud the path is returned unchanged.
+func (c *Client) resolvePath(path string) string {
+	if c.SelfHosted && !strings.HasPrefix(path, "/api/") && path != "/api" {
+		return "/api" + path
+	}
+	return path
 }
 
 // IsNotFound checks whether the error is a 404.

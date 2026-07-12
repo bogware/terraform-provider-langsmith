@@ -26,6 +26,9 @@ provider "langsmith" {
 
 - `api_key` (String, Sensitive) The LangSmith API key. Can also be set with the `LANGSMITH_API_KEY` environment variable.
 - `api_url` (String) The LangSmith API base URL. Defaults to `https://api.smith.langchain.com`. Can also be set with the `LANGSMITH_API_URL` environment variable.
+- `self_hosted` (Boolean) Set to `true` when `api_url` points at a self-hosted LangSmith instance. Can also be set with the `LANGSMITH_SELF_HOSTED` environment variable. Defaults to `false` (LangSmith Cloud).
+
+Self-hosted deployments mount the entire API under a `/api` path prefix, whereas Cloud serves it at the root of the `api.` subdomain. When enabled, the provider adds the `/api` prefix to the endpoints that need it, so resources such as `langsmith_evaluator`, `langsmith_tool`, and the other platform resources work against a self-hosted instance. Leave it unset for Cloud.
 - `workspace_id` (String) The LangSmith workspace ID. Required for org-scoped API keys. Can also be set with the `LANGSMITH_WORKSPACE_ID` environment variable.
 
 To manage several workspaces from one configuration, prefer the per-resource `workspace_id` attribute over a provider alias: a provider block cannot consume a value that is unknown at plan time (such as the ID of a workspace created in the same apply), whereas a resource can.

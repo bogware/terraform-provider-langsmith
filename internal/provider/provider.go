@@ -31,6 +31,7 @@ type LangSmithProviderModel struct {
 	APIKey      types.String `tfsdk:"api_key"`
 	APIURL      types.String `tfsdk:"api_url"`
 	WorkspaceID types.String `tfsdk:"workspace_id"`
+	SelfHosted  types.Bool   `tfsdk:"self_hosted"`
 }
 
 func (p *LangSmithProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -54,6 +55,11 @@ func (p *LangSmithProvider) Schema(ctx context.Context, req provider.SchemaReque
 			"workspace_id": schema.StringAttribute{
 				MarkdownDescription: "The LangSmith workspace ID. Required for org-scoped API keys. Can also be set with the `LANGSMITH_WORKSPACE_ID` environment variable.\n\n" +
 					"To manage several workspaces from one configuration, prefer the per-resource `workspace_id` attribute over a provider alias: a provider block cannot consume a value that is unknown at plan time (such as the ID of a workspace created in the same apply), whereas a resource can.",
+				Optional: true,
+			},
+			"self_hosted": schema.BoolAttribute{
+				MarkdownDescription: "Set to `true` when `api_url` points at a self-hosted LangSmith instance. Can also be set with the `LANGSMITH_SELF_HOSTED` environment variable. Defaults to `false` (LangSmith Cloud).\n\n" +
+					"Self-hosted deployments mount the entire API under a `/api` path prefix, whereas Cloud serves it at the root of the `api.` subdomain. When enabled, the provider adds the `/api` prefix to the endpoints that need it, so resources such as `langsmith_evaluator`, `langsmith_tool`, and the other platform resources work against a self-hosted instance. Leave it unset for Cloud.",
 				Optional: true,
 			},
 		},
@@ -94,6 +100,17 @@ func getWorkspaceId(data LangSmithProviderModel) string {
 	return workspaceID
 }
 
+func getSelfHosted(data LangSmithProviderModel) bool {
+	if !data.SelfHosted.IsNull() {
+		return data.SelfHosted.ValueBool()
+	}
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("LANGSMITH_SELF_HOSTED"))) {
+	case "1", "true", "yes":
+		return true
+	}
+	return false
+}
+
 // checkUnknownConfig rejects provider configuration values that are not known at
 // plan time. A provider is configured before the resources it depends on are
 // applied, so a value such as `api_key = langsmith_api_key.ci.key` or
@@ -126,6 +143,13 @@ func checkUnknownConfig(data LangSmithProviderModel, resp *provider.ConfigureRes
 			"The provider cannot be configured because `workspace_id` is not known at plan time. "+remedy,
 		)
 	}
+	if data.SelfHosted.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("self_hosted"),
+			"Unknown self_hosted value",
+			"The provider cannot be configured because `self_hosted` is not known at plan time. "+remedy,
+		)
+	}
 }
 
 func (p *LangSmithProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
@@ -145,6 +169,7 @@ func (p *LangSmithProvider) Configure(ctx context.Context, req provider.Configur
 	apiKey := getApiKey(data, resp)
 	apiURL := getApiUrl(data)
 	workspaceId := getWorkspaceId(data)
+	selfHosted := getSelfHosted(data)
 	if apiURL == "" || apiKey == "" {
 		return
 	}
@@ -162,7 +187,7 @@ func (p *LangSmithProvider) Configure(ctx context.Context, req provider.Configur
 
 	userAgent := fmt.Sprintf("terraform-provider-langsmith/%s", p.version)
 
-	c := client.NewClient(apiURL, apiKey, workspaceId, userAgent)
+	c := client.NewClient(apiURL, apiKey, workspaceId, userAgent, selfHosted)
 
 	// Validate the API key by making a lightweight request.
 	var info struct {
