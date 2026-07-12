@@ -1,4 +1,4 @@
-## 1.0.0 (Unreleased)
+## 1.0.0 (July 2026)
 
 First stable release. 0.11.0 was never cut; everything planned for it ships here.
 
