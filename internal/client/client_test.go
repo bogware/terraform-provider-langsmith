@@ -33,16 +33,23 @@ func TestResolvePath(t *testing.T) {
 		// Cloud: every path is sent verbatim.
 		{"cloud legacy", false, "/api/v1/sessions", "/api/v1/sessions"},
 		{"cloud platform", false, "/v1/platform/evaluators", "/v1/platform/evaluators"},
-		{"cloud sandboxes", false, "/v2/sandboxes/registries", "/v2/sandboxes/registries"},
 
-		// Self-hosted: legacy paths already carry /api and must not be doubled;
-		// everything else gains the /api prefix.
-		{"selfhosted legacy unchanged", true, "/api/v1/sessions", "/api/v1/sessions"},
+		// Self-hosted: the platform family gains the /api prefix
+		// (/v1/platform/X -> /api/v1/platform/X, confirmed by the helm nginx config).
 		{"selfhosted platform prefixed", true, "/v1/platform/evaluators", "/api/v1/platform/evaluators"},
 		{"selfhosted platform with id", true, "/v1/platform/tools/my-tool", "/api/v1/platform/tools/my-tool"},
-		{"selfhosted sandboxes prefixed", true, "/v2/sandboxes/registries", "/api/v2/sandboxes/registries"},
-		{"selfhosted commits prefixed", true, "/commits/-/my-repo", "/api/commits/-/my-repo"},
-		{"selfhosted workspaces prefixed", true, "/workspaces/current/ttl-settings", "/api/workspaces/current/ttl-settings"},
+
+		// Self-hosted: legacy /api/v1 paths already carry /api and must not be doubled.
+		{"selfhosted legacy unchanged", true, "/api/v1/sessions", "/api/v1/sessions"},
+
+		// Self-hosted: non-platform families are left ALONE. Agent builder and
+		// sandboxes are fleet features served at their own root (not under /api),
+		// so prefixing would break them; the others are unconfirmed. Leaving them
+		// unchanged is the safe default until verified on a real self-hosted host.
+		{"selfhosted agent-builder untouched", true, "/v1/agent-builder/integrations", "/v1/agent-builder/integrations"},
+		{"selfhosted sandboxes untouched", true, "/v2/sandboxes/registries", "/v2/sandboxes/registries"},
+		{"selfhosted commits untouched", true, "/commits/-/my-repo", "/commits/-/my-repo"},
+		{"selfhosted ttl untouched", true, "/workspaces/current/ttl-settings", "/workspaces/current/ttl-settings"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -59,7 +59,7 @@ func (p *LangSmithProvider) Schema(ctx context.Context, req provider.SchemaReque
 			},
 			"self_hosted": schema.BoolAttribute{
 				MarkdownDescription: "Set to `true` when `api_url` points at a self-hosted LangSmith instance. Can also be set with the `LANGSMITH_SELF_HOSTED` environment variable. Defaults to `false` (LangSmith Cloud).\n\n" +
-					"Self-hosted deployments mount the entire API under a `/api` path prefix, whereas Cloud serves it at the root of the `api.` subdomain. When enabled, the provider adds the `/api` prefix to the endpoints that need it, so resources such as `langsmith_evaluator`, `langsmith_tool`, and the other platform resources work against a self-hosted instance. Leave it unset for Cloud.",
+					"Self-hosted deployments serve the API under a `/api` path prefix, whereas Cloud serves it at the root of the `api.` subdomain. When enabled, the provider rewrites the platform endpoints (`/v1/platform/...` -> `/api/v1/platform/...`) so resources such as `langsmith_evaluator`, `langsmith_tool`, and the other platform resources work against a self-hosted instance. Leave it unset for Cloud.",
 				Optional: true,
 			},
 		},

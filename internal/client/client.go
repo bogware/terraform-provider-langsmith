@@ -276,20 +276,31 @@ func (c *Client) WithWorkspaceID(workspaceID string) *Client {
 	return &clientCopy
 }
 
+// selfHostedPlatformPrefix is the base path of the platform API family on Cloud.
+// On self-hosted this family is the one that needs the /api prefix.
+const selfHostedPlatformPrefix = "/v1/platform/"
+
 // resolvePath adapts a request path to the target deployment.
 //
-// LangSmith Cloud serves the API at the root of the api. subdomain, where legacy
-// endpoints live under /api/v1/... and the newer platform endpoints live under
-// /v1/platform/... (no /api). A self-hosted instance instead mounts the whole
-// API under a single /api path prefix, with anything else falling through to the
-// frontend SPA. Legacy paths already begin with /api and work in both places;
-// every other path (/v1/platform/..., /v2/..., /commits/..., /workspaces/...)
-// must gain the /api prefix on self-hosted or it silently hits the SPA.
+// LangSmith Cloud serves the API at the root of the api. subdomain: legacy
+// endpoints live under /api/v1/... and the newer "platform" endpoints under
+// /v1/platform/... (no /api). A self-hosted instance shares a single host
+// between the frontend and the API, so the API sits under a /api path prefix and
+// anything unmatched falls through to the frontend SPA (which returns the app
+// HTML with a 200, or 405 to a POST). This is confirmed by the langchain-ai/helm
+// frontend nginx config, which routes `location /api/v1/platform/` to the
+// platform backend while a bare /v1/platform/... matches no /api location.
 //
-// So on self-hosted we prefix /api to any path that does not already have it;
-// on cloud the path is returned unchanged.
+// Legacy /api/v1/... paths already carry /api and resolve on both. Only the
+// platform family needs rewriting: on self-hosted, /v1/platform/X -> /api/v1/platform/X.
+//
+// We deliberately do NOT blanket-prefix every non-/api path. Several families
+// (agent builder, sandboxes, and other fleet features) are served at their own
+// root on self-hosted, not under /api, so prefixing them would break them. Those
+// endpoints are left unchanged pending confirmation against a real self-hosted
+// instance.
 func (c *Client) resolvePath(path string) string {
-	if c.SelfHosted && !strings.HasPrefix(path, "/api/") && path != "/api" {
+	if c.SelfHosted && strings.HasPrefix(path, selfHostedPlatformPrefix) {
 		return "/api" + path
 	}
 	return path
