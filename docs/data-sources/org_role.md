@@ -30,6 +30,7 @@ data "langsmith_org_role" "example" {
 
 - `access_scope` (String) The access scope of the role.
 - `description` (String) A description of the role.
+- `is_restricted` (Boolean) Whether the role is restricted. A restricted role can only be granted the permissions explicitly assigned to it.
 - `name` (String) The internal name of the role.
 - `organization_id` (String) The organization ID.
 - `permissions` (String) JSON-encoded array of permissions.

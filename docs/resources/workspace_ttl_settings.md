@@ -42,4 +42,3 @@ resource "langsmith_workspace_ttl_settings" "other_workspace" {
 
 - `id` (String) The identifier of the workspace TTL settings (the workspace/tenant ID).
 - `is_custom` (Boolean) Whether the workspace has a custom TTL configured (as opposed to inheriting a default).
-- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead.

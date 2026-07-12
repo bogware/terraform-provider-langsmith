@@ -3,12 +3,30 @@
 page_title: "langsmith_secret Resource - langsmith"
 subcategory: ""
 description: |-
-  Manages a LangSmith workspace secret (key/value pair). The value is write-only and never returned by the API.
+  Manages a LangSmith workspace secret (key/value pair).
+  The secret value is write-only: the LangSmith API only ever returns the key names, never the values. This has two consequences:
+  Terraform cannot detect drift on value. If the secret is changed outside of Terraform, the provider will not notice.Importing a secret cannot recover its value. Immediately after an import the value is absent from state, so the next plan will always show a change for value and re-write the secret with the value from your configuration. This is expected; apply the plan to converge.
+  Import accepts either <key> or <key>:<workspace_id>, for example:
+  
+  terraform import langsmith_secret.example OPENAI_API_KEY
+  terraform import langsmith_secret.example OPENAI_API_KEY:11111111-2222-3333-4444-555555555555
 ---
 
 # langsmith_secret (Resource)
 
-Manages a LangSmith workspace secret (key/value pair). The value is write-only and never returned by the API.
+Manages a LangSmith workspace secret (key/value pair).
+
+The secret `value` is **write-only**: the LangSmith API only ever returns the key names, never the values. This has two consequences:
+
+* Terraform cannot detect drift on `value`. If the secret is changed outside of Terraform, the provider will not notice.
+* **Importing a secret cannot recover its `value`.** Immediately after an import the value is absent from state, so the next plan will always show a change for `value` and re-write the secret with the value from your configuration. This is expected; apply the plan to converge.
+
+Import accepts either `<key>` or `<key>:<workspace_id>`, for example:
+
+```shell
+terraform import langsmith_secret.example OPENAI_API_KEY
+terraform import langsmith_secret.example OPENAI_API_KEY:11111111-2222-3333-4444-555555555555
+```
 
 ## Example Usage
 
@@ -25,7 +43,7 @@ resource "langsmith_secret" "example" {
 ### Required
 
 - `key` (String) The secret key name.
-- `value` (String, Sensitive) The secret value. This is write-only and will not be returned by the API after being set.
+- `value` (String, Sensitive) The secret value. This is write-only: the API never returns it, so Terraform cannot detect drift on it and cannot populate it on import. After importing a secret, the first plan will always show a change for this attribute and re-write the secret with the configured value.
 
 ### Optional
 

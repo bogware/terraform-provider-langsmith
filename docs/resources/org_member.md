@@ -36,3 +36,6 @@ resource "langsmith_org_member" "example" {
 - `created_at` (String) Creation timestamp.
 - `id` (String) The unique identifier of the member/invitation.
 - `organization_id` (String) The organization ID.
+- `user_id` (String) The user ID backing this membership. This is the value to feed into `langsmith_workspace_member.user_id` to grant the member access to a workspace.
+
+This is `null` while the invitation is still pending: an invited user who has not yet accepted may not have a resolvable user ID. It is populated on the next refresh once the invitation is accepted, so a `langsmith_workspace_member` chained off a brand-new invite may require a second apply.

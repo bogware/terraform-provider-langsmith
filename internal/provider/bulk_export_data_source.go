@@ -42,7 +42,6 @@ type BulkExportDataSourceModel struct {
 	Filter                  types.String `tfsdk:"filter"`
 	Status                  types.String `tfsdk:"status"`
 	WorkspaceID             types.String `tfsdk:"workspace_id"`
-	TenantID                types.String `tfsdk:"tenant_id"`
 	CreatedAt               types.String `tfsdk:"created_at"`
 	UpdatedAt               types.String `tfsdk:"updated_at"`
 	FormatVersion           types.String `tfsdk:"format_version"`
@@ -124,11 +123,6 @@ func (d *BulkExportDataSource) Schema(ctx context.Context, req datasource.Schema
 			"workspace_id": schema.StringAttribute{
 				MarkdownDescription: "The workspace ID. If set, overrides the provider-level `workspace_id` for all API calls made by this data source.",
 				Optional:            true,
-				Computed:            true,
-			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
-				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
 				Computed:            true,
 			},
 			"created_at": schema.StringAttribute{
@@ -227,7 +221,6 @@ func (d *BulkExportDataSource) Read(ctx context.Context, req datasource.ReadRequ
 		apiWorkspaceID = result.TenantID
 	}
 	reconcileWorkspaceID(&data.WorkspaceID, apiWorkspaceID, &resp.Diagnostics)
-	data.TenantID = data.WorkspaceID
 
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)

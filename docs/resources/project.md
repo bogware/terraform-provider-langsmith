@@ -55,4 +55,3 @@ resource "langsmith_project" "example" {
 ### Read-Only
 
 - `id` (String) The unique identifier of the project.
-- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead.

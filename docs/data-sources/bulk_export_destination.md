@@ -44,5 +44,4 @@ output "destination_bucket" {
 - `include_bucket_in_prefix` (Boolean) Whether to include the bucket name in the S3 key prefix.
 - `prefix` (String) The S3 key prefix.
 - `region` (String) The AWS region of the S3 bucket.
-- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead. The workspace ID.
 - `updated_at` (String) The last update timestamp.

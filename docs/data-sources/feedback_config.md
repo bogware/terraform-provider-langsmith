@@ -38,4 +38,3 @@ data "langsmith_feedback_config" "example" {
 - `max` (Number) Maximum score value (for continuous type).
 - `min` (Number) Minimum score value (for continuous type).
 - `modified_at` (String) When the feedback config was last modified.
-- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead.

@@ -34,6 +34,7 @@ type OrgRoleDataSourceModel struct {
 	Permissions    types.String `tfsdk:"permissions"`
 	OrganizationID types.String `tfsdk:"organization_id"`
 	AccessScope    types.String `tfsdk:"access_scope"`
+	IsRestricted   types.Bool   `tfsdk:"is_restricted"`
 }
 
 type orgRoleDataSourceAPIResponse struct {
@@ -44,6 +45,7 @@ type orgRoleDataSourceAPIResponse struct {
 	Permissions    json.RawMessage `json:"permissions"`
 	OrganizationID string          `json:"organization_id"`
 	AccessScope    *string         `json:"access_scope"`
+	IsRestricted   bool            `json:"is_restricted"`
 }
 
 func (d *OrgRoleDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -82,6 +84,10 @@ func (d *OrgRoleDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 			},
 			"access_scope": schema.StringAttribute{
 				MarkdownDescription: "The access scope of the role.",
+				Computed:            true,
+			},
+			"is_restricted": schema.BoolAttribute{
+				MarkdownDescription: "Whether the role is restricted. A restricted role can only be granted the permissions explicitly assigned to it.",
 				Computed:            true,
 			},
 		},
@@ -154,6 +160,7 @@ func (d *OrgRoleDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	} else {
 		data.Description = types.StringNull()
 	}
+	data.IsRestricted = types.BoolValue(found.IsRestricted)
 	if found.AccessScope != nil {
 		data.AccessScope = types.StringValue(*found.AccessScope)
 	} else {

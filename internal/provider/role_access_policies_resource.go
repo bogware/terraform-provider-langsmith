@@ -6,6 +6,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -33,6 +34,10 @@ func NewRoleAccessPoliciesResource() resource.Resource {
 // RoleAccessPoliciesResource binds a set of access policies to an organization
 // role. The API exposes only an attach (POST) endpoint that replaces the full
 // set, so Create, Update, and Delete all post the desired (or empty) list.
+//
+// There is no role-scoped GET, but Read is still authoritative: the org-wide
+// access policy list returns each policy's role_ids, so the set attached to a
+// role is recovered by filtering that list. See attachedPolicyIDs.
 type RoleAccessPoliciesResource struct {
 	client *client.Client
 }
@@ -49,6 +54,20 @@ type RoleAccessPoliciesResourceModel struct {
 // (AttachAccessPoliciesPayload). It always carries the full desired list.
 type roleAccessPoliciesAttachRequest struct {
 	AccessPolicyIDs []string `json:"access_policy_ids"`
+}
+
+// roleAccessPoliciesListResponse is the wire format of the org-wide access
+// policy list (ListAccessPoliciesResponse).
+type roleAccessPoliciesListResponse struct {
+	AccessPolicies []roleAccessPolicyListItem `json:"access_policies"`
+}
+
+// roleAccessPolicyListItem is a single entry of the org-wide access policy
+// list. Only the fields needed to resolve role membership are decoded;
+// role_ids is the reverse index the API gives us in lieu of a role-scoped GET.
+type roleAccessPolicyListItem struct {
+	ID      string   `json:"id"`
+	RoleIDs []string `json:"role_ids"`
 }
 
 func (r *RoleAccessPoliciesResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -78,7 +97,10 @@ func (r *RoleAccessPoliciesResource) Schema(ctx context.Context, req resource.Sc
 				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 		},
 	}
@@ -99,6 +121,32 @@ func (r *RoleAccessPoliciesResource) Configure(ctx context.Context, req resource
 // attachPath builds the role-scoped attach endpoint for the given role ID.
 func (r *RoleAccessPoliciesResource) attachPath(roleID string) string {
 	return "/v1/platform/orgs/current/access-policies/roles/" + roleID + "/access-policies"
+}
+
+// roleAccessPoliciesListPath is the org-wide access policy list endpoint.
+const roleAccessPoliciesListPath = "/v1/platform/orgs/current/access-policies"
+
+// attachedPolicyIDs returns the IDs of every access policy in the organization
+// currently attached to roleID. The API has no role-scoped GET, so we read the
+// org-wide list and filter on each policy's role_ids. The result is sorted so
+// the value is stable across refreshes.
+func (r *RoleAccessPoliciesResource) attachedPolicyIDs(ctx context.Context, c *client.Client, roleID string) ([]string, error) {
+	var result roleAccessPoliciesListResponse
+	if err := c.Get(ctx, roleAccessPoliciesListPath, nil, &result); err != nil {
+		return nil, err
+	}
+
+	ids := make([]string, 0, len(result.AccessPolicies))
+	for _, policy := range result.AccessPolicies {
+		for _, rid := range policy.RoleIDs {
+			if rid == roleID {
+				ids = append(ids, policy.ID)
+				break
+			}
+		}
+	}
+	sort.Strings(ids)
+	return ids, nil
 }
 
 // attach posts the supplied access policy IDs (or an empty slice) to the role,
@@ -137,9 +185,16 @@ func (r *RoleAccessPoliciesResource) Create(ctx context.Context, req resource.Cr
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-// Read is best-effort. The LangSmith API exposes no endpoint to list the access
-// policies currently attached to a role, so we cannot detect external drift.
-// Prior state is preserved unchanged.
+// Read repopulates access_policy_ids from the API by filtering the org-wide
+// access policy list on role membership, so external drift (a policy attached
+// or detached outside Terraform) is detected, and importing by role ID yields a
+// complete, accurate state rather than a null set.
+//
+// An empty result is a legitimate state, not a deleted resource: `[]` is a
+// valid configuration for access_policy_ids, and posting an empty list is
+// exactly what Delete does. We therefore record the empty set rather than
+// removing the resource, which would otherwise produce a permanent create-diff
+// for anyone who legitimately configures an empty set.
 func (r *RoleAccessPoliciesResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var data RoleAccessPoliciesResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
@@ -147,10 +202,30 @@ func (r *RoleAccessPoliciesResource) Read(ctx context.Context, req resource.Read
 		return
 	}
 
+	effClient := effectiveClient(r.client, data.WorkspaceID)
+
+	ids, err := r.attachedPolicyIDs(ctx, effClient, data.RoleID.ValueString())
+	if err != nil {
+		if client.IsNotFound(err) {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		resp.Diagnostics.AddError("Error reading access policies for role", err.Error())
+		return
+	}
+
+	policyIDs, diags := types.SetValueFrom(ctx, types.StringType, ids)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	data.AccessPolicyIDs = policyIDs
+
 	if data.ID.IsNull() || data.ID.IsUnknown() {
 		data.ID = data.RoleID
 	}
-	finalizeWorkspaceID(&data.WorkspaceID, effectiveClient(r.client, data.WorkspaceID), "", &resp.Diagnostics)
+	finalizeWorkspaceID(&data.WorkspaceID, effClient, "", &resp.Diagnostics)
+	tflog.Trace(ctx, "read access policies attached to role", map[string]interface{}{"role_id": data.RoleID.ValueString(), "count": len(ids)})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

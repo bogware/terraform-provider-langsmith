@@ -26,5 +26,6 @@ provider "langsmith" {
 
 - `api_key` (String, Sensitive) The LangSmith API key. Can also be set with the `LANGSMITH_API_KEY` environment variable.
 - `api_url` (String) The LangSmith API base URL. Defaults to `https://api.smith.langchain.com`. Can also be set with the `LANGSMITH_API_URL` environment variable.
-- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead. The LangSmith workspace ID. Can also be set with the `LANGSMITH_TENANT_ID` environment variable.
 - `workspace_id` (String) The LangSmith workspace ID. Required for org-scoped API keys. Can also be set with the `LANGSMITH_WORKSPACE_ID` environment variable.
+
+To manage several workspaces from one configuration, prefer the per-resource `workspace_id` attribute over a provider alias: a provider block cannot consume a value that is unknown at plan time (such as the ID of a workspace created in the same apply), whereas a resource can.

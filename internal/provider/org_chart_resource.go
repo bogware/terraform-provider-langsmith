@@ -96,7 +96,10 @@ func (r *OrgChartResource) Schema(ctx context.Context, req resource.SchemaReques
 				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 		},
 	}
@@ -168,10 +171,16 @@ func (r *OrgChartResource) Read(ctx context.Context, req resource.ReadRequest, r
 		return
 	}
 
-	savedCreatedAt := data.CreatedAt
-	savedUpdatedAt := data.UpdatedAt
-	savedSeries := data.Series
-	savedSectionID := data.SectionID
+	// The org chart read endpoint has the same lossy shape as the workspace chart
+	// one: no created_at/updated_at, no section_id, and series comes back in the
+	// server's expanded form (optional keys materialized as null, a generated "id"
+	// per entry). Prior state therefore wins for those attributes — but only when it
+	// actually holds a value, so that an import (which has no prior state) still
+	// populates the required `series` attribute from the API. See ImportState.
+	priorCreatedAt := data.CreatedAt
+	priorUpdatedAt := data.UpdatedAt
+	priorSeries := data.Series
+	priorSectionID := data.SectionID
 
 	body := struct {
 		OmitData  bool   `json:"omit_data"`
@@ -192,10 +201,12 @@ func (r *OrgChartResource) Read(ctx context.Context, req resource.ReadRequest, r
 
 	mapChartResponseToState(&data, &result)
 	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.WorkspaceID, result.TenantID), &resp.Diagnostics)
-	data.CreatedAt = savedCreatedAt
-	data.UpdatedAt = savedUpdatedAt
-	data.Series = savedSeries
-	data.SectionID = savedSectionID
+	// Keep prior state for the attributes the read endpoint cannot faithfully
+	// reproduce, falling back to the API response when there is none (import).
+	data.CreatedAt = preferChartPriorState(priorCreatedAt, data.CreatedAt)
+	data.UpdatedAt = preferChartPriorState(priorUpdatedAt, data.UpdatedAt)
+	data.Series = preferChartPriorState(priorSeries, data.Series)
+	data.SectionID = preferChartPriorState(priorSectionID, data.SectionID)
 	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -261,6 +272,22 @@ func (r *OrgChartResource) Delete(ctx context.Context, req resource.DeleteReques
 	tflog.Trace(ctx, "deleted org chart resource", map[string]interface{}{"id": data.ID.ValueString()})
 }
 
+// ImportState imports an existing org chart by its ID.
+//
+// As with langsmith_chart, two attributes cannot round-trip through an import
+// because the read endpoint (POST /api/v1/org-charts/{id}) does not reproduce them:
+//
+//   - section_id is not part of the read response, so an imported org chart always
+//     has section_id null in state even when it does belong to a section.
+//   - series is returned, but in the server's expanded form (optional keys
+//     materialized as null, a generated "id" per entry), so it is semantically the
+//     same configuration but not byte-identical to the JSON in a
+//     `series = jsonencode(...)` block.
+//
+// The first plan after an import therefore shows a diff for these two attributes;
+// applying it re-sends the configured values (an idempotent update) and state
+// converges. The acceptance tests reflect this with ImportStateVerifyIgnore:
+// {"series", "section_id"}. Everything else round-trips.
 func (r *OrgChartResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }

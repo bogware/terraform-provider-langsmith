@@ -45,13 +45,35 @@ resource "langsmith_issues_agent" "test" {
   session_id        = %[1]q
   priorities        = ["P0", "P1"]
   user_instructions = "Focus on tool-call failures."
+  overview          = "# Overview\n\nTest agent overview."
 }
 `, sessionID),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("langsmith_issues_agent.test", "user_instructions", "Focus on tool-call failures."),
+					resource.TestCheckResourceAttr("langsmith_issues_agent.test", "overview", "# Overview\n\nTest agent overview."),
+					// Saving the overview creates the backing Prompt Hub repo.
+					resource.TestCheckResourceAttrSet("langsmith_issues_agent.test", "session_agent_overview_repo_id"),
 				),
 			},
 			{
+				// overview is write-only, so no GET can refresh it: changing it
+				// must still plan and apply cleanly, and the new content must
+				// survive the refresh that follows the apply.
+				Config: fmt.Sprintf(`
+resource "langsmith_issues_agent" "test" {
+  session_id        = %[1]q
+  priorities        = ["P0", "P1"]
+  user_instructions = "Focus on tool-call failures."
+  overview          = "# Overview\n\nUpdated agent overview."
+}
+`, sessionID),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("langsmith_issues_agent.test", "overview", "# Overview\n\nUpdated agent overview."),
+				),
+			},
+			{
+				// ImportStateVerify is off: overview is never returned by the
+				// API, so an imported agent has it null while state has content.
 				ResourceName:      "langsmith_issues_agent.test",
 				ImportState:       true,
 				ImportStateId:     sessionID,

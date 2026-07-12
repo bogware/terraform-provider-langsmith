@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -49,7 +50,6 @@ type ComparativeExperimentResourceModel struct {
 	CreatedAt          types.String `tfsdk:"created_at"`
 	ModifiedAt         types.String `tfsdk:"modified_at"`
 	WorkspaceID        types.String `tfsdk:"workspace_id"`
-	TenantID           types.String `tfsdk:"tenant_id"`
 }
 
 // comparativeExperimentCreateRequest is sent to POST /api/v1/datasets/comparative.
@@ -83,7 +83,10 @@ func (r *ComparativeExperimentResource) Metadata(ctx context.Context, req resour
 func (r *ComparativeExperimentResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Ties a set of experiments against a shared reference dataset into a durable comparative experiment. " +
-			"The LangSmith API exposes only create and delete for comparative experiments, so all configured fields force replacement when changed.",
+			"The LangSmith API exposes only create and delete for comparative experiments, so every configurable field forces replacement when changed.\n\n" +
+			"Comparative experiments are read back through their reference dataset, so import requires the composite ID " +
+			"`<reference_dataset_id>/<comparative_experiment_id>` (for example " +
+			"`terraform import langsmith_comparative_experiment.example 11111111-1111-1111-1111-111111111111/22222222-2222-2222-2222-222222222222`).",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "The unique identifier of the comparative experiment.",
@@ -91,9 +94,10 @@ func (r *ComparativeExperimentResource) Schema(ctx context.Context, req resource
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"reference_dataset_id": schema.StringAttribute{
-				MarkdownDescription: "UUID of the dataset the compared experiments share as a reference. Required to read the comparative experiment back.",
-				Required:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				MarkdownDescription: "UUID of the dataset the compared experiments share as a reference. Required to read the comparative experiment back, " +
+					"which is why it forms the first half of the import ID.",
+				Required:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"experiment_ids": schema.ListAttribute{
 				MarkdownDescription: "UUIDs of the experiments (sessions) to include in the comparison.",
@@ -101,23 +105,36 @@ func (r *ComparativeExperimentResource) Schema(ctx context.Context, req resource
 				ElementType:         types.StringType,
 				PlanModifiers:       []planmodifier.List{listplanmodifier.RequiresReplace()},
 			},
+			// name, description and extra are not updatable through the API
+			// (there is no PATCH/PUT for comparative experiments), so they must
+			// force replacement — otherwise a change to any of them produces an
+			// in-place plan that hard-fails in Update with no clean recovery.
 			"name": schema.StringAttribute{
-				MarkdownDescription: "Human-readable name of the comparative experiment.",
+				MarkdownDescription: "Human-readable name of the comparative experiment. Changing this forces a new resource to be created.",
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"description": schema.StringAttribute{
-				MarkdownDescription: "Free-form description of the comparative experiment.",
+				MarkdownDescription: "Free-form description of the comparative experiment. Changing this forces a new resource to be created.",
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"extra": schema.StringAttribute{
-				MarkdownDescription: "Arbitrary JSON-encoded metadata stored alongside the comparative experiment.",
+				MarkdownDescription: "Arbitrary JSON-encoded metadata stored alongside the comparative experiment. Changing this forces a new resource to be created.",
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "Creation timestamp.",
@@ -132,13 +149,10 @@ func (r *ComparativeExperimentResource) Schema(ctx context.Context, req resource
 				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
-				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
-				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 		},
 	}
@@ -211,6 +225,15 @@ func (r *ComparativeExperimentResource) Read(ctx context.Context, req resource.R
 		return
 	}
 
+	// There is no single-GET endpoint for a comparative experiment: the only way
+	// to read one back is to list every comparative experiment under its
+	// reference dataset and linear-search by ID. Hence reference_dataset_id is
+	// part of the import ID — without it this URL collapses to
+	// "/api/v1/datasets//comparative".
+	//
+	// NOTE: GET /api/v1/datasets/{dataset_id}/comparative is absent from the
+	// published LangSmith OpenAPI spec, but it is real and returns 200 (verified
+	// against the live API). Do not "correct" this path to a spec-derived one.
 	apiClient := effectiveClient(r.client, data.WorkspaceID)
 	var experiments []comparativeExperimentAPIResponse
 	if err := apiClient.Get(ctx, "/api/v1/datasets/"+data.ReferenceDatasetID.ValueString()+"/comparative", nil, &experiments); err != nil {
@@ -238,9 +261,11 @@ func (r *ComparativeExperimentResource) Read(ctx context.Context, req resource.R
 }
 
 func (r *ComparativeExperimentResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	// All mutable attributes carry RequiresReplace, so no in-place update is
-	// possible. This method exists only to satisfy the resource.Resource
-	// interface; the framework will never invoke it.
+	// The LangSmith API has no update endpoint for comparative experiments, so
+	// every configurable attribute (reference_dataset_id, experiment_ids, name,
+	// description, extra, workspace_id) carries RequiresReplace. That makes this
+	// method unreachable in practice; it exists only to satisfy the
+	// resource.Resource interface. If it ever fires, a plan modifier is missing.
 	resp.Diagnostics.AddError(
 		"Update not supported",
 		"Comparative experiments cannot be updated in place. All changes force replacement.",
@@ -260,8 +285,23 @@ func (r *ComparativeExperimentResource) Delete(ctx context.Context, req resource
 	}
 }
 
+// ImportState accepts the composite ID "<reference_dataset_id>/<comparative_experiment_id>".
+// A bare comparative experiment ID is not enough: Read lists the comparative
+// experiments of a reference dataset and searches for the ID, so without
+// reference_dataset_id in state the read URL degrades to
+// "/api/v1/datasets//comparative" and the import always fails.
 func (r *ComparativeExperimentResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	parts := strings.SplitN(req.ID, "/", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		resp.Diagnostics.AddError(
+			"Invalid Import ID",
+			fmt.Sprintf("Expected import ID in the format \"<reference_dataset_id>/<comparative_experiment_id>\", got: %q", req.ID),
+		)
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("reference_dataset_id"), parts[0])...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), parts[1])...)
 }
 
 // mapResponseToModel copies API response fields into the Terraform model. It
@@ -293,5 +333,4 @@ func (r *ComparativeExperimentResource) mapResponseToModel(api *comparativeExper
 	data.ModifiedAt = types.StringValue(api.ModifiedAt)
 
 	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(api.WorkspaceID, api.TenantID), diags)
-	data.TenantID = data.WorkspaceID
 }

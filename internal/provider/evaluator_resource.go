@@ -42,7 +42,6 @@ type EvaluatorResourceModel struct {
 	Name          types.String        `tfsdk:"name"`
 	Type          types.String        `tfsdk:"type"`
 	WorkspaceID   types.String        `tfsdk:"workspace_id"`
-	TenantID      types.String        `tfsdk:"tenant_id"`
 	CodeEvaluator *codeEvaluatorModel `tfsdk:"code_evaluator"`
 	LLMEvaluator  *llmEvaluatorModel  `tfsdk:"llm_evaluator"`
 	CreatedAt     types.String        `tfsdk:"created_at"`
@@ -153,13 +152,10 @@ func (r *EvaluatorResource) Schema(ctx context.Context, req resource.SchemaReque
 				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
-				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
-				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"code_evaluator": schema.SingleNestedAttribute{
 				MarkdownDescription: "Configuration for a code evaluator. Required when `type = \"code\"`.",
@@ -426,7 +422,6 @@ func (r *EvaluatorResource) mapResponseToModel(ctx context.Context, api *evaluat
 	data.Name = types.StringValue(api.Name)
 	data.Type = types.StringValue(api.Type)
 	reconcileWorkspaceID(&data.WorkspaceID, api.TenantID, diags)
-	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(api.CreatedAt)
 	data.UpdatedAt = types.StringValue(api.UpdatedAt)
 	data.CreatedBy = types.StringValue(api.CreatedBy)

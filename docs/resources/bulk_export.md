@@ -46,5 +46,4 @@ resource "langsmith_bulk_export" "example" {
 - `finished_at` (String) The timestamp when the export finished.
 - `id` (String) The unique identifier of the bulk export.
 - `status` (String) The status of the bulk export.
-- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead.
 - `updated_at` (String) The last update timestamp.

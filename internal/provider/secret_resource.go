@@ -6,6 +6,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -71,7 +72,19 @@ func (r *SecretResource) Metadata(ctx context.Context, req resource.MetadataRequ
 
 func (r *SecretResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Manages a LangSmith workspace secret (key/value pair). The value is write-only and never returned by the API.",
+		MarkdownDescription: "Manages a LangSmith workspace secret (key/value pair).\n\n" +
+			"The secret `value` is **write-only**: the LangSmith API only ever returns the key names, never the values. " +
+			"This has two consequences:\n\n" +
+			"* Terraform cannot detect drift on `value`. If the secret is changed outside of Terraform, " +
+			"the provider will not notice.\n" +
+			"* **Importing a secret cannot recover its `value`.** Immediately after an import the value is absent from " +
+			"state, so the next plan will always show a change for `value` and re-write the secret with the value from " +
+			"your configuration. This is expected; apply the plan to converge.\n\n" +
+			"Import accepts either `<key>` or `<key>:<workspace_id>`, for example:\n\n" +
+			"```shell\n" +
+			"terraform import langsmith_secret.example OPENAI_API_KEY\n" +
+			"terraform import langsmith_secret.example OPENAI_API_KEY:11111111-2222-3333-4444-555555555555\n" +
+			"```",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the secret (same as the key name).",
@@ -88,15 +101,20 @@ func (r *SecretResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				},
 			},
 			"value": schema.StringAttribute{
-				MarkdownDescription: "The secret value. This is write-only and will not be returned by the API after being set.",
-				Required:            true,
-				Sensitive:           true,
+				MarkdownDescription: "The secret value. This is write-only: the API never returns it, so Terraform cannot " +
+					"detect drift on it and cannot populate it on import. After importing a secret, the first plan will " +
+					"always show a change for this attribute and re-write the secret with the configured value.",
+				Required:  true,
+				Sensitive: true,
 			},
 			"workspace_id": schema.StringAttribute{
 				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 		},
 	}
@@ -243,9 +261,43 @@ func (r *SecretResource) Delete(ctx context.Context, req resource.DeleteRequest,
 	tflog.Trace(ctx, "deleted secret resource", map[string]interface{}{"key": data.Key.ValueString()})
 }
 
+// ImportState imports a secret by its key name, optionally pinning it to a
+// specific workspace:
+//
+//	<key>                  -- uses the provider-level workspace
+//	<key>:<workspace_id>   -- overrides the provider-level workspace
+//
+// Read finds the secret by key (the API has no per-secret GET, only a list of
+// key names), so the key -- not just the id -- must be written to state here;
+// passing the ID through to `id` alone leaves `key` empty and the import fails
+// with "Cannot import non-existent remote object".
+//
+// Fair warning: the secret value is write-only and is never returned by the
+// API, so it cannot be recovered on import -- like asking Chester to recall
+// last month's dispatch word-for-word. State will hold no value afterwards,
+// and the first plan following the import will show a change for `value` and
+// re-write the secret from your configuration. That is expected.
 func (r *SecretResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// Import passes the ID through, which maps to the key name.
-	// Fair warning: the secret value won't be available after import --
-	// like asking Chester to recall last month's dispatch word-for-word.
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	const usage = "Expected \"<key>\" or \"<key>:<workspace_id>\" (the key name must not contain a colon). " +
+		"Note: the secret value is write-only and cannot be recovered on import -- the next plan will re-write it from your configuration."
+
+	parts := strings.SplitN(req.ID, ":", 2)
+	key := parts[0]
+	if key == "" {
+		resp.Diagnostics.AddError("Invalid import ID", usage)
+		return
+	}
+
+	// The id is the key name -- same as Create/Read/Update set it.
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("key"), key)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), key)...)
+
+	if len(parts) == 2 {
+		workspaceID := parts[1]
+		if workspaceID == "" {
+			resp.Diagnostics.AddError("Invalid import ID", usage)
+			return
+		}
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("workspace_id"), workspaceID)...)
+	}
 }

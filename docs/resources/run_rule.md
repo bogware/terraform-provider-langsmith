@@ -34,7 +34,7 @@ resource "langsmith_run_rule" "example" {
 - `add_to_annotation_queue_id` (String) UUID of the annotation queue to add matching runs to.
 - `add_to_dataset_id` (String) UUID of the dataset to add matching runs to.
 - `add_to_dataset_prefer_correction` (Boolean) Whether to prefer correction when adding to dataset.
-- `alerts` (String) JSON-encoded array of alert configurations.
+- `alerts` (String, Sensitive) JSON-encoded array of alert configurations. These routinely embed credentials (for example PagerDuty routing keys or Slack tokens), so the value is marked sensitive: Terraform redacts it from plan output and logs as `(sensitive value)`.
 - `backfill_from` (String) ISO timestamp to backfill rules from.
 - `code_evaluators` (String) JSON-encoded array of code evaluator configurations.
 - `create_alignment_queue` (Boolean) If true, instructs the API to create an alignment annotation queue when the rule is created. Write-only; the API does not echo this value back.
@@ -53,7 +53,7 @@ resource "langsmith_run_rule" "example" {
 - `transient` (Boolean) Whether the rule is transient.
 - `tree_filter` (String) Tree filter expression.
 - `use_corrections_dataset` (Boolean) Whether to use a corrections dataset.
-- `webhooks` (String) JSON-encoded array of webhook configurations.
+- `webhooks` (String, Sensitive) JSON-encoded array of webhook configurations. These routinely embed credentials in headers or URLs (for example bearer tokens or signed Slack webhook URLs), so the value is marked sensitive: Terraform redacts it from plan output and logs as `(sensitive value)`.
 - `workspace_id` (String) The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
@@ -71,5 +71,4 @@ resource "langsmith_run_rule" "example" {
 - `dataset_name` (String) The name of the associated dataset.
 - `id` (String) The unique identifier of the run rule.
 - `session_name` (String) The name of the associated session/project.
-- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead.
 - `updated_at` (String) When the rule was last updated.

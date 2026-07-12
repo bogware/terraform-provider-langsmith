@@ -54,7 +54,6 @@ type BulkExportDestinationResourceModel struct {
 	SecretAccessKey       types.String `tfsdk:"secret_access_key"`
 	SessionToken          types.String `tfsdk:"session_token"`
 	WorkspaceID           types.String `tfsdk:"workspace_id"`
-	TenantID              types.String `tfsdk:"tenant_id"`
 	CreatedAt             types.String `tfsdk:"created_at"`
 	UpdatedAt             types.String `tfsdk:"updated_at"`
 	CredentialsKeys       types.List   `tfsdk:"credentials_keys"`
@@ -184,13 +183,10 @@ func (r *BulkExportDestinationResource) Schema(ctx context.Context, req resource
 				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
-				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
-				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "The creation timestamp.",
@@ -391,7 +387,6 @@ func mapBulkExportDestinationResponseToState(data *BulkExportDestinationResource
 	}
 
 	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, diags)
-	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 

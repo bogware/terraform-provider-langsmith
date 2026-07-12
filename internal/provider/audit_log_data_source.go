@@ -64,8 +64,9 @@ func (d *AuditLogDataSource) Schema(ctx context.Context, req datasource.SchemaRe
 			"next_cursor": schema.StringAttribute{Computed: true, MarkdownDescription: "Cursor for the next page, or null when there are no more results."},
 			"items": schema.ListAttribute{
 				Computed:            true,
+				Sensitive:           true,
 				ElementType:         types.StringType,
-				MarkdownDescription: "JSON-encoded audit log entries (one OCSF activity per element).",
+				MarkdownDescription: "JSON-encoded audit log entries (one OCSF activity per element). Entries carry actor personal data (emails, names, IP addresses); the attribute is marked sensitive so those are redacted from plan output. They are still written to Terraform state — use an encrypted backend.",
 			},
 		},
 	}

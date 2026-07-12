@@ -45,7 +45,6 @@ type WorkspaceTTLSettingsResource struct {
 type workspaceTTLSettingsResourceModel struct {
 	ID               types.String `tfsdk:"id"`
 	WorkspaceID      types.String `tfsdk:"workspace_id"`
-	TenantID         types.String `tfsdk:"tenant_id"`
 	LonglivedTTLDays types.Int64  `tfsdk:"longlived_ttl_days"`
 	IsCustom         types.Bool   `tfsdk:"is_custom"`
 }
@@ -87,14 +86,7 @@ func (r *WorkspaceTTLSettingsResource) Schema(ctx context.Context, req resource.
 				Computed:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
-				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
-				Computed:            true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"longlived_ttl_days": schema.Int64Attribute{
@@ -217,7 +209,6 @@ func (r *WorkspaceTTLSettingsResource) mapResponseToState(data *workspaceTTLSett
 	apiWorkspaceID := firstNonEmpty(result.WorkspaceID, result.TenantID)
 
 	finalizeWorkspaceID(&data.WorkspaceID, effClient, apiWorkspaceID, diags)
-	data.TenantID = data.WorkspaceID
 
 	if !data.WorkspaceID.IsNull() {
 		data.ID = data.WorkspaceID

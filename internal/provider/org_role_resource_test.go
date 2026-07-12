@@ -21,6 +21,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
@@ -107,6 +108,180 @@ func TestMapOrgRoleResponseToState_FullAndEmptyDescription(t *testing.T) {
 			// ensure it's valid JSON
 			if !json.Valid([]byte(m.Permissions.ValueString())) {
 				t.Fatalf("Permissions is not valid JSON: %s", m.Permissions.ValueString())
+			}
+		})
+	}
+}
+
+// TestMapOrgRoleResponseToState_IsRestricted pins down the one rule that
+// matters most for is_restricted: it must never come out of the mapper unknown,
+// because Terraform hard-fails on an unknown value after apply.
+func TestMapOrgRoleResponseToState_IsRestricted(t *testing.T) {
+	truth := true
+	falsehood := false
+
+	cases := []struct {
+		name  string
+		prior types.Bool
+		api   *bool
+		want  bool
+	}{
+		{name: "api says true", prior: types.BoolNull(), api: &truth, want: true},
+		{name: "api says false", prior: types.BoolValue(true), api: &falsehood, want: false},
+		{name: "api silent, prior known", prior: types.BoolValue(true), api: nil, want: true},
+		{name: "api silent, prior null", prior: types.BoolNull(), api: nil, want: false},
+		{name: "api silent, prior unknown", prior: types.BoolUnknown(), api: nil, want: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := OrgRoleResourceModel{IsRestricted: tc.prior}
+			res := orgRoleAPIResponse{
+				ID:           "r-1",
+				Permissions:  json.RawMessage(`[{"action":"read"}]`),
+				IsRestricted: tc.api,
+			}
+
+			mapOrgRoleResponseToState(&m, &res)
+
+			if m.IsRestricted.IsUnknown() || m.IsRestricted.IsNull() {
+				t.Fatalf("IsRestricted must be known after mapping, got %v", m.IsRestricted)
+			}
+			if got := m.IsRestricted.ValueBool(); got != tc.want {
+				t.Fatalf("IsRestricted = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestReconcileOrgRoleRestriction verifies that the provider only calls the
+// dedicated restriction endpoint when the flag actually needs to move, and that
+// it always returns a known value for state.
+func TestReconcileOrgRoleRestriction(t *testing.T) {
+	truth := true
+	falsehood := false
+
+	cases := []struct {
+		name string
+		// inputs
+		desired types.Bool
+		api     *bool
+		prior   types.Bool
+		// the role as the fake server has it on the list endpoint
+		serverValue *bool
+		// expectations
+		wantPut  *bool // nil = no PUT expected
+		wantList bool
+		want     bool
+	}{
+		{
+			name:    "no config, api reports false",
+			desired: types.BoolUnknown(),
+			api:     &falsehood,
+			prior:   types.BoolNull(),
+			want:    false,
+		},
+		{
+			name:    "no config, api silent -> read back from list",
+			desired: types.BoolUnknown(),
+			api:     nil,
+			prior:   types.BoolNull(),
+
+			serverValue: &truth,
+			wantList:    true,
+			want:        true,
+		},
+		{
+			name:    "wants true, api silent -> put without asking",
+			desired: types.BoolValue(true),
+			api:     nil,
+			prior:   types.BoolNull(),
+			wantPut: &truth,
+			want:    true,
+		},
+		{
+			name:    "wants true, already true -> no call",
+			desired: types.BoolValue(true),
+			api:     &truth,
+			prior:   types.BoolNull(),
+			want:    true,
+		},
+		{
+			name:    "wants false, currently true -> put false",
+			desired: types.BoolValue(false),
+			api:     &truth,
+			prior:   types.BoolNull(),
+			wantPut: &falsehood,
+			want:    false,
+		},
+		{
+			name:    "update: wants true, prior false, api silent -> put true",
+			desired: types.BoolValue(true),
+			api:     nil,
+			prior:   types.BoolValue(false),
+			wantPut: &truth,
+			want:    true,
+		},
+		{
+			name:    "update: unchanged, api silent -> no call",
+			desired: types.BoolValue(true),
+			api:     nil,
+			prior:   types.BoolValue(true),
+			want:    true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var gotPut *orgRoleRestrictionRequest
+			listed := false
+
+			rt := &mockRoundTripper{fn: func(req *http.Request) *http.Response {
+				switch {
+				case req.Method == http.MethodPut && req.URL.Path == "/api/v1/orgs/current/roles/r-1/restriction":
+					body, _ := io.ReadAll(req.Body)
+					var rr orgRoleRestrictionRequest
+					_ = json.Unmarshal(body, &rr)
+					gotPut = &rr
+					return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewReader([]byte(`{}`)))}
+				case req.Method == http.MethodGet && req.URL.Path == "/api/v1/orgs/current/roles":
+					listed = true
+					b, _ := json.Marshal([]orgRoleAPIResponse{{
+						ID:           "r-1",
+						Permissions:  json.RawMessage(`[]`),
+						IsRestricted: tc.serverValue,
+					}})
+					return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewReader(b))}
+				}
+				return &http.Response{StatusCode: 500, Body: io.NopCloser(bytes.NewReader([]byte("unexpected request")))}
+			}}
+
+			c := clientpkg.NewClient("http://example", "key", "workspace", "ua")
+			c.HTTPClient.Transport = rt
+			c.MaxRetries = 0
+
+			r := &OrgRoleResource{client: c}
+			got, err := r.reconcileOrgRoleRestriction(context.Background(), "r-1", tc.desired, tc.api, tc.prior)
+			if err != nil {
+				t.Fatalf("reconcileOrgRoleRestriction error: %v", err)
+			}
+
+			if got != tc.want {
+				t.Fatalf("restricted = %v, want %v", got, tc.want)
+			}
+			if tc.wantPut == nil && gotPut != nil {
+				t.Fatalf("unexpected PUT to the restriction endpoint: %+v", *gotPut)
+			}
+			if tc.wantPut != nil {
+				if gotPut == nil {
+					t.Fatalf("expected a PUT with is_restricted=%v, none was made", *tc.wantPut)
+				}
+				if gotPut.IsRestricted != *tc.wantPut {
+					t.Fatalf("PUT is_restricted = %v, want %v", gotPut.IsRestricted, *tc.wantPut)
+				}
+			}
+			if listed != tc.wantList {
+				t.Fatalf("list endpoint called = %v, want %v", listed, tc.wantList)
 			}
 		})
 	}
@@ -284,7 +459,8 @@ func TestAccOrgRoleResource_framework(t *testing.T) {
 			_ = json.NewDecoder(r.Body).Decode(&cr)
 			id := fmt.Sprintf("r-%d", nextID)
 			nextID++
-			resp := orgRoleAPIResponse{
+			unrestricted := false
+			stored := orgRoleAPIResponse{
 				ID:             id,
 				Name:           "role_" + id,
 				DisplayName:    cr.DisplayName,
@@ -292,11 +468,33 @@ func TestAccOrgRoleResource_framework(t *testing.T) {
 				OrganizationID: "org-test",
 				Permissions:    cr.Permissions,
 				AccessScope:    "organization",
+				// New roles land unrestricted; the create payload has no say in it.
+				IsRestricted: &unrestricted,
 			}
-			roles[id] = resp
+			roles[id] = stored
+
+			// Mirror the real API: the create response does not carry
+			// is_restricted, so the provider must not depend on it here.
+			created := stored
+			created.IsRestricted = nil
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(201)
-			_ = json.NewEncoder(w).Encode(resp)
+			_ = json.NewEncoder(w).Encode(created)
+			return
+		case r.Method == http.MethodPut && strings.HasPrefix(r.URL.Path, "/api/v1/orgs/current/roles/") && strings.HasSuffix(r.URL.Path, "/restriction"):
+			id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/v1/orgs/current/roles/"), "/restriction")
+			rp, ok := roles[id]
+			if !ok {
+				http.Error(w, "not found", 404)
+				return
+			}
+			var rr orgRoleRestrictionRequest
+			_ = json.NewDecoder(r.Body).Decode(&rr)
+			restricted := rr.IsRestricted
+			rp.IsRestricted = &restricted
+			roles[id] = rp
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"ok"}`))
 			return
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/orgs/current/roles":
 			list := []orgRoleAPIResponse{}
@@ -317,8 +515,13 @@ func TestAccOrgRoleResource_framework(t *testing.T) {
 			}
 			rp.Permissions = ur.Permissions
 			roles[id] = rp
+			// As with create, the update response omits is_restricted -- the
+			// provider has to fall back to prior state to decide whether the
+			// restriction endpoint needs a call.
+			updated := rp
+			updated.IsRestricted = nil
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(rp)
+			_ = json.NewEncoder(w).Encode(updated)
 			return
 		case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/api/v1/orgs/current/roles/"):
 			id := strings.TrimPrefix(r.URL.Path, "/api/v1/orgs/current/roles/")
@@ -348,16 +551,158 @@ func TestAccOrgRoleResource_framework(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("langsmith_org_role.test", "id"),
 					resource.TestCheckResourceAttr("langsmith_org_role.test", "display_name", rName),
+					// Unset in config: the provider must still land on a known
+					// value (the server default) rather than leaving it unknown.
+					resource.TestCheckResourceAttr("langsmith_org_role.test", "is_restricted", "false"),
 				),
 			},
 			{
 				Config: testAccOrgRoleConfig(rName + "-updated"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("langsmith_org_role.test", "display_name", rName+"-updated"),
+					resource.TestCheckResourceAttr("langsmith_org_role.test", "is_restricted", "false"),
+				),
+			},
+			{
+				// Restricting a role is an in-place update, never a replacement.
+				Config: testAccOrgRoleRestrictedConfig(rName+"-updated", true),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("langsmith_org_role.test", plancheck.ResourceActionUpdate),
+					},
+				},
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("langsmith_org_role.test", "is_restricted", "true"),
+				),
+			},
+			{
+				// ...and lifting it again is too.
+				Config: testAccOrgRoleRestrictedConfig(rName+"-updated", false),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("langsmith_org_role.test", plancheck.ResourceActionUpdate),
+					},
+				},
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("langsmith_org_role.test", "is_restricted", "false"),
 				),
 			},
 		},
 	})
+}
+
+// TestAccOrgRoleResource_restrictedOnCreate covers the other half of the story:
+// a role born restricted. The create payload can't carry the flag, so the
+// provider has to follow up with the restriction endpoint before it writes state.
+func TestAccOrgRoleResource_restrictedOnCreate(t *testing.T) {
+	var mu sync.Mutex
+	roles := map[string]orgRoleAPIResponse{}
+	nextID := 1
+	restrictionCalls := 0
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/info":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"version":"test"}`))
+			return
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/orgs/current/roles":
+			var cr orgRoleCreateRequest
+			_ = json.NewDecoder(r.Body).Decode(&cr)
+			id := fmt.Sprintf("r-%d", nextID)
+			nextID++
+			unrestricted := false
+			roles[id] = orgRoleAPIResponse{
+				ID:             id,
+				Name:           "role_" + id,
+				DisplayName:    cr.DisplayName,
+				OrganizationID: "org-test",
+				Permissions:    cr.Permissions,
+				AccessScope:    "organization",
+				IsRestricted:   &unrestricted,
+			}
+			created := roles[id]
+			created.IsRestricted = nil
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(201)
+			_ = json.NewEncoder(w).Encode(created)
+			return
+		case r.Method == http.MethodPut && strings.HasSuffix(r.URL.Path, "/restriction"):
+			id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/v1/orgs/current/roles/"), "/restriction")
+			rp, ok := roles[id]
+			if !ok {
+				http.Error(w, "not found", 404)
+				return
+			}
+			var rr orgRoleRestrictionRequest
+			_ = json.NewDecoder(r.Body).Decode(&rr)
+			restricted := rr.IsRestricted
+			rp.IsRestricted = &restricted
+			roles[id] = rp
+			restrictionCalls++
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"ok"}`))
+			return
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/orgs/current/roles":
+			list := []orgRoleAPIResponse{}
+			for _, v := range roles {
+				list = append(list, v)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(list)
+			return
+		case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/api/v1/orgs/current/roles/"):
+			id := strings.TrimPrefix(r.URL.Path, "/api/v1/orgs/current/roles/")
+			delete(roles, id)
+			w.WriteHeader(204)
+			return
+		default:
+			http.Error(w, "not found", 404)
+			return
+		}
+	}))
+	defer srv.Close()
+
+	t.Setenv("LANGSMITH_API_KEY", "test-key")
+	t.Setenv("LANGSMITH_API_URL", srv.URL)
+
+	rName := fmt.Sprintf("tf-test-%s", acctest.RandStringFromCharSet(6, acctest.CharSetAlphaNum))
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             func(s *terraform.State) error { return nil },
+		Steps: []resource.TestStep{
+			{
+				Config: testAccOrgRoleRestrictedConfig(rName, true),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("langsmith_org_role.test", "id"),
+					resource.TestCheckResourceAttr("langsmith_org_role.test", "is_restricted", "true"),
+				),
+			},
+			{
+				// Re-applying the same config must be a no-op: no drift, and no
+				// gratuitous second trip to the restriction endpoint.
+				Config:   testAccOrgRoleRestrictedConfig(rName, true),
+				PlanOnly: true,
+			},
+			{
+				Config:            testAccOrgRoleRestrictedConfig(rName, true),
+				ResourceName:      "langsmith_org_role.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+		},
+	})
+
+	mu.Lock()
+	defer mu.Unlock()
+	if restrictionCalls != 1 {
+		t.Fatalf("restriction endpoint called %d times, want exactly 1", restrictionCalls)
+	}
 }
 
 func testAccOrgRoleConfig(name string) string {
@@ -366,4 +711,13 @@ func testAccOrgRoleConfig(name string) string {
   permissions  = jsonencode([{"action":"read"}])
 }
 `, name)
+}
+
+func testAccOrgRoleRestrictedConfig(name string, restricted bool) string {
+	return fmt.Sprintf(`resource "langsmith_org_role" "test" {
+  display_name  = %q
+  permissions   = jsonencode([{"action":"read"}])
+  is_restricted = %t
+}
+`, name, restricted)
 }

@@ -30,6 +30,16 @@ resource "langsmith_issues_agent" "chatbot" {
   cron_enabled      = true
   user_instructions = "Prioritize tool-call failures and hallucinated citations."
 
+  # Seed the Agent Overview document. This is write-only: the API never returns
+  # the content, so Terraform cannot detect drift on it and the value is not
+  # populated on import. It is re-sent only when the configured content changes.
+  overview = <<-EOT
+    # Production chatbot
+
+    Customer-facing support agent. Tools: `search_docs`, `create_ticket`.
+    Escalate anything touching billing to a human.
+  EOT
+
   # Monthly Engine LCU spend cap for this project (decimal string).
   session_lcu_spend_limit_monthly = "100"
 }
@@ -50,6 +60,7 @@ resource "langsmith_issues_agent" "chatbot" {
 - `github_base_branch` (String) **Beta:** Base branch fix PRs are opened against.
 - `github_repo_subdir` (String) **Beta:** Subdirectory of the repository containing the agent's code.
 - `github_repo_url` (String) **Beta:** URL of the GitHub repository the agent proposes fixes against. Changing it clears fix-related fields server-side.
+- `overview` (String) **Beta:** Content of the Agent Overview document. Saved through the dedicated `PATCH /v1/platform/sessions/{session_id}/issues-agent/overview` endpoint (neither create nor update accepts it), which creates or updates the private Prompt Hub repo backing the overview and links it to the agent config — see `session_agent_overview_repo_id`. **Write-only:** no API endpoint returns the overview content, so Terraform cannot detect drift on it. The value is preserved from state on refresh, is not populated on import, and is re-sent only when the configured content changes. Removing the attribute leaves the last saved overview in place server-side (the API exposes no way to delete it), and the agent itself may rewrite the document on its next scan.
 - `priorities` (List of String) **Beta:** Ordered list of issue priorities the agent focuses on.
 - `session_lcu_spend_limit_monthly` (String) **Beta:** Per-project monthly Engine LCU spend cap, serialized as a decimal string to preserve precision (e.g. `"100"`). `0` blocks all new runs. Removing the attribute clears the cap (a negative value is sent to the API). Applied via a follow-up PATCH after create.
 - `user_instructions` (String) **Beta:** Free-form user preferences the agent treats as authoritative context. Removing the attribute clears the instructions (an empty string is sent to the API). Applied via a follow-up PATCH after create.
@@ -64,6 +75,5 @@ resource "langsmith_issues_agent" "chatbot" {
 - `latest_thread_id` (String) **Beta:** Thread ID of the latest agent run; null until the first trigger.
 - `session_agent_overview_repo_id` (String) **Beta:** UUID of the server-managed agent-overview hub repo.
 - `session_name` (String) **Beta:** Name of the tracing project, resolved server-side.
-- `tenant_id` (String) **Beta:** Workspace (tenant) UUID that owns the session.
 - `tenant_name` (String) **Beta:** Workspace (tenant) display name, resolved server-side.
 - `updated_at` (String) **Beta:** Last update timestamp.

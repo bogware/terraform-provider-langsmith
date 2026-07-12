@@ -44,7 +44,6 @@ type WebhookResourceModel struct {
 	IncludePrompts types.List   `tfsdk:"include_prompts"`
 	ExcludePrompts types.List   `tfsdk:"exclude_prompts"`
 	WorkspaceID    types.String `tfsdk:"workspace_id"`
-	TenantID       types.String `tfsdk:"tenant_id"`
 	CreatedAt      types.String `tfsdk:"created_at"`
 	UpdatedAt      types.String `tfsdk:"updated_at"`
 }
@@ -89,8 +88,9 @@ func (r *WebhookResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Required:            true,
 			},
 			"headers": schema.MapAttribute{
-				MarkdownDescription: "Custom headers to include in webhook requests.",
+				MarkdownDescription: "Custom headers to include in webhook requests. This commonly carries credentials (for example `Authorization: Bearer ...`), so the whole map is marked sensitive: Terraform redacts it from plan output and logs as `(sensitive value)`.",
 				Optional:            true,
+				Sensitive:           true,
 				ElementType:         types.StringType,
 			},
 			"triggers": schema.ListAttribute{
@@ -114,13 +114,8 @@ func (r *WebhookResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Computed:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
 				},
-			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
-				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
-				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "When the webhook was created.",
@@ -305,7 +300,6 @@ func (r *WebhookResource) mapResponseToModel(ctx context.Context, result *webhoo
 	data.ID = types.StringValue(result.ID)
 	data.URL = types.StringValue(result.URL)
 	reconcileWorkspaceID(&data.WorkspaceID, result.TenantID, diagnostics)
-	data.TenantID = data.WorkspaceID
 	data.CreatedAt = types.StringValue(result.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.UpdatedAt)
 

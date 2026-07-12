@@ -51,7 +51,6 @@ type ProjectResourceModel struct {
 	TraceTier          types.String `tfsdk:"trace_tier"`
 	TagValueIDs        types.List   `tfsdk:"tag_value_ids"`
 	WorkspaceID        types.String `tfsdk:"workspace_id"`
-	TenantID           types.String `tfsdk:"tenant_id"`
 	StartTime          types.String `tfsdk:"start_time"`
 	EndTime            types.String `tfsdk:"end_time"`
 }
@@ -138,13 +137,10 @@ func (r *ProjectResource) Schema(ctx context.Context, req resource.SchemaRequest
 				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Deprecated: use `workspace_id` instead.",
-				DeprecationMessage:  "Use workspace_id instead. This attribute will be removed in a future release.",
-				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"start_time": schema.StringAttribute{
 				MarkdownDescription: "The start time of the project, as an RFC 3339 / ISO 8601 timestamp. If unset, the server assigns the creation time.",
@@ -389,7 +385,6 @@ func mapProjectResponseToState(ctx context.Context, data *ProjectResourceModel, 
 	}
 
 	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.WorkspaceID, result.TenantID), diags)
-	data.TenantID = data.WorkspaceID
 	data.StartTime = types.StringValue(result.StartTime)
 
 	if result.EndTime != nil {

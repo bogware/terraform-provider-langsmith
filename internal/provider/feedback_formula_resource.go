@@ -54,6 +54,13 @@ type feedbackFormulaCreateRequest struct {
 	SessionID       *string         `json:"session_id,omitempty"`
 }
 
+// feedbackFormulaUpdateRequest mirrors the API's FeedbackFormulaUpdate schema,
+// which - unlike FeedbackFormulaCreate - accepts only feedback_key,
+// aggregation_type and formula_parts.  The scoping fields dataset_id and
+// session_id are deliberately absent: PUT /api/v1/feedback/formulas/{id} cannot
+// change them.  They are therefore marked RequiresReplace in the schema, so a
+// change to either forces recreation instead of silently no-op'ing.  Do not add
+// them here without first confirming the API accepts them.
 type feedbackFormulaUpdateRequest struct {
 	FeedbackKey     string          `json:"feedback_key"`
 	AggregationType string          `json:"aggregation_type"`
@@ -102,12 +109,14 @@ func (r *FeedbackFormulaResource) Schema(ctx context.Context, req resource.Schem
 				Required:            true,
 			},
 			"dataset_id": schema.StringAttribute{
-				MarkdownDescription: "Optional dataset ID to scope the formula.",
+				MarkdownDescription: "Optional dataset ID to scope the formula. Changing this forces a new feedback formula to be created, because the API's update endpoint does not accept `dataset_id`.",
 				Optional:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"session_id": schema.StringAttribute{
-				MarkdownDescription: "Optional session/project ID to scope the formula.",
+				MarkdownDescription: "Optional session/project ID to scope the formula. Changing this forces a new feedback formula to be created, because the API's update endpoint does not accept `session_id`.",
 				Optional:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "Creation timestamp.",
@@ -122,7 +131,10 @@ func (r *FeedbackFormulaResource) Schema(ctx context.Context, req resource.Schem
 				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 		},
 	}

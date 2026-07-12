@@ -30,7 +30,7 @@ output "tracing_project_count" {
 ### Optional
 
 - `tag_value_ids` (List of String) Optional list of tag value UUIDs to filter the counts to resources carrying those tags.
-- `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this data source.
+- `workspace_id` (String) The UUID of the workspace the stats belong to. If set, overrides the provider-level `workspace_id` for all API calls made by this data source.
 
 ### Read-Only
 
@@ -40,5 +40,4 @@ output "tracing_project_count" {
 - `deployment_count` (Number) Number of deployments in the workspace.
 - `evaluator_count` (Number) Number of evaluators in the workspace.
 - `repo_count` (Number) Number of prompt repos in the workspace.
-- `tenant_id` (String) The UUID of the workspace (tenant) the stats belong to.
 - `tracer_session_count` (Number) Number of tracing projects (tracer sessions) in the workspace.

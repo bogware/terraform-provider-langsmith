@@ -3,12 +3,15 @@
 page_title: "langsmith_comparative_experiment Resource - langsmith"
 subcategory: ""
 description: |-
-  Ties a set of experiments against a shared reference dataset into a durable comparative experiment. The LangSmith API exposes only create and delete for comparative experiments, so all configured fields force replacement when changed.
+  Ties a set of experiments against a shared reference dataset into a durable comparative experiment. The LangSmith API exposes only create and delete for comparative experiments, so every configurable field forces replacement when changed.
+  Comparative experiments are read back through their reference dataset, so import requires the composite ID <reference_dataset_id>/<comparative_experiment_id> (for example terraform import langsmith_comparative_experiment.example 11111111-1111-1111-1111-111111111111/22222222-2222-2222-2222-222222222222).
 ---
 
 # langsmith_comparative_experiment (Resource)
 
-Ties a set of experiments against a shared reference dataset into a durable comparative experiment. The LangSmith API exposes only create and delete for comparative experiments, so all configured fields force replacement when changed.
+Ties a set of experiments against a shared reference dataset into a durable comparative experiment. The LangSmith API exposes only create and delete for comparative experiments, so every configurable field forces replacement when changed.
+
+Comparative experiments are read back through their reference dataset, so import requires the composite ID `<reference_dataset_id>/<comparative_experiment_id>` (for example `terraform import langsmith_comparative_experiment.example 11111111-1111-1111-1111-111111111111/22222222-2222-2222-2222-222222222222`).
 
 ## Example Usage
 
@@ -31,13 +34,13 @@ resource "langsmith_comparative_experiment" "example" {
 ### Required
 
 - `experiment_ids` (List of String) UUIDs of the experiments (sessions) to include in the comparison.
-- `reference_dataset_id` (String) UUID of the dataset the compared experiments share as a reference. Required to read the comparative experiment back.
+- `reference_dataset_id` (String) UUID of the dataset the compared experiments share as a reference. Required to read the comparative experiment back, which is why it forms the first half of the import ID.
 
 ### Optional
 
-- `description` (String) Free-form description of the comparative experiment.
-- `extra` (String) Arbitrary JSON-encoded metadata stored alongside the comparative experiment.
-- `name` (String) Human-readable name of the comparative experiment.
+- `description` (String) Free-form description of the comparative experiment. Changing this forces a new resource to be created.
+- `extra` (String) Arbitrary JSON-encoded metadata stored alongside the comparative experiment. Changing this forces a new resource to be created.
+- `name` (String) Human-readable name of the comparative experiment. Changing this forces a new resource to be created.
 - `workspace_id` (String) The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only
@@ -45,4 +48,3 @@ resource "langsmith_comparative_experiment" "example" {
 - `created_at` (String) Creation timestamp.
 - `id` (String) The unique identifier of the comparative experiment.
 - `modified_at` (String) Last modification timestamp.
-- `tenant_id` (String, Deprecated) Deprecated: use `workspace_id` instead.

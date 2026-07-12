@@ -103,7 +103,10 @@ func (r *RepoOwnerResource) Schema(ctx context.Context, req resource.SchemaReque
 				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
 				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 		},
 	}
@@ -139,7 +142,11 @@ func (r *RepoOwnerResource) Create(ctx context.Context, req resource.CreateReque
 	}
 	r.mapResponse(&api, &data)
 	reconcileWorkspaceID(&data.WorkspaceID, "", &resp.Diagnostics)
-	tflog.Trace(ctx, "added repo owner", map[string]interface{}{"email": data.Email.ValueString()})
+	// Log opaque identifiers, not the collaborator's email (PII in logs).
+	tflog.Trace(ctx, "added repo owner", map[string]interface{}{
+		"identity_id": data.IdentityID.ValueString(),
+		"ls_user_id":  data.LSUserID.ValueString(),
+	})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
@@ -176,8 +183,19 @@ func (r *RepoOwnerResource) Read(ctx context.Context, req resource.ReadRequest, 
 	resp.State.RemoveResource(ctx)
 }
 
+// Update is unreachable: every configurable attribute (owner, repo, email and
+// workspace_id) carries RequiresReplace, and the LangSmith API exposes only
+// add/remove for repo owners — there is nothing to PATCH. It errors loudly
+// rather than silently no-opping so that re-introducing an updatable attribute
+// fails the apply instead of quietly dropping the change.
 func (r *RepoOwnerResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	// All inputs are RequiresReplace; no Update.
+	resp.Diagnostics.AddError(
+		"Update Not Supported",
+		"Repo owners cannot be updated; the API only supports adding and removing an owner. "+
+			"All configurable attributes are marked RequiresReplace, so this method should be unreachable — "+
+			"reaching it means an updatable attribute was added to the schema without update support. "+
+			"Please report this as a provider bug.",
+	)
 }
 
 func (r *RepoOwnerResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
