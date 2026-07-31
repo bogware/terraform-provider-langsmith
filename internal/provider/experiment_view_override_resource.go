@@ -159,7 +159,7 @@ func (r *ExperimentViewOverrideResource) Configure(ctx context.Context, req reso
 }
 
 func experimentViewOverrideBasePath(datasetID string) string {
-	return "/v1/platform/datasets/" + datasetID + "/experiment-view-overrides"
+	return "/api/v1/platform/datasets/" + datasetID + "/experiment-view-overrides"
 }
 
 func (r *ExperimentViewOverrideResource) buildRequest(ctx context.Context, data *ExperimentViewOverrideResourceModel, diags *diag.Diagnostics) experimentViewOverrideRequest {

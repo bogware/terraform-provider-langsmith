@@ -249,7 +249,7 @@ func (r *AlertRuleResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	apiPath := fmt.Sprintf("/v1/platform/alerts/%s", data.SessionID.ValueString())
+	apiPath := fmt.Sprintf("/api/v1/platform/alerts/%s", data.SessionID.ValueString())
 
 	c := effectiveClient(r.client, data.WorkspaceID)
 	var result alertRuleResponse
@@ -278,7 +278,7 @@ func (r *AlertRuleResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	apiPath := fmt.Sprintf("/v1/platform/alerts/%s/%s",
+	apiPath := fmt.Sprintf("/api/v1/platform/alerts/%s/%s",
 		data.SessionID.ValueString(), data.ID.ValueString())
 
 	c := effectiveClient(r.client, data.WorkspaceID)
@@ -312,7 +312,7 @@ func (r *AlertRuleResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	apiPath := fmt.Sprintf("/v1/platform/alerts/%s/%s",
+	apiPath := fmt.Sprintf("/api/v1/platform/alerts/%s/%s",
 		data.SessionID.ValueString(), data.ID.ValueString())
 
 	c := effectiveClient(r.client, data.WorkspaceID)
@@ -337,7 +337,7 @@ func (r *AlertRuleResource) Delete(ctx context.Context, req resource.DeleteReque
 		return
 	}
 
-	apiPath := fmt.Sprintf("/v1/platform/alerts/%s/%s",
+	apiPath := fmt.Sprintf("/api/v1/platform/alerts/%s/%s",
 		data.SessionID.ValueString(), data.ID.ValueString())
 
 	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, apiPath)

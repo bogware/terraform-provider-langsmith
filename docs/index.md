@@ -26,9 +26,21 @@ provider "langsmith" {
 
 - `api_key` (String, Sensitive) The LangSmith API key. Can also be set with the `LANGSMITH_API_KEY` environment variable.
 - `api_url` (String) The LangSmith API base URL. Defaults to `https://api.smith.langchain.com`. Can also be set with the `LANGSMITH_API_URL` environment variable.
+- `path_overrides` (Map of String) Rewrite API request paths by prefix. This is an escape hatch for a deployment whose routing does not match what the provider assumes — you should not need it against LangSmith Cloud.
+
+Each key is a path prefix to match and each value replaces it; both must begin with `/`. The **longest** matching key wins, and the rewrite is applied last, after the built-in `self_hosted` rules, so it can override them:
+
+```hcl
+path_overrides = {
+  # send the platform family to the un-prefixed form instead
+  "/api/v1/platform/" = "/v1/platform/"
+}
+```
+
+Can also be set with the `LANGSMITH_PATH_OVERRIDES` environment variable as a JSON object (for example `{"/api/v1/platform/":"/v1/platform/"}`). A non-null attribute overrides the environment variable.
 - `self_hosted` (Boolean) Set to `true` when `api_url` points at a self-hosted LangSmith instance. Can also be set with the `LANGSMITH_SELF_HOSTED` environment variable. Defaults to `false` (LangSmith Cloud).
 
-Self-hosted deployments serve the API under a `/api` path prefix, whereas Cloud serves it at the root of the `api.` subdomain. When enabled, the provider rewrites the platform endpoints (`/v1/platform/...` -> `/api/v1/platform/...`) so resources such as `langsmith_evaluator`, `langsmith_tool`, and the other platform resources work against a self-hosted instance. Leave it unset for Cloud.
+Self-hosted deployments serve the API under a `/api` path prefix, whereas Cloud serves it at the root of the `api.` subdomain. The provider already uses the `/api`-prefixed form for every endpoint that has one, so this flag only affects the few families Cloud serves at the root with no `/api` equivalent (workspace TTL settings, data planes). Leave it unset for Cloud.
 - `workspace_id` (String) The LangSmith workspace ID. Required for org-scoped API keys. Can also be set with the `LANGSMITH_WORKSPACE_ID` environment variable.
 
 To manage several workspaces from one configuration, prefer the per-resource `workspace_id` attribute over a provider alias: a provider block cannot consume a value that is unknown at plan time (such as the ID of a workspace created in the same apply), whereas a resource can.

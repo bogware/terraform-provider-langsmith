@@ -167,7 +167,7 @@ func (r *AccessPolicyResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	var createResult accessPolicyCreateResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/v1/platform/orgs/current/access-policies", body, &createResult)
+	err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/platform/orgs/current/access-policies", body, &createResult)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating access policy", err.Error())
 		return
@@ -177,7 +177,7 @@ func (r *AccessPolicyResource) Create(ctx context.Context, req resource.CreateRe
 
 	// Read back to get full state.
 	var result accessPolicyAPIResponse
-	err = effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/v1/platform/orgs/current/access-policies/"+createResult.ID, nil, &result)
+	err = effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/platform/orgs/current/access-policies/"+createResult.ID, nil, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading access policy after creation", err.Error())
 		// Persist partial state so the created access policy is tracked (and
@@ -203,7 +203,7 @@ func (r *AccessPolicyResource) Read(ctx context.Context, req resource.ReadReques
 	}
 
 	var result accessPolicyAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/v1/platform/orgs/current/access-policies/"+data.ID.ValueString(), nil, &result)
+	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/platform/orgs/current/access-policies/"+data.ID.ValueString(), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -239,7 +239,7 @@ func (r *AccessPolicyResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/v1/platform/orgs/current/access-policies/"+data.ID.ValueString())
+	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/api/v1/platform/orgs/current/access-policies/"+data.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting access policy", err.Error())
 		return

@@ -97,12 +97,34 @@ provider "langsmith" {
 }
 ```
 
-`self_hosted` is required for a self-hosted instance because self-hosted deployments serve the API
-under a `/api` path prefix, whereas Cloud serves it at the root of the `api.` subdomain. Without it,
-the platform resources (`langsmith_evaluator`, `langsmith_tool`, and others that use
-`/v1/platform/...` endpoints) request a path that falls through to the frontend web app instead of
-the API and fail. When enabled, the provider rewrites those `/v1/platform/...` calls to
-`/api/v1/platform/...`. Leave `self_hosted` unset for LangSmith Cloud.
+Self-hosted deployments serve the API under a `/api` path prefix, whereas Cloud serves it at the
+root of the `api.` subdomain. The provider now uses the `/api`-prefixed form for every endpoint that
+has one — Cloud serves those identically — so most resources work on a self-hosted instance without
+any special configuration. `self_hosted` covers the remainder: a few families (workspace TTL
+settings, data planes) that Cloud serves *only* at the root, which therefore need the prefix added
+on self-hosted. Leave `self_hosted` unset for LangSmith Cloud.
+
+#### When the paths still aren't right
+
+Routing varies between deployments, and the provider's assumptions can be wrong for yours. Rather
+than waiting on a provider release, rewrite the paths yourself with `path_overrides` — a map of path
+prefix to replacement, applied after the built-in rules, longest matching prefix first:
+
+```hcl
+provider "langsmith" {
+  api_url     = "https://langsmith.internal.example.com"
+  self_hosted = true
+
+  path_overrides = {
+    # e.g. this deployment serves the platform family without the /api prefix
+    "/api/v1/platform/" = "/v1/platform/"
+  }
+}
+```
+
+Both sides of every entry must begin with `/`. The same map can be supplied as JSON in
+`LANGSMITH_PATH_OVERRIDES`. If you need an override to make a resource work, please open an issue —
+the goal is for the defaults to be correct.
 
 ### Managing multiple workspaces
 

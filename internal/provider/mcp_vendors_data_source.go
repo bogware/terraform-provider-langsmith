@@ -105,7 +105,7 @@ func (d *MCPVendorsDataSource) Read(ctx context.Context, req datasource.ReadRequ
 	c := effectiveClient(d.client, data.WorkspaceID)
 
 	var api mcpVendorsAPIResponse
-	if err := c.Get(ctx, "/v1/platform/mcp-vendors", nil, &api); err != nil {
+	if err := c.Get(ctx, "/api/v1/platform/mcp-vendors", nil, &api); err != nil {
 		resp.Diagnostics.AddError("Error listing MCP vendors", err.Error())
 		return
 	}

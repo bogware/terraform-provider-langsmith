@@ -120,11 +120,11 @@ func (r *RoleAccessPoliciesResource) Configure(ctx context.Context, req resource
 
 // attachPath builds the role-scoped attach endpoint for the given role ID.
 func (r *RoleAccessPoliciesResource) attachPath(roleID string) string {
-	return "/v1/platform/orgs/current/access-policies/roles/" + roleID + "/access-policies"
+	return "/api/v1/platform/orgs/current/access-policies/roles/" + roleID + "/access-policies"
 }
 
 // roleAccessPoliciesListPath is the org-wide access policy list endpoint.
-const roleAccessPoliciesListPath = "/v1/platform/orgs/current/access-policies"
+const roleAccessPoliciesListPath = "/api/v1/platform/orgs/current/access-policies"
 
 // attachedPolicyIDs returns the IDs of every access policy in the organization
 // currently attached to roleID. The API has no role-scoped GET, so we read the

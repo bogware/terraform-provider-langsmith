@@ -86,7 +86,7 @@ func (d *ToolDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	}
 	c := effectiveClient(d.client, data.WorkspaceID)
 	var api toolAPI
-	if err := c.Get(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), nil, &api); err != nil {
+	if err := c.Get(ctx, "/api/v1/platform/tools/"+data.Handle.ValueString(), nil, &api); err != nil {
 		resp.Diagnostics.AddError("Error reading tool", err.Error())
 		return
 	}

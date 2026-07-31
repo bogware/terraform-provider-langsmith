@@ -146,7 +146,7 @@ func (d *AccessPoliciesDataSource) Read(ctx context.Context, req datasource.Read
 	c := effectiveClient(d.client, data.WorkspaceID)
 
 	var result accessPoliciesListResponse
-	if err := c.Get(ctx, "/v1/platform/orgs/current/access-policies", nil, &result); err != nil {
+	if err := c.Get(ctx, "/api/v1/platform/orgs/current/access-policies", nil, &result); err != nil {
 		resp.Diagnostics.AddError(
 			"Error listing access policies",
 			"Listing access policies requires ABAC to be enabled on the organization; a 403 response means it is not.\n\n"+err.Error(),

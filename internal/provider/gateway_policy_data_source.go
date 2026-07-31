@@ -92,7 +92,7 @@ func (d *GatewayPolicyDataSource) Read(ctx context.Context, req datasource.ReadR
 		return
 	}
 	var api gatewayPolicyAPI
-	if err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/v1/platform/gateway-policies/"+data.ID.ValueString(), nil, &api); err != nil {
+	if err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/platform/gateway-policies/"+data.ID.ValueString(), nil, &api); err != nil {
 		resp.Diagnostics.AddError("Error reading gateway policy", err.Error())
 		return
 	}

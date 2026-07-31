@@ -100,7 +100,7 @@ func (r *AnnotationQueueReviewerResource) Create(ctx context.Context, req resour
 	var result struct {
 		IdentityID string `json:"identity_id"`
 	}
-	if err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/v1/platform/annotation-queues/"+data.QueueID.ValueString()+"/reviewers", body, &result); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/platform/annotation-queues/"+data.QueueID.ValueString()+"/reviewers", body, &result); err != nil {
 		resp.Diagnostics.AddError("Error adding annotation queue reviewer", err.Error())
 		return
 	}
@@ -150,7 +150,7 @@ func (r *AnnotationQueueReviewerResource) Delete(ctx context.Context, req resour
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/v1/platform/annotation-queues/"+data.QueueID.ValueString()+"/reviewers/"+data.IdentityID.ValueString()); err != nil && !client.IsNotFound(err) {
+	if err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/api/v1/platform/annotation-queues/"+data.QueueID.ValueString()+"/reviewers/"+data.IdentityID.ValueString()); err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error removing annotation queue reviewer", err.Error())
 		return
 	}

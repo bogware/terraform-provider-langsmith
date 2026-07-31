@@ -107,7 +107,7 @@ func (d *PromptCommitDataSource) Read(ctx context.Context, req datasource.ReadRe
 	}
 
 	var result promptCommitDataSourceAPIResponse
-	err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, fmt.Sprintf("/commits/-/%s/%s", data.RepoHandle.ValueString(), ref), nil, &result)
+	err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, fmt.Sprintf("/api/v1/commits/-/%s/%s", data.RepoHandle.ValueString(), ref), nil, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading prompt commit", err.Error())
 		return

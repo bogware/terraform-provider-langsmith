@@ -180,7 +180,7 @@ func (r *ToolResource) Create(ctx context.Context, req resource.CreateRequest, r
 
 	c := effectiveClient(r.client, data.WorkspaceID)
 	var api toolAPI
-	if err := c.Post(ctx, "/v1/platform/tools", body, &api); err != nil {
+	if err := c.Post(ctx, "/api/v1/platform/tools", body, &api); err != nil {
 		resp.Diagnostics.AddError("Error creating tool", err.Error())
 		return
 	}
@@ -197,7 +197,7 @@ func (r *ToolResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	}
 	c := effectiveClient(r.client, data.WorkspaceID)
 	var api toolAPI
-	if err := c.Get(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), nil, &api); err != nil {
+	if err := c.Get(ctx, "/api/v1/platform/tools/"+data.Handle.ValueString(), nil, &api); err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
 			return
@@ -240,7 +240,7 @@ func (r *ToolResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 	c := effectiveClient(r.client, data.WorkspaceID)
 	var api toolAPI
-	if err := c.Patch(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), body, &api); err != nil {
+	if err := c.Patch(ctx, "/api/v1/platform/tools/"+data.Handle.ValueString(), body, &api); err != nil {
 		resp.Diagnostics.AddError("Error updating tool", err.Error())
 		return
 	}
@@ -254,7 +254,7 @@ func (r *ToolResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/v1/platform/tools/"+data.Handle.ValueString()); err != nil && !client.IsNotFound(err) {
+	if err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/api/v1/platform/tools/"+data.Handle.ValueString()); err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting tool", err.Error())
 		return
 	}

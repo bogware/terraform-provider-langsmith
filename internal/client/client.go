@@ -33,20 +33,26 @@ type Client struct {
 	UserAgent   string
 	// SelfHosted routes requests for a self-hosted LangSmith instance, which
 	// mounts the entire API under a /api path prefix rather than at the root of
-	// the cloud api. subdomain. See doRequest for the exact rewrite.
+	// the cloud api. subdomain. See resolvePath for the exact rewrite.
 	SelfHosted bool
-	HTTPClient *http.Client
-	MaxRetries int
+	// PathOverrides rewrites request paths by prefix, as a last step after the
+	// built-in rules. It is the escape hatch for a deployment whose routing does
+	// not match what the provider assumes: the longest matching key wins, and its
+	// value replaces that prefix. Empty for the vast majority of users.
+	PathOverrides map[string]string
+	HTTPClient    *http.Client
+	MaxRetries    int
 }
 
 // NewClient creates a new LangSmith API client.
-func NewClient(baseURL, apiKey, workspaceID, userAgent string, selfHosted bool) *Client {
+func NewClient(baseURL, apiKey, workspaceID, userAgent string, selfHosted bool, pathOverrides map[string]string) *Client {
 	return &Client{
-		BaseURL:     baseURL,
-		APIKey:      apiKey,
-		WorkspaceID: workspaceID,
-		UserAgent:   userAgent,
-		SelfHosted:  selfHosted,
+		BaseURL:       baseURL,
+		APIKey:        apiKey,
+		WorkspaceID:   workspaceID,
+		UserAgent:     userAgent,
+		SelfHosted:    selfHosted,
+		PathOverrides: pathOverrides,
 		HTTPClient: &http.Client{
 			Timeout:       120 * time.Second,
 			CheckRedirect: dropAuthOnCrossHostRedirect,
@@ -276,34 +282,84 @@ func (c *Client) WithWorkspaceID(workspaceID string) *Client {
 	return &clientCopy
 }
 
-// selfHostedPlatformPrefix is the base path of the platform API family on Cloud.
-// On self-hosted this family is the one that needs the /api prefix.
-const selfHostedPlatformPrefix = "/v1/platform/"
+// legacyPlatformPrefix is the pre-1.2 spelling of the platform family. Every
+// call site now uses the canonical /api/v1/platform/... form, which Cloud and
+// self-hosted both serve; this constant only backstops code (or a path override)
+// that still emits the bare form.
+const legacyPlatformPrefix = "/v1/platform/"
+
+// selfHostedRootFamilies are the families Cloud serves at the root of the api.
+// subdomain with no /api-prefixed equivalent at all — verified live: both
+// /api/v1/workspaces/current/ttl-settings and
+// /api/v1/platform/orgs/current/data-planes report "the requested path does not
+// exist", while the bare forms resolve. Since a self-hosted deployment puts the
+// whole API under /api, these are prefixed there. This is inference from the
+// deployment topology rather than a verified route, which is exactly the case
+// PathOverrides exists to correct.
+var selfHostedRootFamilies = []string{"/workspaces/", "/orgs/"}
 
 // resolvePath adapts a request path to the target deployment.
 //
-// LangSmith Cloud serves the API at the root of the api. subdomain: legacy
-// endpoints live under /api/v1/... and the newer "platform" endpoints under
-// /v1/platform/... (no /api). A self-hosted instance shares a single host
-// between the frontend and the API, so the API sits under a /api path prefix and
-// anything unmatched falls through to the frontend SPA (which returns the app
-// HTML with a 200, or 405 to a POST). This is confirmed by the langchain-ai/helm
-// frontend nginx config, which routes `location /api/v1/platform/` to the
-// platform backend while a bare /v1/platform/... matches no /api location.
+// LangSmith Cloud serves the API at the root of the api. subdomain. Most
+// endpoints live under /api/v1/..., and the platform family is served under BOTH
+// /v1/platform/... and /api/v1/platform/... (verified live across every platform
+// path this provider calls: identical status codes under either prefix). The
+// same holds for /api/v1/commits/... and /api/v2/sandboxes/registries. The
+// provider therefore uses the /api form everywhere, because a self-hosted
+// instance shares one host between the frontend and the API: the API sits under
+// a /api path prefix and anything unmatched falls through to the frontend SPA
+// (which answers with the app HTML and a 200, or 405 to a POST). This matches
+// the langchain-ai/helm frontend nginx config, which routes
+// `location /api/v1/platform/` to the platform backend while a bare
+// /v1/platform/... matches no /api location.
 //
-// Legacy /api/v1/... paths already carry /api and resolve on both. Only the
-// platform family needs rewriting: on self-hosted, /v1/platform/X -> /api/v1/platform/X.
+// What is left un-prefixed is deliberate. Agent builder (/v1/agent-builder/...)
+// has no /api form on Cloud at all, and the comment history for this file
+// records that agent builder, sandboxes and other fleet features are served at
+// their own root on self-hosted, so blanket-prefixing them would break them.
 //
-// We deliberately do NOT blanket-prefix every non-/api path. Several families
-// (agent builder, sandboxes, and other fleet features) are served at their own
-// root on self-hosted, not under /api, so prefixing them would break them. Those
-// endpoints are left unchanged pending confirmation against a real self-hosted
-// instance.
+// Whatever the built-in rules produce, PathOverrides is applied last and can
+// rewrite any prefix, so a deployment that routes differently can be corrected
+// in configuration rather than waiting on a provider release.
 func (c *Client) resolvePath(path string) string {
-	if c.SelfHosted && strings.HasPrefix(path, selfHostedPlatformPrefix) {
+	if c.SelfHosted {
+		path = selfHostedPath(path)
+	}
+	return c.applyPathOverrides(path)
+}
+
+func selfHostedPath(path string) string {
+	if strings.HasPrefix(path, "/api/") {
+		return path // already carries /api; never double it
+	}
+	if strings.HasPrefix(path, legacyPlatformPrefix) {
 		return "/api" + path
 	}
+	for _, family := range selfHostedRootFamilies {
+		if strings.HasPrefix(path, family) {
+			return "/api" + path
+		}
+	}
 	return path
+}
+
+// applyPathOverrides rewrites the longest matching prefix. Longest-match makes
+// the result independent of Go's randomised map iteration order, so a config
+// with both "/api/v1/" and "/api/v1/platform/" behaves predictably.
+func (c *Client) applyPathOverrides(path string) string {
+	if len(c.PathOverrides) == 0 {
+		return path
+	}
+	best := ""
+	for prefix := range c.PathOverrides {
+		if len(prefix) > len(best) && strings.HasPrefix(path, prefix) {
+			best = prefix
+		}
+	}
+	if best == "" {
+		return path
+	}
+	return c.PathOverrides[best] + strings.TrimPrefix(path, best)
 }
 
 // IsNotFound checks whether the error is a 404.

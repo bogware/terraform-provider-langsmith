@@ -1,3 +1,18 @@
+## 1.2.0 (Unreleased)
+
+BUG FIXES:
+
+* Self-hosted instances: `langsmith_prompt`, `langsmith_prompt_tag`, the `langsmith_prompt_commit` data source, `langsmith_sandbox_registry` and the `langsmith_sandbox_registries` data source were still broken on self-hosted. They call root-mounted paths (`/commits/...`, `/v2/sandboxes/registries`) that the 1.1.0 `self_hosted` rewrite deliberately did not cover, so those requests fell through to the frontend web app instead of reaching the API. All of them now use the canonical `/api`-prefixed form (`/api/v1/commits/...`, `/api/v2/sandboxes/registries`), which LangSmith Cloud serves identically, so they work on both deployment types with no extra configuration. ([#64](https://github.com/bogware/terraform-provider-langsmith/issues/64))
+* Self-hosted instances: `langsmith_workspace_ttl_settings` and `langsmith_data_plane` use families that Cloud serves only at the root, with no `/api`-prefixed equivalent at all. With `self_hosted = true` these now gain the prefix (`/workspaces/...` → `/api/workspaces/...`, `/orgs/...` → `/api/orgs/...`). ([#64](https://github.com/bogware/terraform-provider-langsmith/issues/64))
+
+ENHANCEMENTS:
+
+* The platform API family now uses its canonical documented path (`/api/v1/platform/...`) on every deployment, instead of the bare `/v1/platform/...` form that was rewritten only when `self_hosted` was set. LangSmith Cloud serves both forms identically — verified against every platform endpoint this provider calls — so Cloud behavior is unchanged, and self-hosted no longer depends on the rewrite for this family. The bare form is still accepted and rewritten when `self_hosted = true`.
+
+FEATURES:
+
+* Added the provider-level `path_overrides` attribute (and the `LANGSMITH_PATH_OVERRIDES` environment variable, a JSON object): a map of API path prefix → replacement, applied after the built-in routing rules, with the longest matching prefix winning. It is an escape hatch for deployments whose routing differs from what the provider assumes, so a routing mismatch can be corrected in configuration instead of waiting for a provider release.
+
 ## 1.1.0 (July 2026)
 
 BUG FIXES:

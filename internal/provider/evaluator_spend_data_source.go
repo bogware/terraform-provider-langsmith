@@ -71,7 +71,7 @@ func (d *EvaluatorSpendDataSource) Read(ctx context.Context, req datasource.Read
 	}
 
 	var raw json.RawMessage
-	if err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/v1/platform/evaluators/spend", nil, &raw); err != nil {
+	if err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/platform/evaluators/spend", nil, &raw); err != nil {
 		if client.IsNotFound(err) {
 			resp.Diagnostics.AddError("Evaluator Spend Not Found", "The evaluator spend endpoint returned 404. It may not be available on this LangSmith deployment.")
 			return

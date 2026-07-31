@@ -13,7 +13,7 @@ import (
 )
 
 func TestEffectiveClient(t *testing.T) {
-	base := client.NewClient("https://api.smith.langchain.com", "key", "provider-ws", "ua", false)
+	base := client.NewClient("https://api.smith.langchain.com", "key", "provider-ws", "ua", false, nil)
 
 	tests := []struct {
 		name        string

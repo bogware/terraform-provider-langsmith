@@ -142,7 +142,7 @@ func (d *EvaluatorsDataSource) Read(ctx context.Context, req datasource.ReadRequ
 		query.Set("offset", strconv.Itoa(offset))
 
 		var page evaluatorsListAPIResponse
-		if err := c.Get(ctx, "/v1/platform/evaluators", query, &page); err != nil {
+		if err := c.Get(ctx, "/api/v1/platform/evaluators", query, &page); err != nil {
 			resp.Diagnostics.AddError("Error listing evaluators", err.Error())
 			return
 		}

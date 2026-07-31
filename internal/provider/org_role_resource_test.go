@@ -256,7 +256,7 @@ func TestReconcileOrgRoleRestriction(t *testing.T) {
 				return &http.Response{StatusCode: 500, Body: io.NopCloser(bytes.NewReader([]byte("unexpected request")))}
 			}}
 
-			c := clientpkg.NewClient("http://example", "key", "workspace", "ua", false)
+			c := clientpkg.NewClient("http://example", "key", "workspace", "ua", false, nil)
 			c.HTTPClient.Transport = rt
 			c.MaxRetries = 0
 
@@ -368,7 +368,7 @@ func TestOrgRoleClientCRUD(t *testing.T) {
 		return &http.Response{StatusCode: 500, Body: io.NopCloser(bytes.NewReader([]byte("unexpected request")))}
 	}}
 
-	c := clientpkg.NewClient("http://example", "key", "workspace", "ua", false)
+	c := clientpkg.NewClient("http://example", "key", "workspace", "ua", false, nil)
 	c.HTTPClient.Transport = rt
 	c.MaxRetries = 0
 
