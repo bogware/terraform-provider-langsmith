@@ -20,13 +20,12 @@ import (
 // extension requires an llm as a judge evaluator or code evaluator", HTTP 422),
 // which is why the config below carries a code evaluator.
 //
-// This is deliberately a single apply. Updating a run rule that has an
-// evaluator currently fails with 422 "Provide either evaluator_id or
-// evaluators/code_evaluators, not both" — Create lets the server assign
-// evaluator_id, Read stores it, and Update then sends it alongside
-// code_evaluators. That is a pre-existing defect, reproducible with nothing but
-// a display_name change, so it is not exercised here; add the second step once
-// it is fixed.
+// The code evaluator does double duty as a regression test for two defects the
+// second step would otherwise hit: the API assigns an evaluator_id on create,
+// which must not then be sent back alongside code_evaluators ("Provide either
+// evaluator_id or evaluators/code_evaluators, not both", HTTP 422), and it
+// expands the evaluator with language: "python", which must not overwrite the
+// configured JSON and leave a permanent diff.
 func TestAccRunRuleResource_retentionFlags(t *testing.T) {
 	name := fmt.Sprintf("tf-acc-rr-%s", acctest.RandStringFromCharSet(8, acctest.CharSetAlphaNum))
 
@@ -44,6 +43,18 @@ func TestAccRunRuleResource_retentionFlags(t *testing.T) {
 					resource.TestCheckResourceAttr("langsmith_run_rule.test", "extend_dataset_trace_retention", "true"),
 					resource.TestCheckResourceAttr("langsmith_run_rule.test", "extend_annotation_queue_trace_retention", "true"),
 					resource.TestCheckResourceAttr("langsmith_run_rule.test", "extend_webhook_trace_retention", "true"),
+				),
+			},
+			// Flip every flag: the update endpoint accepts all of them, so this
+			// must apply in place rather than force a replacement.
+			{
+				Config: testAccRunRuleResourceConfig(name, false),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("langsmith_run_rule.test", "is_tracing_disabled", "false"),
+					resource.TestCheckResourceAttr("langsmith_run_rule.test", "extend_evaluator_trace_retention", "false"),
+					resource.TestCheckResourceAttr("langsmith_run_rule.test", "extend_dataset_trace_retention", "false"),
+					resource.TestCheckResourceAttr("langsmith_run_rule.test", "extend_annotation_queue_trace_retention", "false"),
+					resource.TestCheckResourceAttr("langsmith_run_rule.test", "extend_webhook_trace_retention", "false"),
 				),
 			},
 		},
@@ -64,13 +75,11 @@ resource "langsmith_run_rule" "test" {
   session_id    = langsmith_project.test.id
   sampling_rate = 1
 
-  # language is spelled out because the API injects it when omitted, and Read
-  # overwrites the configured JSON with the server's expanded copy — leaving a
-  # permanent diff on every plan.
+  # language is deliberately omitted: the API fills it in, and Read must keep
+  # the configured form rather than the server's expanded copy.
   code_evaluators = jsonencode([
     {
-      code     = "def perform_eval(run):\n    return {\"score\": 1}\n"
-      language = "python"
+      code = "def perform_eval(run):\n    return {\"score\": 1}\n"
     }
   ])
 

@@ -508,29 +508,6 @@ func (r *RunRuleResource) Create(ctx context.Context, req resource.CreateRequest
 	if !data.SpendLimit.IsNull() && !data.SpendLimit.IsUnknown() {
 		body.SpendLimit = json.RawMessage(data.SpendLimit.ValueString())
 	}
-	if !data.IsTracingDisabled.IsNull() && !data.IsTracingDisabled.IsUnknown() {
-		v := data.IsTracingDisabled.ValueBool()
-		body.IsTracingDisabled = &v
-	}
-	if !data.ExtendEvaluatorRetention.IsNull() && !data.ExtendEvaluatorRetention.IsUnknown() {
-		v := data.ExtendEvaluatorRetention.ValueBool()
-		body.ExtendEvaluatorRetention = &v
-	}
-	if !data.ExtendDatasetRetention.IsNull() && !data.ExtendDatasetRetention.IsUnknown() {
-		v := data.ExtendDatasetRetention.ValueBool()
-		body.ExtendDatasetRetention = &v
-	}
-	if !data.ExtendAnnotationQueueRet.IsNull() && !data.ExtendAnnotationQueueRet.IsUnknown() {
-		v := data.ExtendAnnotationQueueRet.ValueBool()
-		body.ExtendAnnotationQueueRet = &v
-	}
-	if !data.ExtendWebhookRetention.IsNull() && !data.ExtendWebhookRetention.IsUnknown() {
-		v := data.ExtendWebhookRetention.ValueBool()
-		body.ExtendWebhookRetention = &v
-	}
-	if !data.SpendLimit.IsNull() && !data.SpendLimit.IsUnknown() {
-		body.SpendLimit = json.RawMessage(data.SpendLimit.ValueString())
-	}
 	if !data.TracerSessionIssueID.IsNull() && !data.TracerSessionIssueID.IsUnknown() {
 		v := data.TracerSessionIssueID.ValueString()
 		body.TracerSessionIssueID = &v
@@ -550,7 +527,7 @@ func (r *RunRuleResource) Create(ctx context.Context, req resource.CreateRequest
 	if !data.CreateAlignmentQueue.IsNull() && !data.CreateAlignmentQueue.IsUnknown() {
 		body.CreateAlignmentQueue = data.CreateAlignmentQueue.ValueBool()
 	}
-	if !data.EvaluatorID.IsNull() && !data.EvaluatorID.IsUnknown() {
+	if !ruleUsesInlineEvaluators(&data) && !data.EvaluatorID.IsNull() && !data.EvaluatorID.IsUnknown() {
 		v := data.EvaluatorID.ValueString()
 		body.EvaluatorID = &v
 	}
@@ -680,6 +657,29 @@ func (r *RunRuleResource) Update(ctx context.Context, req resource.UpdateRequest
 		v := data.ExtendOnly.ValueBool()
 		body.ExtendOnly = &v
 	}
+	if !data.IsTracingDisabled.IsNull() && !data.IsTracingDisabled.IsUnknown() {
+		v := data.IsTracingDisabled.ValueBool()
+		body.IsTracingDisabled = &v
+	}
+	if !data.ExtendEvaluatorRetention.IsNull() && !data.ExtendEvaluatorRetention.IsUnknown() {
+		v := data.ExtendEvaluatorRetention.ValueBool()
+		body.ExtendEvaluatorRetention = &v
+	}
+	if !data.ExtendDatasetRetention.IsNull() && !data.ExtendDatasetRetention.IsUnknown() {
+		v := data.ExtendDatasetRetention.ValueBool()
+		body.ExtendDatasetRetention = &v
+	}
+	if !data.ExtendAnnotationQueueRet.IsNull() && !data.ExtendAnnotationQueueRet.IsUnknown() {
+		v := data.ExtendAnnotationQueueRet.ValueBool()
+		body.ExtendAnnotationQueueRet = &v
+	}
+	if !data.ExtendWebhookRetention.IsNull() && !data.ExtendWebhookRetention.IsUnknown() {
+		v := data.ExtendWebhookRetention.ValueBool()
+		body.ExtendWebhookRetention = &v
+	}
+	if !data.SpendLimit.IsNull() && !data.SpendLimit.IsUnknown() {
+		body.SpendLimit = json.RawMessage(data.SpendLimit.ValueString())
+	}
 	if !data.Transient.IsNull() && !data.Transient.IsUnknown() {
 		v := data.Transient.ValueBool()
 		body.Transient = &v
@@ -690,7 +690,7 @@ func (r *RunRuleResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 	// Deliberately NOT sending group_by: the API's RunRulesUpdateSchema omits
 	// it, so the resource treats it as RequiresReplace.
-	if !data.EvaluatorID.IsNull() && !data.EvaluatorID.IsUnknown() {
+	if !ruleUsesInlineEvaluators(&data) && !data.EvaluatorID.IsNull() && !data.EvaluatorID.IsUnknown() {
 		v := data.EvaluatorID.ValueString()
 		body.EvaluatorID = &v
 	}
@@ -826,8 +826,10 @@ func (r *RunRuleResource) mapResponseToModel(result *runRuleAPIResponse, data *R
 		data.GroupBy = types.StringNull()
 	}
 	// JSON fields -- Doc Adams keeps meticulous records and so do we.
-	data.Evaluators = jsonEmptyArrayIsNull(result.Evaluators)
-	data.CodeEvaluators = jsonEmptyArrayIsNull(result.CodeEvaluators)
+	// The API expands both of these (a code evaluator gains language: "python"),
+	// so keep the configured form whenever the response only adds to it.
+	data.Evaluators = jsonPreserveConfigSubset(result.Evaluators, data.Evaluators)
+	data.CodeEvaluators = jsonPreserveConfigSubset(result.CodeEvaluators, data.CodeEvaluators)
 	data.Alerts = jsonEmptyArrayIsNull(result.Alerts)
 	data.Webhooks = jsonEmptyArrayIsNull(result.Webhooks)
 	// Computed fields -- dispatches that only the API can write.
@@ -892,4 +894,17 @@ func (r *RunRuleResource) mapResponseToModel(result *runRuleAPIResponse, data *R
 	} else {
 		data.BackfillError = types.StringNull()
 	}
+}
+
+// ruleUsesInlineEvaluators reports whether the configuration defines this rule's
+// evaluators inline rather than pointing at a standalone evaluator.
+//
+// The API rejects a request carrying both forms: "Provide either evaluator_id or
+// evaluators/code_evaluators, not both." Creating a rule with inline evaluators
+// makes the server assign an evaluator_id, which Read then stores, so without
+// this check every subsequent update sends both and fails with HTTP 422 -- the
+// rule becomes impossible to modify.
+func ruleUsesInlineEvaluators(data *RunRuleResourceModel) bool {
+	set := func(v types.String) bool { return !v.IsNull() && !v.IsUnknown() }
+	return set(data.Evaluators) || set(data.CodeEvaluators)
 }
