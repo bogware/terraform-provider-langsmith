@@ -24,10 +24,15 @@ resource "langsmith_sso_settings" "example" {
 
 ### Optional
 
+- `attribute_mapping` (String) JSON-encoded object mapping SAML/OIDC assertion attributes onto LangSmith user fields.
 - `default_workspace_ids` (String) JSON-encoded array of default workspace IDs for SSO-provisioned users.
 - `default_workspace_role_id` (String) Default role ID for SSO-provisioned users.
 - `metadata_url` (String) The SAML metadata URL.
 - `metadata_xml` (String, Sensitive) The SAML metadata XML.
+- `sso_groups_claim_field` (String) Name of the assertion claim carrying the user's groups. Defaults to `groups` server-side.
+- `sso_groups_enabled` (Boolean) Whether group claims from the identity provider are honored. Defaults to `false` server-side.
+- `sso_groups_required` (Boolean) Whether a user must carry at least one mapped group to sign in. Defaults to `false` server-side.
+- `sso_groups_role_sync_enabled` (Boolean) Whether workspace roles are synchronized from group claims on every sign-in. Defaults to `true` server-side.
 
 ### Read-Only
 

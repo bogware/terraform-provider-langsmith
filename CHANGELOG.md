@@ -8,6 +8,15 @@ BUG FIXES:
 
 ENHANCEMENTS:
 
+* Closed attribute gaps against the LangSmith API for seven resources. Every field below is accepted by the API but had no Terraform attribute:
+    * `langsmith_organization_settings`: `llm_auth_proxy_enabled`, `llm_auth_proxy_jwt_audience`, `llm_auth_proxy_allowed_urls`, `disabled_model_providers`, `restrict_browser_secrets`, `byoc_create_saas_workspace_enabled`, `engine_enabled`, `engine_lcu_spend_limit_monthly`.
+    * `langsmith_run_rule`: `is_tracing_disabled`, `spend_limit`, `tracer_session_issue_id`, and the four per-target retention extensions `extend_evaluator_trace_retention`, `extend_dataset_trace_retention`, `extend_annotation_queue_trace_retention`, `extend_webhook_trace_retention`. The retention flags require the rule to carry an evaluator; the API rejects them otherwise.
+    * `langsmith_playground_settings`: the OAuth block (`oauth_enabled`, `oauth_token_url`, `oauth_client_id`, `oauth_client_secret`, `oauth_token_endpoint_auth_method`, `oauth_params`, `oauth_headers`) and the six `available_in_*` flags. The availability flags are accepted only by the update endpoint, so creating a resource that sets them now issues a follow-up call.
+    * `langsmith_sso_settings`: `attribute_mapping` (previously decoded from the API but never exposed) plus `sso_groups_enabled`, `sso_groups_claim_field`, `sso_groups_required`, `sso_groups_role_sync_enabled`.
+    * `langsmith_api_key` and `langsmith_personal_access_token`: `read_only`, so read-only credentials can be issued from Terraform. Also `default_workspace_id` on `langsmith_api_key`, and `role_id` / `workspaces` on `langsmith_personal_access_token`. The API does not return `read_only`, so it cannot be refreshed and changing it forces a new key.
+    * `langsmith_annotation_queue`: `reviewer_access_mode` and `session_ids`.
+* Added acceptance tests for `langsmith_run_rule` and `langsmith_playground_settings`, neither of which had a test file.
+
 * The platform API family now uses its canonical documented path (`/api/v1/platform/...`) on every deployment, instead of the bare `/v1/platform/...` form that was rewritten only when `self_hosted` was set. LangSmith Cloud serves both forms identically — verified against every platform endpoint this provider calls — so Cloud behavior is unchanged, and self-hosted no longer depends on the rewrite for this family. The bare form is still accepted and rewritten when `self_hosted = true`.
 
 FEATURES:

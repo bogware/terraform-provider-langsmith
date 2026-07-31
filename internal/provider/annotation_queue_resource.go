@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -54,6 +55,8 @@ type AnnotationQueueResourceModel struct {
 	RubricInstructions  types.String `tfsdk:"rubric_instructions"`
 	RubricItems         types.String `tfsdk:"rubric_items"`
 	Metadata            types.String `tfsdk:"metadata"`
+	ReviewerAccessMode  types.String `tfsdk:"reviewer_access_mode"`
+	SessionIDs          types.List   `tfsdk:"session_ids"`
 	SourceRuleID        types.String `tfsdk:"source_rule_id"`
 	RunRuleID           types.String `tfsdk:"run_rule_id"`
 	QueueType           types.String `tfsdk:"queue_type"`
@@ -73,6 +76,10 @@ type annotationQueueAPIRequest struct {
 	RubricInstructions  *string         `json:"rubric_instructions,omitempty"`
 	RubricItems         json.RawMessage `json:"rubric_items,omitempty"`
 	Metadata            json.RawMessage `json:"metadata,omitempty"`
+	ReviewerAccessMode  *string         `json:"reviewer_access_mode,omitempty"`
+	// SessionIDs is accepted only on create; the update endpoint has no such
+	// field, so it is populated in Create alone.
+	SessionIDs []string `json:"session_ids,omitempty"`
 }
 
 // annotationQueueAPIResponse is the API response for an annotation queue.
@@ -87,6 +94,7 @@ type annotationQueueAPIResponse struct {
 	RubricInstructions  *string         `json:"rubric_instructions"`
 	RubricItems         json.RawMessage `json:"rubric_items"`
 	Metadata            json.RawMessage `json:"metadata"`
+	ReviewerAccessMode  string          `json:"reviewer_access_mode"`
 	SourceRuleID        *string         `json:"source_rule_id"`
 	RunRuleID           *string         `json:"run_rule_id"`
 	QueueType           string          `json:"queue_type"`
@@ -152,6 +160,18 @@ func (r *AnnotationQueueResource) Schema(ctx context.Context, req resource.Schem
 			"metadata": schema.StringAttribute{
 				MarkdownDescription: "JSON-encoded metadata object.",
 				Optional:            true,
+			},
+			"reviewer_access_mode": schema.StringAttribute{
+				MarkdownDescription: "Who may review items in this queue. Defaults to `any` server-side when omitted.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"session_ids": schema.ListAttribute{
+				MarkdownDescription: "UUIDs of the tracing projects to attach to the queue. Accepted only when the queue is created — the update endpoint has no equivalent field, so changing this forces a new queue. The API does not return it, so it cannot be refreshed from the server.",
+				Optional:            true,
+				ElementType:         types.StringType,
+				PlanModifiers:       []planmodifier.List{listplanmodifier.RequiresReplace()},
 			},
 			"source_rule_id": schema.StringAttribute{
 				MarkdownDescription: "The ID of the source rule that created this queue.",
@@ -246,6 +266,18 @@ func (r *AnnotationQueueResource) Create(ctx context.Context, req resource.Creat
 	if !data.RubricItems.IsNull() && !data.RubricItems.IsUnknown() {
 		body.RubricItems = json.RawMessage(data.RubricItems.ValueString())
 	}
+	if !data.ReviewerAccessMode.IsNull() && !data.ReviewerAccessMode.IsUnknown() {
+		v := data.ReviewerAccessMode.ValueString()
+		body.ReviewerAccessMode = &v
+	}
+	if !data.SessionIDs.IsNull() && !data.SessionIDs.IsUnknown() {
+		var ids []string
+		resp.Diagnostics.Append(data.SessionIDs.ElementsAs(ctx, &ids, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		body.SessionIDs = ids
+	}
 	if !data.Metadata.IsNull() && !data.Metadata.IsUnknown() {
 		body.Metadata = json.RawMessage(data.Metadata.ValueString())
 	}
@@ -337,6 +369,10 @@ func (r *AnnotationQueueResource) Update(ctx context.Context, req resource.Updat
 	if !data.RubricItems.IsNull() && !data.RubricItems.IsUnknown() {
 		body.RubricItems = json.RawMessage(data.RubricItems.ValueString())
 	}
+	if !data.ReviewerAccessMode.IsNull() && !data.ReviewerAccessMode.IsUnknown() {
+		v := data.ReviewerAccessMode.ValueString()
+		body.ReviewerAccessMode = &v
+	}
 	if !data.Metadata.IsNull() && !data.Metadata.IsUnknown() {
 		body.Metadata = json.RawMessage(data.Metadata.ValueString())
 	}
@@ -390,6 +426,7 @@ func (r *AnnotationQueueResource) ImportState(ctx context.Context, req resource.
 func mapAnnotationQueueResponseToState(data *AnnotationQueueResourceModel, result *annotationQueueAPIResponse, c *client.Client, diags *diag.Diagnostics) {
 	data.ID = types.StringValue(result.ID)
 	data.Name = types.StringValue(result.Name)
+	data.ReviewerAccessMode = types.StringValue(result.ReviewerAccessMode)
 
 	if result.Description != nil {
 		data.Description = types.StringValue(*result.Description)

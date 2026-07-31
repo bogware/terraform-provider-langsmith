@@ -28,8 +28,21 @@ resource "langsmith_playground_settings" "example" {
 
 ### Optional
 
+- `available_in_agent_builder` (Boolean) Whether these settings are offered in Agent Builder.
+- `available_in_evaluators` (Boolean) Whether these settings are offered when configuring evaluators.
+- `available_in_insights_heavy` (Boolean) Whether these settings are offered for heavyweight insights jobs.
+- `available_in_insights_light` (Boolean) Whether these settings are offered for lightweight insights jobs.
+- `available_in_playground` (Boolean) Whether these settings are offered in the playground. Set only by the update endpoint, so creating a resource with this attribute issues a follow-up API call.
+- `available_in_polly` (Boolean) Whether these settings are offered to Polly.
 - `description` (String) A description of the playground settings.
 - `name` (String) The name of the playground settings.
+- `oauth_client_id` (String) OAuth client ID.
+- `oauth_client_secret` (String, Sensitive) OAuth client secret. The API returns this value, so it is stored in state — treat the state file accordingly.
+- `oauth_enabled` (Boolean) Whether the provider behind these settings authenticates with OAuth.
+- `oauth_headers` (String, Sensitive) JSON-encoded object of extra headers sent to the token endpoint. May carry credentials, so it is marked sensitive.
+- `oauth_params` (String) JSON-encoded object of extra parameters sent to the token endpoint.
+- `oauth_token_endpoint_auth_method` (String) How the client authenticates to the token endpoint: `client_secret_basic` or `client_secret_post`.
+- `oauth_token_url` (String) OAuth token endpoint used to mint access tokens.
 - `options` (String) JSON-encoded options object.
 - `settings_type` (String) The settings type. Valid values: `complex`, `simple`. Defaults to `complex`. Cannot be changed after creation.
 - `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this resource.

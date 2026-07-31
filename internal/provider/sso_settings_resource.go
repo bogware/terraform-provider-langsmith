@@ -45,6 +45,11 @@ type SSOSettingsResourceModel struct {
 	MetadataXML            types.String `tfsdk:"metadata_xml"`
 	ProviderID             types.String `tfsdk:"provider_id"`
 	OrganizationID         types.String `tfsdk:"organization_id"`
+	AttributeMapping       types.String `tfsdk:"attribute_mapping"`
+	SSOGroupsEnabled       types.Bool   `tfsdk:"sso_groups_enabled"`
+	SSOGroupsClaimField    types.String `tfsdk:"sso_groups_claim_field"`
+	SSOGroupsRequired      types.Bool   `tfsdk:"sso_groups_required"`
+	SSOGroupsRoleSync      types.Bool   `tfsdk:"sso_groups_role_sync_enabled"`
 }
 
 // ssoSettingsCreateRequest is the order to set up the SSO checkpoint on the
@@ -55,6 +60,10 @@ type ssoSettingsCreateRequest struct {
 	MetadataURL            *string         `json:"metadata_url,omitempty"`
 	MetadataXML            *string         `json:"metadata_xml,omitempty"`
 	AttributeMapping       json.RawMessage `json:"attribute_mapping,omitempty"`
+	SSOGroupsEnabled       *bool           `json:"sso_groups_enabled,omitempty"`
+	SSOGroupsClaimField    *string         `json:"sso_groups_claim_field,omitempty"`
+	SSOGroupsRequired      *bool           `json:"sso_groups_required,omitempty"`
+	SSOGroupsRoleSync      *bool           `json:"sso_groups_role_sync_enabled,omitempty"`
 }
 
 // ssoSettingsUpdateRequest patches the SSO checkpoint -- adjusting the rules
@@ -65,6 +74,10 @@ type ssoSettingsUpdateRequest struct {
 	MetadataURL            *string         `json:"metadata_url,omitempty"`
 	MetadataXML            *string         `json:"metadata_xml,omitempty"`
 	AttributeMapping       json.RawMessage `json:"attribute_mapping,omitempty"`
+	SSOGroupsEnabled       *bool           `json:"sso_groups_enabled,omitempty"`
+	SSOGroupsClaimField    *string         `json:"sso_groups_claim_field,omitempty"`
+	SSOGroupsRequired      *bool           `json:"sso_groups_required,omitempty"`
+	SSOGroupsRoleSync      *bool           `json:"sso_groups_role_sync_enabled,omitempty"`
 }
 
 // ssoSettingsAPIResponse is the full dispatch the API returns about an SSO
@@ -77,6 +90,11 @@ type ssoSettingsAPIResponse struct {
 	DefaultWorkspaceIDs    json.RawMessage `json:"default_workspace_ids"`
 	MetadataURL            string          `json:"metadata_url"`
 	MetadataXML            string          `json:"metadata_xml"`
+	AttributeMapping       json.RawMessage `json:"attribute_mapping"`
+	SSOGroupsEnabled       bool            `json:"sso_groups_enabled"`
+	SSOGroupsClaimField    string          `json:"sso_groups_claim_field"`
+	SSOGroupsRequired      bool            `json:"sso_groups_required"`
+	SSOGroupsRoleSync      bool            `json:"sso_groups_role_sync_enabled"`
 }
 
 // ssoSettingsListAPIResponse is the full manifest -- every SSO configuration
@@ -124,6 +142,31 @@ func (r *SSOSettingsResource) Schema(ctx context.Context, req resource.SchemaReq
 				MarkdownDescription: "The organization ID that owns these SSO settings.",
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"attribute_mapping": schema.StringAttribute{
+				MarkdownDescription: "JSON-encoded object mapping SAML/OIDC assertion attributes onto LangSmith user fields.",
+				Optional:            true,
+				Computed:            true,
+			},
+			"sso_groups_enabled": schema.BoolAttribute{
+				MarkdownDescription: "Whether group claims from the identity provider are honored. Defaults to `false` server-side.",
+				Optional:            true,
+				Computed:            true,
+			},
+			"sso_groups_claim_field": schema.StringAttribute{
+				MarkdownDescription: "Name of the assertion claim carrying the user's groups. Defaults to `groups` server-side.",
+				Optional:            true,
+				Computed:            true,
+			},
+			"sso_groups_required": schema.BoolAttribute{
+				MarkdownDescription: "Whether a user must carry at least one mapped group to sign in. Defaults to `false` server-side.",
+				Optional:            true,
+				Computed:            true,
+			},
+			"sso_groups_role_sync_enabled": schema.BoolAttribute{
+				MarkdownDescription: "Whether workspace roles are synchronized from group claims on every sign-in. Defaults to `true` server-side.",
+				Optional:            true,
+				Computed:            true,
 			},
 		},
 	}
@@ -173,6 +216,26 @@ func (r *SSOSettingsResource) Create(ctx context.Context, req resource.CreateReq
 	if !data.MetadataXML.IsNull() && !data.MetadataXML.IsUnknown() {
 		v := data.MetadataXML.ValueString()
 		body.MetadataXML = &v
+	}
+
+	if !data.AttributeMapping.IsNull() && !data.AttributeMapping.IsUnknown() {
+		body.AttributeMapping = json.RawMessage(data.AttributeMapping.ValueString())
+	}
+	if !data.SSOGroupsEnabled.IsNull() && !data.SSOGroupsEnabled.IsUnknown() {
+		v := data.SSOGroupsEnabled.ValueBool()
+		body.SSOGroupsEnabled = &v
+	}
+	if !data.SSOGroupsClaimField.IsNull() && !data.SSOGroupsClaimField.IsUnknown() {
+		v := data.SSOGroupsClaimField.ValueString()
+		body.SSOGroupsClaimField = &v
+	}
+	if !data.SSOGroupsRequired.IsNull() && !data.SSOGroupsRequired.IsUnknown() {
+		v := data.SSOGroupsRequired.ValueBool()
+		body.SSOGroupsRequired = &v
+	}
+	if !data.SSOGroupsRoleSync.IsNull() && !data.SSOGroupsRoleSync.IsUnknown() {
+		v := data.SSOGroupsRoleSync.ValueBool()
+		body.SSOGroupsRoleSync = &v
 	}
 
 	var result ssoSettingsAPIResponse
@@ -251,6 +314,26 @@ func (r *SSOSettingsResource) Update(ctx context.Context, req resource.UpdateReq
 		body.MetadataXML = &v
 	}
 
+	if !data.AttributeMapping.IsNull() && !data.AttributeMapping.IsUnknown() {
+		body.AttributeMapping = json.RawMessage(data.AttributeMapping.ValueString())
+	}
+	if !data.SSOGroupsEnabled.IsNull() && !data.SSOGroupsEnabled.IsUnknown() {
+		v := data.SSOGroupsEnabled.ValueBool()
+		body.SSOGroupsEnabled = &v
+	}
+	if !data.SSOGroupsClaimField.IsNull() && !data.SSOGroupsClaimField.IsUnknown() {
+		v := data.SSOGroupsClaimField.ValueString()
+		body.SSOGroupsClaimField = &v
+	}
+	if !data.SSOGroupsRequired.IsNull() && !data.SSOGroupsRequired.IsUnknown() {
+		v := data.SSOGroupsRequired.ValueBool()
+		body.SSOGroupsRequired = &v
+	}
+	if !data.SSOGroupsRoleSync.IsNull() && !data.SSOGroupsRoleSync.IsUnknown() {
+		v := data.SSOGroupsRoleSync.ValueBool()
+		body.SSOGroupsRoleSync = &v
+	}
+
 	var result ssoSettingsAPIResponse
 	err := r.client.Patch(ctx, "/api/v1/orgs/current/sso-settings/"+data.ID.ValueString(), body, &result)
 	if err != nil {
@@ -299,6 +382,15 @@ func mapSSOSettingsResponseToState(data *SSOSettingsResourceModel, result *ssoSe
 	}
 
 	data.DefaultWorkspaceIDs = jsonStringValue(result.DefaultWorkspaceIDs)
+	data.AttributeMapping = jsonStringValue(result.AttributeMapping)
+	data.SSOGroupsEnabled = types.BoolValue(result.SSOGroupsEnabled)
+	data.SSOGroupsRequired = types.BoolValue(result.SSOGroupsRequired)
+	data.SSOGroupsRoleSync = types.BoolValue(result.SSOGroupsRoleSync)
+	if result.SSOGroupsClaimField != "" {
+		data.SSOGroupsClaimField = types.StringValue(result.SSOGroupsClaimField)
+	} else {
+		data.SSOGroupsClaimField = types.StringNull()
+	}
 
 	if result.MetadataURL != "" {
 		data.MetadataURL = types.StringValue(result.MetadataURL)
