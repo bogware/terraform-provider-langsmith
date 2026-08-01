@@ -408,6 +408,12 @@ func (p *LangSmithProvider) DataSources(ctx context.Context) []func() datasource
 		NewRepoTagsDataSource,
 		NewSandboxRegistriesDataSource,
 		NewWorkspaceTagsDataSource,
+
+		// API parity (1.2)
+		NewDatasetVersionsDataSource,
+		NewSharedTokensDataSource,
+		NewSessionAgentVersionsDataSource,
+		NewMCPVendorDetailsDataSource,
 	}
 }
 

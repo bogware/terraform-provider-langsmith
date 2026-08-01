@@ -25,6 +25,13 @@ ENHANCEMENTS:
 
 FEATURES:
 
+* New data sources for API surface the provider did not reach:
+    * `langsmith_dataset_versions` — the version history of a dataset (`as_of` plus any tags pointing at it), so a version can be discovered before pinning a tag or an experiment to it.
+    * `langsmith_shared_tokens` — everything in the workspace currently published through a public share link, including shares created outside Terraform. A share token is an unauthenticated capability, so this exists to audit what is exposed.
+    * `langsmith_session_agent_versions` — the agent versions (by commit) observed sending traces to a project.
+    * `langsmith_mcp_vendor_details` — a vendor's linked account, MCP servers and published tools, each fetched only when its `include_*` flag is set.
+* `langsmith_tool` (data source) can now look a tool up by `id` as well as by `handle`, using the API's `/tools/id/{id}` form. Exactly one of the two must be set.
+
 * Added the provider-level `path_overrides` attribute (and the `LANGSMITH_PATH_OVERRIDES` environment variable, a JSON object): a map of API path prefix → replacement, applied after the built-in routing rules, with the longest matching prefix winning. It is an escape hatch for deployments whose routing differs from what the provider assumes, so a routing mismatch can be corrected in configuration instead of waiting for a provider release.
 
 ## 1.1.0 (July 2026)
