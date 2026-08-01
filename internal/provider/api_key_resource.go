@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
@@ -49,6 +50,8 @@ type apiKeyResourceModel struct {
 	Workspaces           types.List   `tfsdk:"workspaces"`
 	RoleID               types.String `tfsdk:"role_id"`
 	OrgRoleID            types.String `tfsdk:"org_role_id"`
+	ReadOnly             types.Bool   `tfsdk:"read_only"`
+	DefaultWorkspaceID   types.String `tfsdk:"default_workspace_id"`
 	ShortKey             types.String `tfsdk:"short_key"`
 	Key                  types.String `tfsdk:"key"`
 	CreatedAt            types.String `tfsdk:"created_at"`
@@ -67,6 +70,11 @@ type apiKeyCreateRequest struct {
 	Workspaces  []string `json:"workspaces,omitempty"`
 	RoleID      *string  `json:"role_id,omitempty"`
 	OrgRoleID   *string  `json:"org_role_id,omitempty"`
+	// ReadOnly is always sent: it is the difference between a key that can read
+	// and one that can write, so it must never be left to a server-side default
+	// that could change.
+	ReadOnly           bool    `json:"read_only"`
+	DefaultWorkspaceID *string `json:"default_workspace_id,omitempty"`
 }
 
 // apiKeyCreateResponse is the one-time create response that includes the full
@@ -153,6 +161,25 @@ func (r *APIKeyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 			},
 			"org_role_id": schema.StringAttribute{
 				MarkdownDescription: "UUID of the organization role for org-scoped keys. If omitted, defaults to ORG_USER server-side.",
+				Optional:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"read_only": schema.BoolAttribute{
+				// Deliberately Optional-only rather than Optional+Computed with a
+				// default: a default would plan `false` against the null already in
+				// the state of every key created before this attribute existed,
+				// and RequiresReplace would then destroy and reissue those keys on
+				// upgrade. Null and false mean the same thing to the API.
+				MarkdownDescription: "Whether the key is read-only. Defaults to `false` server-side when omitted. The API does not return this value, so Terraform cannot refresh it and leaves it null unless you set it explicitly; changing it forces a new key.",
+				Optional:            true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.RequiresReplace(),
+				},
+			},
+			"default_workspace_id": schema.StringAttribute{
+				MarkdownDescription: "UUID of the workspace this key defaults to when a request does not name one. The API returns only `default_workspace_name`, so this value cannot be refreshed from the server.",
 				Optional:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -260,6 +287,11 @@ func (r *APIKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 			return
 		}
 		body.Workspaces = ws
+	}
+	body.ReadOnly = data.ReadOnly.ValueBool()
+	if !data.DefaultWorkspaceID.IsNull() && !data.DefaultWorkspaceID.IsUnknown() {
+		v := data.DefaultWorkspaceID.ValueString()
+		body.DefaultWorkspaceID = &v
 	}
 
 	effClient := effectiveClient(r.client, data.WorkspaceID)

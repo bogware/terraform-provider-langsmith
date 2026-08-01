@@ -90,7 +90,7 @@ func (d *MCPVendorDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 	var api mcpVendorAPI
-	if err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/v1/platform/mcp-vendors/"+data.VendorSlug.ValueString(), nil, &api); err != nil {
+	if err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/platform/mcp-vendors/"+data.VendorSlug.ValueString(), nil, &api); err != nil {
 		resp.Diagnostics.AddError("Error reading MCP vendor", err.Error())
 		return
 	}

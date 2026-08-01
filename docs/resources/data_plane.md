@@ -3,12 +3,12 @@
 page_title: "langsmith_data_plane Resource - langsmith"
 subcategory: ""
 description: |-
-  Provisions a hybrid/self-hosted (BYOC) data plane for the current LangSmith organization. The API accepts the request and returns the data plane in status requested; provisioning continues asynchronously. Requires BYOC to be enabled on the org and org-admin permissions. The API offers no update or delete endpoint: every configurable attribute forces replacement, and terraform destroy only removes the resource from state — the data plane keeps running and must be deprovisioned through LangSmith support.
+  Provisions a hybrid/self-hosted (BYOC) data plane for the current LangSmith organization. The API accepts the request and returns the data plane in status requested; provisioning continues asynchronously. Requires BYOC to be enabled on the org and org-admin permissions. The API offers no update endpoint, so every configurable attribute forces replacement. terraform destroy calls the delete endpoint; on a deployment that does not expose it (HTTP 404 or 405) the resource is still removed from state and a warning is raised — the data plane keeps running and must then be deprovisioned through LangSmith support.
 ---
 
 # langsmith_data_plane (Resource)
 
-Provisions a hybrid/self-hosted (BYOC) data plane for the current LangSmith organization. The API accepts the request and returns the data plane in status `requested`; provisioning continues asynchronously. Requires BYOC to be enabled on the org and org-admin permissions. **The API offers no update or delete endpoint**: every configurable attribute forces replacement, and `terraform destroy` only removes the resource from state — the data plane keeps running and must be deprovisioned through LangSmith support.
+Provisions a hybrid/self-hosted (BYOC) data plane for the current LangSmith organization. The API accepts the request and returns the data plane in status `requested`; provisioning continues asynchronously. Requires BYOC to be enabled on the org and org-admin permissions. **The API offers no update endpoint**, so every configurable attribute forces replacement. `terraform destroy` calls the delete endpoint; on a deployment that does not expose it (HTTP 404 or 405) the resource is still removed from state and a warning is raised — the data plane keeps running and must then be deprovisioned through LangSmith support.
 
 ## Example Usage
 

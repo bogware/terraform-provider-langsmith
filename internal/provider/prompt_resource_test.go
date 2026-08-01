@@ -73,8 +73,11 @@ func TestAccPromptResource_partialCreateRecovery(t *testing.T) {
 			// endpoint with 400 "Manifest type ... is not supported", after the
 			// repo itself has already been created.
 			{
-				Config:      testAccPromptResourceConfigUnsupportedManifest(handle),
-				ExpectError: regexp.MustCompile("is not supported"),
+				Config: testAccPromptResourceConfigUnsupportedManifest(handle),
+				// \s+ rather than literal spaces: Terraform hard-wraps diagnostic
+				// text at the terminal width, so any space in the message can
+				// arrive as a newline depending on how long the request path is.
+				ExpectError: regexp.MustCompile(`is\s+not\s+supported`),
 			},
 			// Step 2: same resource address with a valid ChatPromptTemplate
 			// manifest. The tainted repo from step 1 is destroyed and

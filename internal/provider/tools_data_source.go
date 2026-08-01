@@ -161,7 +161,7 @@ func (d *ToolsDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		query.Set("offset", strconv.Itoa(offset))
 
 		var page toolsListResponse
-		if err := c.Get(ctx, "/v1/platform/tools", query, &page); err != nil {
+		if err := c.Get(ctx, "/api/v1/platform/tools", query, &page); err != nil {
 			resp.Diagnostics.AddError("Error listing tools", err.Error())
 			return
 		}

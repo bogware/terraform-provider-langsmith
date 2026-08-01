@@ -163,7 +163,7 @@ func (d *SandboxRegistriesDataSource) Read(ctx context.Context, req datasource.R
 		}
 
 		var page sandboxRegistryListResponse
-		if err := c.Get(ctx, "/v2/sandboxes/registries", query, &page); err != nil {
+		if err := c.Get(ctx, "/api/v2/sandboxes/registries", query, &page); err != nil {
 			resp.Diagnostics.AddError("Error listing sandbox registries", err.Error())
 			return
 		}

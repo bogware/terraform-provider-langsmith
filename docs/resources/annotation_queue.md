@@ -35,8 +35,10 @@ resource "langsmith_annotation_queue" "example" {
 - `metadata` (String) JSON-encoded metadata object.
 - `num_reviewers_per_item` (Number) The number of reviewers per item in the queue.
 - `reservation_minutes` (Number) The number of minutes a reservation is held.
+- `reviewer_access_mode` (String) Who may review items in this queue. Defaults to `any` server-side when omitted.
 - `rubric_instructions` (String) Rubric instructions for reviewers.
 - `rubric_items` (String) JSON-encoded array of rubric items for the annotation queue.
+- `session_ids` (List of String) UUIDs of the tracing projects to attach to the queue. Accepted only when the queue is created — the update endpoint has no equivalent field, so changing this forces a new queue. The API does not return it, so it cannot be refreshed from the server.
 - `workspace_id` (String) The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.
 
 ### Read-Only

@@ -110,7 +110,7 @@ func (r *MCPVendorSettingsResource) Configure(ctx context.Context, req resource.
 }
 
 func mcpVendorSettingsPath(vendorSlug string) string {
-	return "/v1/platform/mcp-vendors/" + vendorSlug + "/settings"
+	return "/api/v1/platform/mcp-vendors/" + vendorSlug + "/settings"
 }
 
 func (r *MCPVendorSettingsResource) buildRequest(data *MCPVendorSettingsResourceModel) mcpVendorSettingsRequest {

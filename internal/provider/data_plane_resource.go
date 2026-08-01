@@ -6,8 +6,11 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -72,7 +75,7 @@ func (r *DataPlaneResource) Metadata(ctx context.Context, req resource.MetadataR
 
 func (r *DataPlaneResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Provisions a hybrid/self-hosted (BYOC) data plane for the current LangSmith organization. The API accepts the request and returns the data plane in status `requested`; provisioning continues asynchronously. Requires BYOC to be enabled on the org and org-admin permissions. **The API offers no update or delete endpoint**: every configurable attribute forces replacement, and `terraform destroy` only removes the resource from state — the data plane keeps running and must be deprovisioned through LangSmith support.",
+		MarkdownDescription: "Provisions a hybrid/self-hosted (BYOC) data plane for the current LangSmith organization. The API accepts the request and returns the data plane in status `requested`; provisioning continues asynchronously. Requires BYOC to be enabled on the org and org-admin permissions. **The API offers no update endpoint**, so every configurable attribute forces replacement. `terraform destroy` calls the delete endpoint; on a deployment that does not expose it (HTTP 404 or 405) the resource is still removed from state and a warning is raised — the data plane keeps running and must then be deprovisioned through LangSmith support.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
@@ -205,12 +208,55 @@ func (r *DataPlaneResource) Update(ctx context.Context, req resource.UpdateReque
 }
 
 func (r *DataPlaneResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	// The LangSmith API exposes no delete endpoint for data planes; removing
-	// the resource from state is all Terraform can do.
-	resp.Diagnostics.AddWarning(
-		"Data plane not deprovisioned",
-		"The LangSmith API does not support deleting data planes; the data plane was removed from Terraform state but keeps running. Contact LangSmith support to deprovision it.",
-	)
+	var data DataPlaneResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(r.deleteDataPlane(ctx, data.ID.ValueString())...)
+}
+
+// deleteDataPlane calls the delete endpoint and maps the outcome to
+// diagnostics. A deployment without the endpoint must not fail the destroy —
+// the user would be stuck with a resource Terraform can never remove — so 404
+// and 405 degrade to a warning while any other error is surfaced.
+func (r *DataPlaneResource) deleteDataPlane(ctx context.Context, id string) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	err := r.client.Delete(ctx, "/orgs/current/data-planes/"+id)
+	switch {
+	case err == nil:
+		tflog.Trace(ctx, "deleted data plane", map[string]interface{}{"id": id})
+	case client.IsNotFound(err):
+		// Already gone, or this deployment predates the delete endpoint. Both are
+		// indistinguishable from here (a missing route and a missing object both
+		// answer 404), so fall back to the warning rather than failing a destroy
+		// the user cannot otherwise complete.
+		diags.AddWarning(
+			"Data plane may not have been deprovisioned",
+			"Deleting the data plane returned 404. It was removed from Terraform state, but if this deployment does not support deleting data planes it keeps running — check the LangSmith console and contact support to deprovision it.",
+		)
+	case isMethodNotAllowed(err):
+		diags.AddWarning(
+			"Data plane not deprovisioned",
+			"This LangSmith deployment does not support deleting data planes (HTTP 405). The data plane was removed from Terraform state but keeps running. Contact LangSmith support to deprovision it.",
+		)
+	default:
+		diags.AddError("Error deleting data plane", err.Error())
+	}
+	return diags
+}
+
+// isMethodNotAllowed reports whether err is a 405. A self-hosted frontend also
+// answers 405 when a request falls through to the SPA, so this doubles as the
+// "endpoint is not reachable here" case.
+func isMethodNotAllowed(err error) bool {
+	var apiErr *client.APIError
+	if errors.As(err, &apiErr) {
+		return apiErr.StatusCode == http.StatusMethodNotAllowed
+	}
+	return false
 }
 
 func (r *DataPlaneResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

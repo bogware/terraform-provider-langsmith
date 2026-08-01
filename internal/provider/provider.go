@@ -5,6 +5,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -28,10 +29,11 @@ type LangSmithProvider struct {
 
 // LangSmithProviderModel describes the provider configuration.
 type LangSmithProviderModel struct {
-	APIKey      types.String `tfsdk:"api_key"`
-	APIURL      types.String `tfsdk:"api_url"`
-	WorkspaceID types.String `tfsdk:"workspace_id"`
-	SelfHosted  types.Bool   `tfsdk:"self_hosted"`
+	APIKey        types.String `tfsdk:"api_key"`
+	APIURL        types.String `tfsdk:"api_url"`
+	WorkspaceID   types.String `tfsdk:"workspace_id"`
+	SelfHosted    types.Bool   `tfsdk:"self_hosted"`
+	PathOverrides types.Map    `tfsdk:"path_overrides"`
 }
 
 func (p *LangSmithProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -59,8 +61,16 @@ func (p *LangSmithProvider) Schema(ctx context.Context, req provider.SchemaReque
 			},
 			"self_hosted": schema.BoolAttribute{
 				MarkdownDescription: "Set to `true` when `api_url` points at a self-hosted LangSmith instance. Can also be set with the `LANGSMITH_SELF_HOSTED` environment variable. Defaults to `false` (LangSmith Cloud).\n\n" +
-					"Self-hosted deployments serve the API under a `/api` path prefix, whereas Cloud serves it at the root of the `api.` subdomain. When enabled, the provider rewrites the platform endpoints (`/v1/platform/...` -> `/api/v1/platform/...`) so resources such as `langsmith_evaluator`, `langsmith_tool`, and the other platform resources work against a self-hosted instance. Leave it unset for Cloud.",
+					"Self-hosted deployments serve the API under a `/api` path prefix, whereas Cloud serves it at the root of the `api.` subdomain. The provider already uses the `/api`-prefixed form for every endpoint that has one, so this flag only affects the few families Cloud serves at the root with no `/api` equivalent (workspace TTL settings, data planes). Leave it unset for Cloud.",
 				Optional: true,
+			},
+			"path_overrides": schema.MapAttribute{
+				MarkdownDescription: "Rewrite API request paths by prefix. This is an escape hatch for a deployment whose routing does not match what the provider assumes — you should not need it against LangSmith Cloud.\n\n" +
+					"Each key is a path prefix to match and each value replaces it; both must begin with `/`. The **longest** matching key wins, and the rewrite is applied last, after the built-in `self_hosted` rules, so it can override them:\n\n" +
+					"```hcl\npath_overrides = {\n  # send the platform family to the un-prefixed form instead\n  \"/api/v1/platform/\" = \"/v1/platform/\"\n}\n```\n\n" +
+					"Can also be set with the `LANGSMITH_PATH_OVERRIDES` environment variable as a JSON object (for example `{\"/api/v1/platform/\":\"/v1/platform/\"}`). A non-null attribute overrides the environment variable.",
+				ElementType: types.StringType,
+				Optional:    true,
 			},
 		},
 	}
@@ -98,6 +108,50 @@ func getWorkspaceId(data LangSmithProviderModel) string {
 		workspaceID = data.WorkspaceID.ValueString()
 	}
 	return workspaceID
+}
+
+// getPathOverrides resolves the prefix-rewrite map from the attribute, falling
+// back to LANGSMITH_PATH_OVERRIDES (a JSON object). Both keys and values must be
+// absolute paths: a rewrite that produced a relative path would silently corrupt
+// every URL built from it, so this is rejected rather than normalised.
+func getPathOverrides(ctx context.Context, data LangSmithProviderModel, resp *provider.ConfigureResponse) map[string]string {
+	overrides := map[string]string{}
+
+	if !data.PathOverrides.IsNull() {
+		resp.Diagnostics.Append(data.PathOverrides.ElementsAs(ctx, &overrides, false)...)
+		if resp.Diagnostics.HasError() {
+			return nil
+		}
+	} else if raw := strings.TrimSpace(os.Getenv("LANGSMITH_PATH_OVERRIDES")); raw != "" {
+		if err := json.Unmarshal([]byte(raw), &overrides); err != nil {
+			resp.Diagnostics.AddError(
+				"Invalid LANGSMITH_PATH_OVERRIDES",
+				fmt.Sprintf("LANGSMITH_PATH_OVERRIDES must be a JSON object mapping path prefixes to replacements, for example {\"/api/v1/platform/\":\"/v1/platform/\"}: %s", err),
+			)
+			return nil
+		}
+	}
+
+	for prefix, replacement := range overrides {
+		switch {
+		case prefix == "":
+			resp.Diagnostics.AddAttributeError(
+				path.Root("path_overrides"),
+				"Empty path override prefix",
+				"A path_overrides key must be a path prefix such as \"/api/v1/platform/\"; the empty string matches every request.",
+			)
+		case !strings.HasPrefix(prefix, "/"), !strings.HasPrefix(replacement, "/"):
+			resp.Diagnostics.AddAttributeError(
+				path.Root("path_overrides"),
+				"Invalid path override",
+				fmt.Sprintf("Both sides of a path_overrides entry must begin with \"/\"; got %q = %q.", prefix, replacement),
+			)
+		}
+	}
+	if len(overrides) == 0 {
+		return nil
+	}
+	return overrides
 }
 
 func getSelfHosted(data LangSmithProviderModel) bool {
@@ -150,6 +204,13 @@ func checkUnknownConfig(data LangSmithProviderModel, resp *provider.ConfigureRes
 			"The provider cannot be configured because `self_hosted` is not known at plan time. "+remedy,
 		)
 	}
+	if data.PathOverrides.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("path_overrides"),
+			"Unknown path_overrides value",
+			"The provider cannot be configured because `path_overrides` is not known at plan time. "+remedy,
+		)
+	}
 }
 
 func (p *LangSmithProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
@@ -170,6 +231,10 @@ func (p *LangSmithProvider) Configure(ctx context.Context, req provider.Configur
 	apiURL := getApiUrl(data)
 	workspaceId := getWorkspaceId(data)
 	selfHosted := getSelfHosted(data)
+	pathOverrides := getPathOverrides(ctx, data, resp)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	if apiURL == "" || apiKey == "" {
 		return
 	}
@@ -187,7 +252,7 @@ func (p *LangSmithProvider) Configure(ctx context.Context, req provider.Configur
 
 	userAgent := fmt.Sprintf("terraform-provider-langsmith/%s", p.version)
 
-	c := client.NewClient(apiURL, apiKey, workspaceId, userAgent, selfHosted)
+	c := client.NewClient(apiURL, apiKey, workspaceId, userAgent, selfHosted, pathOverrides)
 
 	// Validate the API key by making a lightweight request.
 	var info struct {
@@ -272,6 +337,11 @@ func (p *LangSmithProvider) Resources(ctx context.Context) []func() resource.Res
 
 		// Platform completeness (1.0)
 		NewSandboxRegistryResource,
+
+		// API parity (1.2)
+		NewOAuthClientResource,
+		NewOptimizationJobResource,
+		NewHubDirectoryResource,
 	}
 }
 
@@ -343,6 +413,15 @@ func (p *LangSmithProvider) DataSources(ctx context.Context) []func() datasource
 		NewRepoTagsDataSource,
 		NewSandboxRegistriesDataSource,
 		NewWorkspaceTagsDataSource,
+
+		// API parity (1.2)
+		NewDatasetVersionsDataSource,
+		NewSharedTokensDataSource,
+		NewSessionAgentVersionsDataSource,
+		NewMCPVendorDetailsDataSource,
+		NewOAuthAuthorizedAppsDataSource,
+		NewInfoHealthDataSource,
+		NewOptimizationJobLogsDataSource,
 	}
 }
 

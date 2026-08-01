@@ -62,6 +62,66 @@ func stripJSONKey(raw json.RawMessage, key string, saved types.String) types.Str
 	return types.StringValue(string(out))
 }
 
+// jsonPreserveConfigSubset keeps the saved value when the API response only
+// adds to it. LangSmith expands several JSON attributes on the way in — a code
+// evaluator submitted as {"code": "..."} comes back as
+// {"code": "...", "language": "python"} — and writing the expanded copy into
+// state leaves a diff against the configuration on every plan, forever.
+//
+// The saved value wins when every key it specifies is present and equal in the
+// response, recursively; anything the server added on top is ignored. A genuine
+// server-side change still shows up, because then some key the user specified
+// differs and the response is used instead.
+func jsonPreserveConfigSubset(raw json.RawMessage, saved types.String) types.String {
+	fresh := jsonEmptyArrayIsNull(raw)
+	if saved.IsNull() || saved.IsUnknown() || fresh.IsNull() {
+		return fresh
+	}
+	var savedVal, freshVal interface{}
+	if err := json.Unmarshal([]byte(saved.ValueString()), &savedVal); err != nil {
+		return fresh
+	}
+	if err := json.Unmarshal([]byte(fresh.ValueString()), &freshVal); err != nil {
+		return fresh
+	}
+	if jsonSubset(savedVal, freshVal) {
+		return types.StringValue(normalizeJSON(saved.ValueString()))
+	}
+	return fresh
+}
+
+// jsonSubset reports whether want is contained in got: objects may carry extra
+// keys, arrays must line up element for element, scalars must be equal.
+func jsonSubset(want, got interface{}) bool {
+	switch w := want.(type) {
+	case map[string]interface{}:
+		g, ok := got.(map[string]interface{})
+		if !ok {
+			return false
+		}
+		for k, wv := range w {
+			gv, present := g[k]
+			if !present || !jsonSubset(wv, gv) {
+				return false
+			}
+		}
+		return true
+	case []interface{}:
+		g, ok := got.([]interface{})
+		if !ok || len(g) != len(w) {
+			return false
+		}
+		for i := range w {
+			if !jsonSubset(w[i], g[i]) {
+				return false
+			}
+		}
+		return true
+	default:
+		return want == got
+	}
+}
+
 // jsonEmptyArrayIsNull returns types.StringNull() if the JSON is an empty
 // array "[]" or empty object "{}", otherwise normalizes and returns.
 func jsonEmptyArrayIsNull(raw json.RawMessage) types.String {

@@ -79,7 +79,7 @@ func (d *EvaluatorDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 	var api evaluatorAPI
-	if err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/v1/platform/evaluators/"+data.ID.ValueString(), nil, &api); err != nil {
+	if err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/platform/evaluators/"+data.ID.ValueString(), nil, &api); err != nil {
 		resp.Diagnostics.AddError("Error reading evaluator", err.Error())
 		return
 	}

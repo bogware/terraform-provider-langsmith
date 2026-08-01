@@ -10,6 +10,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -41,6 +43,9 @@ type PersonalAccessTokenResourceModel struct {
 	ExpiresAt          types.String `tfsdk:"expires_at"`
 	DefaultWorkspaceID types.String `tfsdk:"default_workspace_id"`
 	OrgRoleID          types.String `tfsdk:"org_role_id"`
+	ReadOnly           types.Bool   `tfsdk:"read_only"`
+	RoleID             types.String `tfsdk:"role_id"`
+	Workspaces         types.List   `tfsdk:"workspaces"`
 }
 
 type patCreateRequest struct {
@@ -48,6 +53,11 @@ type patCreateRequest struct {
 	ExpiresAt          *string `json:"expires_at,omitempty"`
 	DefaultWorkspaceID *string `json:"default_workspace_id,omitempty"`
 	OrgRoleID          *string `json:"org_role_id,omitempty"`
+	// ReadOnly is always sent: it decides whether the token can write, so it must
+	// not be left to a server-side default that could change.
+	ReadOnly   bool     `json:"read_only"`
+	RoleID     *string  `json:"role_id,omitempty"`
+	Workspaces []string `json:"workspaces,omitempty"`
 }
 
 type patCreateResponse struct {
@@ -112,6 +122,25 @@ func (r *PersonalAccessTokenResource) Schema(ctx context.Context, req resource.S
 				MarkdownDescription: "UUID of the org role to assign. Defaults server-side to `ORG_USER` when omitted.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
+			"read_only": schema.BoolAttribute{
+				// Optional-only on purpose -- see the note on langsmith_api_key's
+				// read_only: a default plus RequiresReplace would reissue every
+				// token that predates this attribute.
+				Optional:            true,
+				MarkdownDescription: "Whether the token is read-only. Defaults to `false` server-side when omitted. The API does not return this value, so Terraform cannot refresh it and leaves it null unless you set it explicitly; changing it forces a new token.",
+				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.RequiresReplace()},
+			},
+			"role_id": schema.StringAttribute{
+				Optional:            true,
+				MarkdownDescription: "UUID of the workspace role to assign to the token. If omitted, the server picks a default role.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
+			"workspaces": schema.ListAttribute{
+				Optional:            true,
+				ElementType:         types.StringType,
+				MarkdownDescription: "List of workspace UUIDs this token may access.",
+				PlanModifiers:       []planmodifier.List{listplanmodifier.RequiresReplace()},
+			},
 		},
 	}
 }
@@ -147,6 +176,19 @@ func (r *PersonalAccessTokenResource) Create(ctx context.Context, req resource.C
 		v := data.OrgRoleID.ValueString()
 		body.OrgRoleID = &v
 	}
+	if !data.RoleID.IsNull() && !data.RoleID.IsUnknown() {
+		v := data.RoleID.ValueString()
+		body.RoleID = &v
+	}
+	if !data.Workspaces.IsNull() && !data.Workspaces.IsUnknown() {
+		var ws []string
+		resp.Diagnostics.Append(data.Workspaces.ElementsAs(ctx, &ws, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		body.Workspaces = ws
+	}
+	body.ReadOnly = data.ReadOnly.ValueBool()
 
 	var result patCreateResponse
 	if err := r.client.Post(ctx, "/api/v1/orgs/current/personal-access-tokens", body, &result); err != nil {

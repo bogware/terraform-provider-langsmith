@@ -293,7 +293,7 @@ func (r *EvaluatorResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	var created evaluatorCreateResponse
-	if err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/v1/platform/evaluators", body, &created); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/platform/evaluators", body, &created); err != nil {
 		resp.Diagnostics.AddError("Error creating evaluator", err.Error())
 		return
 	}
@@ -314,7 +314,7 @@ func (r *EvaluatorResource) Read(ctx context.Context, req resource.ReadRequest, 
 	}
 
 	var api evaluatorAPI
-	if err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/v1/platform/evaluators/"+data.ID.ValueString(), nil, &api); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/platform/evaluators/"+data.ID.ValueString(), nil, &api); err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
 			return
@@ -388,7 +388,7 @@ func (r *EvaluatorResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 
 	var updated evaluatorCreateResponse
-	if err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/v1/platform/evaluators/"+data.ID.ValueString(), body, &updated); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/platform/evaluators/"+data.ID.ValueString(), body, &updated); err != nil {
 		resp.Diagnostics.AddError("Error updating evaluator", err.Error())
 		return
 	}
@@ -407,7 +407,7 @@ func (r *EvaluatorResource) Delete(ctx context.Context, req resource.DeleteReque
 		return
 	}
 
-	if err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/v1/platform/evaluators/"+data.ID.ValueString()); err != nil && !client.IsNotFound(err) {
+	if err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/api/v1/platform/evaluators/"+data.ID.ValueString()); err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting evaluator", err.Error())
 		return
 	}

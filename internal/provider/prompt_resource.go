@@ -306,7 +306,7 @@ func (r *PromptResource) Create(ctx context.Context, req resource.CreateRequest,
 			Manifest: json.RawMessage(data.Manifest.ValueString()),
 		}
 		var commitResult promptCommitResponse
-		err := c.Post(ctx, fmt.Sprintf("/commits/-/%s", data.RepoHandle.ValueString()), commitBody, &commitResult)
+		err := c.Post(ctx, fmt.Sprintf("/api/v1/commits/-/%s", data.RepoHandle.ValueString()), commitBody, &commitResult)
 		if err != nil {
 			resp.Diagnostics.AddError("Error creating prompt commit", err.Error())
 			// Persist partial state so the created repo is tracked (and tainted)
@@ -399,7 +399,7 @@ func (r *PromptResource) Read(ctx context.Context, req resource.ReadRequest, res
 	// Ride over to the commits corral and fetch the latest manifest.
 	if result.Repo.NumCommits > 0 {
 		var latestCommit promptLatestCommitResponse
-		commitErr := c.Get(ctx, fmt.Sprintf("/commits/-/%s/latest", repoHandle), nil, &latestCommit)
+		commitErr := c.Get(ctx, fmt.Sprintf("/api/v1/commits/-/%s/latest", repoHandle), nil, &latestCommit)
 		if commitErr != nil {
 			resp.Diagnostics.AddWarning("Error reading prompt manifest", commitErr.Error())
 		} else {
@@ -484,7 +484,7 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 			Manifest: json.RawMessage(data.Manifest.ValueString()),
 		}
 		var commitResult promptCommitResponse
-		commitErr := c.Post(ctx, fmt.Sprintf("/commits/-/%s", repoHandle), commitBody, &commitResult)
+		commitErr := c.Post(ctx, fmt.Sprintf("/api/v1/commits/-/%s", repoHandle), commitBody, &commitResult)
 		if commitErr != nil {
 			resp.Diagnostics.AddError("Error creating prompt commit", commitErr.Error())
 			return
@@ -517,7 +517,7 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 	if data.CommitHash.IsNull() || data.CommitHash.IsUnknown() {
 		if result.Repo.NumCommits > 0 {
 			var latestCommit promptLatestCommitResponse
-			commitErr := c.Get(ctx, fmt.Sprintf("/commits/-/%s/latest", repoHandle), nil, &latestCommit)
+			commitErr := c.Get(ctx, fmt.Sprintf("/api/v1/commits/-/%s/latest", repoHandle), nil, &latestCommit)
 			if commitErr == nil {
 				data.CommitHash = types.StringValue(latestCommit.CommitHash)
 				data.Manifest = jsonStringValue(latestCommit.Manifest)

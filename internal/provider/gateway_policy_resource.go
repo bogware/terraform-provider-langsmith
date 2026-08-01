@@ -263,7 +263,7 @@ func (r *GatewayPolicyResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 	var api gatewayPolicyAPI
-	if err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/v1/platform/gateway-policies", body, &api); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Post(ctx, "/api/v1/platform/gateway-policies", body, &api); err != nil {
 		resp.Diagnostics.AddError("Error creating gateway policy", err.Error())
 		return
 	}
@@ -283,7 +283,7 @@ func (r *GatewayPolicyResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 	var api gatewayPolicyAPI
-	if err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/v1/platform/gateway-policies/"+data.ID.ValueString(), nil, &api); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/platform/gateway-policies/"+data.ID.ValueString(), nil, &api); err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
 			return
@@ -340,7 +340,7 @@ func (r *GatewayPolicyResource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	var api gatewayPolicyAPI
-	if err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/v1/platform/gateway-policies/"+data.ID.ValueString(), body, &api); err != nil {
+	if err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/platform/gateway-policies/"+data.ID.ValueString(), body, &api); err != nil {
 		resp.Diagnostics.AddError("Error updating gateway policy", err.Error())
 		return
 	}
@@ -357,7 +357,7 @@ func (r *GatewayPolicyResource) Delete(ctx context.Context, req resource.DeleteR
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/v1/platform/gateway-policies/"+data.ID.ValueString()); err != nil && !client.IsNotFound(err) {
+	if err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/api/v1/platform/gateway-policies/"+data.ID.ValueString()); err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting gateway policy", err.Error())
 		return
 	}

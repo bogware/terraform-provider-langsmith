@@ -39,23 +39,31 @@ type OrganizationSettingsResource struct {
 
 // OrganizationSettingsResourceModel maps the Terraform schema for organization settings.
 type OrganizationSettingsResourceModel struct {
-	ID                           types.String `tfsdk:"id"`
-	DisplayName                  types.String `tfsdk:"display_name"`
-	PublicSharingDisabled        types.Bool   `tfsdk:"public_sharing_disabled"`
-	PatCreationDisabled          types.Bool   `tfsdk:"pat_creation_disabled"`
-	JitProvisioningEnabled       types.Bool   `tfsdk:"jit_provisioning_enabled"`
-	InvitesEnabled               types.Bool   `tfsdk:"invites_enabled"`
-	WorkspaceAdminCanInviteToOrg types.Bool   `tfsdk:"workspace_admin_can_invite_to_org"`
-	MaxAPIKeyExpiryDays          types.Int64  `tfsdk:"max_api_key_expiry_days"`
-	MaxPatExpiryDays             types.Int64  `tfsdk:"max_pat_expiry_days"`
-	MaxServiceKeyExpiryDays      types.Int64  `tfsdk:"max_service_key_expiry_days"`
-	SecurityContact              types.String `tfsdk:"security_contact"`
-	ScimGroupNameSeparator       types.String `tfsdk:"scim_group_name_separator"`
-	IPAllowlist                  types.List   `tfsdk:"ip_allowlist"`
-	SsoOnly                      types.Bool   `tfsdk:"sso_only"`
-	IPAllowlistEnabled           types.Bool   `tfsdk:"ip_allowlist_enabled"`
-	SsoLoginSlug                 types.String `tfsdk:"sso_login_slug"`
-	IsPersonal                   types.Bool   `tfsdk:"is_personal"`
+	ID                           types.String  `tfsdk:"id"`
+	DisplayName                  types.String  `tfsdk:"display_name"`
+	PublicSharingDisabled        types.Bool    `tfsdk:"public_sharing_disabled"`
+	PatCreationDisabled          types.Bool    `tfsdk:"pat_creation_disabled"`
+	JitProvisioningEnabled       types.Bool    `tfsdk:"jit_provisioning_enabled"`
+	InvitesEnabled               types.Bool    `tfsdk:"invites_enabled"`
+	WorkspaceAdminCanInviteToOrg types.Bool    `tfsdk:"workspace_admin_can_invite_to_org"`
+	MaxAPIKeyExpiryDays          types.Int64   `tfsdk:"max_api_key_expiry_days"`
+	MaxPatExpiryDays             types.Int64   `tfsdk:"max_pat_expiry_days"`
+	MaxServiceKeyExpiryDays      types.Int64   `tfsdk:"max_service_key_expiry_days"`
+	SecurityContact              types.String  `tfsdk:"security_contact"`
+	ScimGroupNameSeparator       types.String  `tfsdk:"scim_group_name_separator"`
+	IPAllowlist                  types.List    `tfsdk:"ip_allowlist"`
+	DisabledModelProviders       types.List    `tfsdk:"disabled_model_providers"`
+	LLMAuthProxyEnabled          types.Bool    `tfsdk:"llm_auth_proxy_enabled"`
+	LLMAuthProxyJWTAudience      types.String  `tfsdk:"llm_auth_proxy_jwt_audience"`
+	LLMAuthProxyAllowedURLs      types.List    `tfsdk:"llm_auth_proxy_allowed_urls"`
+	RestrictBrowserSecrets       types.Bool    `tfsdk:"restrict_browser_secrets"`
+	BYOCCreateSaaSWorkspace      types.Bool    `tfsdk:"byoc_create_saas_workspace_enabled"`
+	EngineEnabled                types.Bool    `tfsdk:"engine_enabled"`
+	EngineLCUSpendLimitMonthly   types.Float64 `tfsdk:"engine_lcu_spend_limit_monthly"`
+	SsoOnly                      types.Bool    `tfsdk:"sso_only"`
+	IPAllowlistEnabled           types.Bool    `tfsdk:"ip_allowlist_enabled"`
+	SsoLoginSlug                 types.String  `tfsdk:"sso_login_slug"`
+	IsPersonal                   types.Bool    `tfsdk:"is_personal"`
 }
 
 // organizationUpdateRequest is sent to PATCH /api/v1/orgs/current/info.
@@ -73,6 +81,14 @@ type organizationUpdateRequest struct {
 	SecurityContact              *string   `json:"security_contact,omitempty"`
 	ScimGroupNameSeparator       *string   `json:"scim_group_name_separator,omitempty"`
 	IPAllowlist                  *[]string `json:"ip_allowlist,omitempty"`
+	DisabledModelProviders       *[]string `json:"disabled_model_providers,omitempty"`
+	LLMAuthProxyEnabled          *bool     `json:"llm_auth_proxy_enabled,omitempty"`
+	LLMAuthProxyJWTAudience      *string   `json:"llm_auth_proxy_jwt_audience,omitempty"`
+	LLMAuthProxyAllowedURLs      *[]string `json:"llm_auth_proxy_allowed_urls,omitempty"`
+	RestrictBrowserSecrets       *bool     `json:"restrict_browser_secrets,omitempty"`
+	BYOCCreateSaaSWorkspace      *bool     `json:"byoc_create_saas_workspace_enabled,omitempty"`
+	EngineEnabled                *bool     `json:"engine_enabled,omitempty"`
+	EngineLCUSpendLimitMonthly   *float64  `json:"engine_lcu_spend_limit_monthly,omitempty"`
 }
 
 // allowedLoginMethodsUpdateRequest is sent to PATCH /api/v1/orgs/current/login-methods.
@@ -99,6 +115,14 @@ type organizationInfoAPIResponse struct {
 	SecurityContact              *string  `json:"security_contact"`
 	ScimGroupNameSeparator       string   `json:"scim_group_name_separator"`
 	IPAllowlist                  []string `json:"ip_allowlist"`
+	DisabledModelProviders       []string `json:"disabled_model_providers"`
+	LLMAuthProxyEnabled          bool     `json:"llm_auth_proxy_enabled"`
+	LLMAuthProxyJWTAudience      *string  `json:"llm_auth_proxy_jwt_audience"`
+	LLMAuthProxyAllowedURLs      []string `json:"llm_auth_proxy_allowed_urls"`
+	RestrictBrowserSecrets       bool     `json:"restrict_browser_secrets"`
+	BYOCCreateSaaSWorkspace      bool     `json:"byoc_create_saas_workspace_enabled"`
+	EngineEnabled                bool     `json:"engine_enabled"`
+	EngineLCUSpendLimitMonthly   *float64 `json:"engine_lcu_spend_limit_monthly"`
 	IPAllowlistEnabled           bool     `json:"ip_allowlist_enabled"`
 }
 
@@ -174,6 +198,48 @@ func (r *OrganizationSettingsResource) Schema(ctx context.Context, req resource.
 			"ip_allowlist": schema.ListAttribute{
 				MarkdownDescription: "List of CIDR ranges allowed to access the organization (requires the IP allowlist feature).",
 				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+			},
+			"disabled_model_providers": schema.ListAttribute{
+				MarkdownDescription: "Model providers that are disabled organization-wide.",
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+			},
+			"llm_auth_proxy_enabled": schema.BoolAttribute{
+				MarkdownDescription: "Whether the LLM auth proxy is enabled for the organization.",
+				Optional:            true,
+				Computed:            true,
+			},
+			"llm_auth_proxy_jwt_audience": schema.StringAttribute{
+				MarkdownDescription: "Expected `aud` claim for JWTs presented to the LLM auth proxy.",
+				Optional:            true,
+				Computed:            true,
+			},
+			"llm_auth_proxy_allowed_urls": schema.ListAttribute{
+				MarkdownDescription: "URLs the LLM auth proxy is permitted to forward requests to.",
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+			},
+			"restrict_browser_secrets": schema.BoolAttribute{
+				MarkdownDescription: "Whether workspace secrets are withheld from the browser client.",
+				Optional:            true,
+				Computed:            true,
+			},
+			"byoc_create_saas_workspace_enabled": schema.BoolAttribute{
+				MarkdownDescription: "Whether a BYOC organization may also create SaaS-hosted workspaces.",
+				Optional:            true,
+				Computed:            true,
+			},
+			"engine_enabled": schema.BoolAttribute{
+				MarkdownDescription: "Whether the LangSmith engine is enabled for the organization.",
+				Optional:            true,
+				Computed:            true,
+			},
+			"engine_lcu_spend_limit_monthly": schema.Float64Attribute{
+				MarkdownDescription: "Monthly engine spend limit, in LCUs. Null means no limit.",
 				Optional:            true,
 				Computed:            true,
 			},
@@ -354,14 +420,35 @@ func orgUpdateFromConfig(ctx context.Context, config *OrganizationSettingsResour
 	setString(config.SecurityContact, &body.SecurityContact)
 	setString(config.ScimGroupNameSeparator, &body.ScimGroupNameSeparator)
 
-	if !config.IPAllowlist.IsNull() && !config.IPAllowlist.IsUnknown() {
-		var list []string
-		diags.Append(config.IPAllowlist.ElementsAs(ctx, &list, false)...)
-		if diags.HasError() {
-			return body, false
-		}
-		body.IPAllowlist = &list
+	setBool(config.LLMAuthProxyEnabled, &body.LLMAuthProxyEnabled)
+	setString(config.LLMAuthProxyJWTAudience, &body.LLMAuthProxyJWTAudience)
+	setBool(config.RestrictBrowserSecrets, &body.RestrictBrowserSecrets)
+	setBool(config.BYOCCreateSaaSWorkspace, &body.BYOCCreateSaaSWorkspace)
+	setBool(config.EngineEnabled, &body.EngineEnabled)
+	if !config.EngineLCUSpendLimitMonthly.IsNull() && !config.EngineLCUSpendLimitMonthly.IsUnknown() {
+		f := config.EngineLCUSpendLimitMonthly.ValueFloat64()
+		body.EngineLCUSpendLimitMonthly = &f
 		hasUpdates = true
+	}
+
+	setList := func(v types.List, dst **[]string) bool {
+		if v.IsNull() || v.IsUnknown() {
+			return true
+		}
+		var list []string
+		diags.Append(v.ElementsAs(ctx, &list, false)...)
+		if diags.HasError() {
+			return false
+		}
+		*dst = &list
+		hasUpdates = true
+		return true
+	}
+
+	if !setList(config.IPAllowlist, &body.IPAllowlist) ||
+		!setList(config.DisabledModelProviders, &body.DisabledModelProviders) ||
+		!setList(config.LLMAuthProxyAllowedURLs, &body.LLMAuthProxyAllowedURLs) {
+		return body, false
 	}
 
 	return body, hasUpdates
@@ -410,6 +497,29 @@ func mapOrganizationInfoToState(ctx context.Context, data *OrganizationSettingsR
 	ipAllowlist, d := types.ListValueFrom(ctx, types.StringType, result.IPAllowlist)
 	diags.Append(d...)
 	data.IPAllowlist = ipAllowlist
+
+	disabledProviders, d := types.ListValueFrom(ctx, types.StringType, result.DisabledModelProviders)
+	diags.Append(d...)
+	data.DisabledModelProviders = disabledProviders
+
+	proxyURLs, d := types.ListValueFrom(ctx, types.StringType, result.LLMAuthProxyAllowedURLs)
+	diags.Append(d...)
+	data.LLMAuthProxyAllowedURLs = proxyURLs
+
+	data.LLMAuthProxyEnabled = types.BoolValue(result.LLMAuthProxyEnabled)
+	if result.LLMAuthProxyJWTAudience != nil {
+		data.LLMAuthProxyJWTAudience = types.StringValue(*result.LLMAuthProxyJWTAudience)
+	} else {
+		data.LLMAuthProxyJWTAudience = types.StringNull()
+	}
+	data.RestrictBrowserSecrets = types.BoolValue(result.RestrictBrowserSecrets)
+	data.BYOCCreateSaaSWorkspace = types.BoolValue(result.BYOCCreateSaaSWorkspace)
+	data.EngineEnabled = types.BoolValue(result.EngineEnabled)
+	if result.EngineLCUSpendLimitMonthly != nil {
+		data.EngineLCUSpendLimitMonthly = types.Float64Value(*result.EngineLCUSpendLimitMonthly)
+	} else {
+		data.EngineLCUSpendLimitMonthly = types.Float64Null()
+	}
 
 	data.SsoOnly = types.BoolValue(result.SsoOnly)
 	data.IPAllowlistEnabled = types.BoolValue(result.IPAllowlistEnabled)

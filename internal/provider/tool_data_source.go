@@ -8,8 +8,11 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/bogware/terraform-provider-langsmith/internal/client"
@@ -45,10 +48,21 @@ func (d *ToolDataSource) Metadata(ctx context.Context, req datasource.MetadataRe
 
 func (d *ToolDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Looks up a LangSmith platform tool by `handle`.",
+		MarkdownDescription: "Looks up a LangSmith platform tool by `handle` or by `id`. Exactly one of the two must be set — a handle is the readable name a tool is published under, while the ID addresses it even after a rename.",
 		Attributes: map[string]schema.Attribute{
-			"handle":      schema.StringAttribute{Required: true},
-			"id":          schema.StringAttribute{Computed: true},
+			"handle": schema.StringAttribute{
+				MarkdownDescription: "Handle of the tool to look up. Conflicts with `id`.",
+				Optional:            true,
+				Computed:            true,
+				Validators: []validator.String{
+					stringvalidator.ExactlyOneOf(path.MatchRoot("handle"), path.MatchRoot("id")),
+				},
+			},
+			"id": schema.StringAttribute{
+				MarkdownDescription: "UUID of the tool to look up. Conflicts with `handle`.",
+				Optional:            true,
+				Computed:            true,
+			},
 			"name":        schema.StringAttribute{Computed: true},
 			"description": schema.StringAttribute{Computed: true},
 			"parameters":  schema.StringAttribute{Computed: true},
@@ -85,8 +99,16 @@ func (d *ToolDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 	c := effectiveClient(d.client, data.WorkspaceID)
+
+	// The API addresses tools two ways: /tools/{handle} and /tools/id/{id}.
+	// ExactlyOneOf on the schema guarantees precisely one is set here.
+	lookup := "/api/v1/platform/tools/" + data.Handle.ValueString()
+	if !data.ID.IsNull() && !data.ID.IsUnknown() {
+		lookup = "/api/v1/platform/tools/id/" + data.ID.ValueString()
+	}
+
 	var api toolAPI
-	if err := c.Get(ctx, "/v1/platform/tools/"+data.Handle.ValueString(), nil, &api); err != nil {
+	if err := c.Get(ctx, lookup, nil, &api); err != nil {
 		resp.Diagnostics.AddError("Error reading tool", err.Error())
 		return
 	}

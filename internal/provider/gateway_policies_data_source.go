@@ -218,7 +218,7 @@ func (d *GatewayPoliciesDataSource) Read(ctx context.Context, req datasource.Rea
 
 	// The list endpoint returns a bare JSON array, not a paginated envelope.
 	var policies []gatewayPolicyAPI
-	if err := c.Get(ctx, "/v1/platform/gateway-policies", query, &policies); err != nil {
+	if err := c.Get(ctx, "/api/v1/platform/gateway-policies", query, &policies); err != nil {
 		resp.Diagnostics.AddError(
 			"Error listing gateway policies",
 			"Listing gateway policies requires the LLM Gateway feature to be enabled on the organization; a 403 response means it is not.\n\n"+err.Error(),

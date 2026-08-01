@@ -104,7 +104,7 @@ func (r *FeatureModelConfigResource) Configure(ctx context.Context, req resource
 }
 
 func featureModelConfigBasePath(feature string) string {
-	return "/v1/platform/features/" + url.PathEscape(feature)
+	return "/api/v1/platform/features/" + url.PathEscape(feature)
 }
 
 // stringSetElements converts a types.Set of strings to a Go slice. Null and
@@ -298,7 +298,7 @@ func (r *FeatureModelConfigResource) ImportState(ctx context.Context, req resour
 // configuration, which maps to a null default_model and no disabled models.
 func (r *FeatureModelConfigResource) refresh(ctx context.Context, c *client.Client, data *FeatureModelConfigResourceModel, diags *diag.Diagnostics) {
 	var list []featureModelConfigAPI
-	if err := c.Get(ctx, "/v1/platform/features", nil, &list); err != nil {
+	if err := c.Get(ctx, "/api/v1/platform/features", nil, &list); err != nil {
 		diags.AddError("Error reading feature model configurations", err.Error())
 		return
 	}

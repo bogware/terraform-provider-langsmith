@@ -30,15 +30,23 @@ resource "langsmith_organization_settings" "this" {
 
 ### Optional
 
+- `byoc_create_saas_workspace_enabled` (Boolean) Whether a BYOC organization may also create SaaS-hosted workspaces.
+- `disabled_model_providers` (List of String) Model providers that are disabled organization-wide.
 - `display_name` (String) Display name of the organization. May contain letters, digits, spaces, hyphens, and underscores.
+- `engine_enabled` (Boolean) Whether the LangSmith engine is enabled for the organization.
+- `engine_lcu_spend_limit_monthly` (Number) Monthly engine spend limit, in LCUs. Null means no limit.
 - `invites_enabled` (Boolean) Whether member invites are enabled.
 - `ip_allowlist` (List of String) List of CIDR ranges allowed to access the organization (requires the IP allowlist feature).
 - `jit_provisioning_enabled` (Boolean) Whether just-in-time user provisioning is enabled.
+- `llm_auth_proxy_allowed_urls` (List of String) URLs the LLM auth proxy is permitted to forward requests to.
+- `llm_auth_proxy_enabled` (Boolean) Whether the LLM auth proxy is enabled for the organization.
+- `llm_auth_proxy_jwt_audience` (String) Expected `aud` claim for JWTs presented to the LLM auth proxy.
 - `max_api_key_expiry_days` (Number) Maximum allowed expiry (in days) for newly created API keys.
 - `max_pat_expiry_days` (Number) Maximum allowed expiry (in days) for newly created personal access tokens.
 - `max_service_key_expiry_days` (Number) Maximum allowed expiry (in days) for newly created service keys.
 - `pat_creation_disabled` (Boolean) Whether creation of personal access tokens is disabled org-wide.
 - `public_sharing_disabled` (Boolean) Whether public sharing of traces, datasets, and prompts is disabled org-wide.
+- `restrict_browser_secrets` (Boolean) Whether workspace secrets are withheld from the browser client.
 - `scim_group_name_separator` (String) Single-character separator used when parsing SCIM group names (defaults to `:`).
 - `security_contact` (String) Email address of the organization's security contact.
 - `sso_only` (Boolean) Whether SSO is the only allowed login method for the organization. Managed via the login-methods endpoint.

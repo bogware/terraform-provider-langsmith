@@ -85,7 +85,7 @@ func (d *IssuesDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 	}
 
 	var raw json.RawMessage
-	if err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/v1/platform/issues", query, &raw); err != nil {
+	if err := effectiveClient(d.client, data.WorkspaceID).Get(ctx, "/api/v1/platform/issues", query, &raw); err != nil {
 		if client.IsNotFound(err) {
 			resp.Diagnostics.AddError("Issues Not Found", "The issues endpoint returned 404. It is a beta endpoint and may not be available on this LangSmith deployment.")
 			return

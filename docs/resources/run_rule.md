@@ -42,14 +42,21 @@ resource "langsmith_run_rule" "example" {
 - `evaluator_id` (String) The ID of the evaluator. Optional on input to reference an existing evaluator; populated by the API on response.
 - `evaluator_version` (Number) The version of the associated evaluator. Set to pin a specific version, or leave unset to let the API pick.
 - `evaluators` (String) JSON-encoded array of evaluator configurations.
+- `extend_annotation_queue_trace_retention` (Boolean) Extend trace retention for runs this rule adds to an annotation queue.
+- `extend_dataset_trace_retention` (Boolean) Extend trace retention for runs this rule adds to a dataset.
+- `extend_evaluator_trace_retention` (Boolean) Extend trace retention for runs this rule sends to an evaluator. Defaults to `false` server-side.
 - `extend_only` (Boolean) Whether the rule only extends existing annotations.
+- `extend_webhook_trace_retention` (Boolean) Extend trace retention for runs this rule delivers to a webhook.
 - `filter` (String) Run filter expression.
 - `group_by` (String) Field to group runs by. The only accepted value is `thread_id`. Changing this value forces replacement because the API rejects `group_by` on update.
 - `include_extended_stats` (Boolean) Whether to include extended statistics.
 - `is_enabled` (Boolean) Whether the rule is enabled.
+- `is_tracing_disabled` (Boolean) Whether tracing is disabled for runs matched by this rule. Defaults to `false` server-side.
 - `num_few_shot_examples` (Number) Number of few-shot examples.
 - `session_id` (String) The project/session UUID to scope this rule to.
+- `spend_limit` (String) JSON-encoded spend limit for the rule's evaluators.
 - `trace_filter` (String) Trace filter expression.
+- `tracer_session_issue_id` (String) UUID of the tracing-project issue this rule is attached to. Accepted only when the rule is created — the update endpoint has no equivalent field, so changing it forces a new rule, and the API does not return it.
 - `transient` (Boolean) Whether the rule is transient.
 - `tree_filter` (String) Tree filter expression.
 - `use_corrections_dataset` (Boolean) Whether to use a corrections dataset.

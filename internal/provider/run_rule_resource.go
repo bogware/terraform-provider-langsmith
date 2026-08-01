@@ -60,6 +60,13 @@ type RunRuleResourceModel struct {
 	BackfillFrom                 types.String  `tfsdk:"backfill_from"`
 	UseCorrectionsDataset        types.Bool    `tfsdk:"use_corrections_dataset"`
 	ExtendOnly                   types.Bool    `tfsdk:"extend_only"`
+	IsTracingDisabled            types.Bool    `tfsdk:"is_tracing_disabled"`
+	ExtendEvaluatorRetention     types.Bool    `tfsdk:"extend_evaluator_trace_retention"`
+	ExtendDatasetRetention       types.Bool    `tfsdk:"extend_dataset_trace_retention"`
+	ExtendAnnotationQueueRet     types.Bool    `tfsdk:"extend_annotation_queue_trace_retention"`
+	ExtendWebhookRetention       types.Bool    `tfsdk:"extend_webhook_trace_retention"`
+	SpendLimit                   types.String  `tfsdk:"spend_limit"`
+	TracerSessionIssueID         types.String  `tfsdk:"tracer_session_issue_id"`
 	Transient                    types.Bool    `tfsdk:"transient"`
 	IncludeExtendedStats         types.Bool    `tfsdk:"include_extended_stats"`
 	GroupBy                      types.String  `tfsdk:"group_by"`
@@ -104,16 +111,25 @@ type runRuleCreateRequest struct {
 	BackfillFrom                 *string         `json:"backfill_from,omitempty"`
 	UseCorrectionsDataset        *bool           `json:"use_corrections_dataset,omitempty"`
 	ExtendOnly                   *bool           `json:"extend_only,omitempty"`
-	Transient                    *bool           `json:"transient,omitempty"`
-	IncludeExtendedStats         *bool           `json:"include_extended_stats,omitempty"`
-	GroupBy                      *string         `json:"group_by,omitempty"`
-	CreateAlignmentQueue         bool            `json:"create_alignment_queue,omitempty"`
-	EvaluatorID                  *string         `json:"evaluator_id,omitempty"`
-	EvaluatorVersion             *int64          `json:"evaluator_version,omitempty"`
-	Evaluators                   json.RawMessage `json:"evaluators,omitempty"`
-	CodeEvaluators               json.RawMessage `json:"code_evaluators,omitempty"`
-	Alerts                       json.RawMessage `json:"alerts,omitempty"`
-	Webhooks                     json.RawMessage `json:"webhooks,omitempty"`
+	IsTracingDisabled            *bool           `json:"is_tracing_disabled,omitempty"`
+	ExtendEvaluatorRetention     *bool           `json:"extend_evaluator_trace_retention,omitempty"`
+	ExtendDatasetRetention       *bool           `json:"extend_dataset_trace_retention,omitempty"`
+	ExtendAnnotationQueueRet     *bool           `json:"extend_annotation_queue_trace_retention,omitempty"`
+	ExtendWebhookRetention       *bool           `json:"extend_webhook_trace_retention,omitempty"`
+	SpendLimit                   json.RawMessage `json:"spend_limit,omitempty"`
+	// TracerSessionIssueID is accepted only on create; the update endpoint has no
+	// such field.
+	TracerSessionIssueID *string         `json:"tracer_session_issue_id,omitempty"`
+	Transient            *bool           `json:"transient,omitempty"`
+	IncludeExtendedStats *bool           `json:"include_extended_stats,omitempty"`
+	GroupBy              *string         `json:"group_by,omitempty"`
+	CreateAlignmentQueue bool            `json:"create_alignment_queue,omitempty"`
+	EvaluatorID          *string         `json:"evaluator_id,omitempty"`
+	EvaluatorVersion     *int64          `json:"evaluator_version,omitempty"`
+	Evaluators           json.RawMessage `json:"evaluators,omitempty"`
+	CodeEvaluators       json.RawMessage `json:"code_evaluators,omitempty"`
+	Alerts               json.RawMessage `json:"alerts,omitempty"`
+	Webhooks             json.RawMessage `json:"webhooks,omitempty"`
 }
 
 // runRuleAPIResponse is the full dossier the API returns on a run rule --
@@ -135,6 +151,12 @@ type runRuleAPIResponse struct {
 	BackfillFrom                 *string         `json:"backfill_from"`
 	UseCorrectionsDataset        bool            `json:"use_corrections_dataset"`
 	ExtendOnly                   bool            `json:"extend_only"`
+	IsTracingDisabled            bool            `json:"is_tracing_disabled"`
+	ExtendEvaluatorRetention     bool            `json:"extend_evaluator_trace_retention"`
+	ExtendDatasetRetention       bool            `json:"extend_dataset_trace_retention"`
+	ExtendAnnotationQueueRet     bool            `json:"extend_annotation_queue_trace_retention"`
+	ExtendWebhookRetention       bool            `json:"extend_webhook_trace_retention"`
+	SpendLimit                   json.RawMessage `json:"spend_limit"`
 	Transient                    bool            `json:"transient"`
 	IncludeExtendedStats         bool            `json:"include_extended_stats"`
 	GroupBy                      *string         `json:"group_by"`
@@ -241,6 +263,43 @@ func (r *RunRuleResource) Schema(ctx context.Context, req resource.SchemaRequest
 				MarkdownDescription: "Whether the rule only extends existing annotations.",
 				Optional:            true,
 				Computed:            true,
+			},
+			"is_tracing_disabled": schema.BoolAttribute{
+				MarkdownDescription: "Whether tracing is disabled for runs matched by this rule. Defaults to `false` server-side.",
+				Optional:            true,
+				Computed:            true,
+			},
+			"extend_evaluator_trace_retention": schema.BoolAttribute{
+				MarkdownDescription: "Extend trace retention for runs this rule sends to an evaluator. Defaults to `false` server-side.",
+				Optional:            true,
+				Computed:            true,
+			},
+			"extend_dataset_trace_retention": schema.BoolAttribute{
+				MarkdownDescription: "Extend trace retention for runs this rule adds to a dataset.",
+				Optional:            true,
+				Computed:            true,
+			},
+			"extend_annotation_queue_trace_retention": schema.BoolAttribute{
+				MarkdownDescription: "Extend trace retention for runs this rule adds to an annotation queue.",
+				Optional:            true,
+				Computed:            true,
+			},
+			"extend_webhook_trace_retention": schema.BoolAttribute{
+				MarkdownDescription: "Extend trace retention for runs this rule delivers to a webhook.",
+				Optional:            true,
+				Computed:            true,
+			},
+			"spend_limit": schema.StringAttribute{
+				MarkdownDescription: "JSON-encoded spend limit for the rule's evaluators.",
+				Optional:            true,
+				Computed:            true,
+			},
+			"tracer_session_issue_id": schema.StringAttribute{
+				MarkdownDescription: "UUID of the tracing-project issue this rule is attached to. Accepted only when the rule is created — the update endpoint has no equivalent field, so changing it forces a new rule, and the API does not return it.",
+				Optional:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"transient": schema.BoolAttribute{
 				MarkdownDescription: "Whether the rule is transient.",
@@ -426,6 +485,33 @@ func (r *RunRuleResource) Create(ctx context.Context, req resource.CreateRequest
 		v := data.ExtendOnly.ValueBool()
 		body.ExtendOnly = &v
 	}
+	if !data.IsTracingDisabled.IsNull() && !data.IsTracingDisabled.IsUnknown() {
+		v := data.IsTracingDisabled.ValueBool()
+		body.IsTracingDisabled = &v
+	}
+	if !data.ExtendEvaluatorRetention.IsNull() && !data.ExtendEvaluatorRetention.IsUnknown() {
+		v := data.ExtendEvaluatorRetention.ValueBool()
+		body.ExtendEvaluatorRetention = &v
+	}
+	if !data.ExtendDatasetRetention.IsNull() && !data.ExtendDatasetRetention.IsUnknown() {
+		v := data.ExtendDatasetRetention.ValueBool()
+		body.ExtendDatasetRetention = &v
+	}
+	if !data.ExtendAnnotationQueueRet.IsNull() && !data.ExtendAnnotationQueueRet.IsUnknown() {
+		v := data.ExtendAnnotationQueueRet.ValueBool()
+		body.ExtendAnnotationQueueRet = &v
+	}
+	if !data.ExtendWebhookRetention.IsNull() && !data.ExtendWebhookRetention.IsUnknown() {
+		v := data.ExtendWebhookRetention.ValueBool()
+		body.ExtendWebhookRetention = &v
+	}
+	if !data.SpendLimit.IsNull() && !data.SpendLimit.IsUnknown() {
+		body.SpendLimit = json.RawMessage(data.SpendLimit.ValueString())
+	}
+	if !data.TracerSessionIssueID.IsNull() && !data.TracerSessionIssueID.IsUnknown() {
+		v := data.TracerSessionIssueID.ValueString()
+		body.TracerSessionIssueID = &v
+	}
 	if !data.Transient.IsNull() && !data.Transient.IsUnknown() {
 		v := data.Transient.ValueBool()
 		body.Transient = &v
@@ -441,7 +527,7 @@ func (r *RunRuleResource) Create(ctx context.Context, req resource.CreateRequest
 	if !data.CreateAlignmentQueue.IsNull() && !data.CreateAlignmentQueue.IsUnknown() {
 		body.CreateAlignmentQueue = data.CreateAlignmentQueue.ValueBool()
 	}
-	if !data.EvaluatorID.IsNull() && !data.EvaluatorID.IsUnknown() {
+	if !ruleUsesInlineEvaluators(&data) && !data.EvaluatorID.IsNull() && !data.EvaluatorID.IsUnknown() {
 		v := data.EvaluatorID.ValueString()
 		body.EvaluatorID = &v
 	}
@@ -571,6 +657,29 @@ func (r *RunRuleResource) Update(ctx context.Context, req resource.UpdateRequest
 		v := data.ExtendOnly.ValueBool()
 		body.ExtendOnly = &v
 	}
+	if !data.IsTracingDisabled.IsNull() && !data.IsTracingDisabled.IsUnknown() {
+		v := data.IsTracingDisabled.ValueBool()
+		body.IsTracingDisabled = &v
+	}
+	if !data.ExtendEvaluatorRetention.IsNull() && !data.ExtendEvaluatorRetention.IsUnknown() {
+		v := data.ExtendEvaluatorRetention.ValueBool()
+		body.ExtendEvaluatorRetention = &v
+	}
+	if !data.ExtendDatasetRetention.IsNull() && !data.ExtendDatasetRetention.IsUnknown() {
+		v := data.ExtendDatasetRetention.ValueBool()
+		body.ExtendDatasetRetention = &v
+	}
+	if !data.ExtendAnnotationQueueRet.IsNull() && !data.ExtendAnnotationQueueRet.IsUnknown() {
+		v := data.ExtendAnnotationQueueRet.ValueBool()
+		body.ExtendAnnotationQueueRet = &v
+	}
+	if !data.ExtendWebhookRetention.IsNull() && !data.ExtendWebhookRetention.IsUnknown() {
+		v := data.ExtendWebhookRetention.ValueBool()
+		body.ExtendWebhookRetention = &v
+	}
+	if !data.SpendLimit.IsNull() && !data.SpendLimit.IsUnknown() {
+		body.SpendLimit = json.RawMessage(data.SpendLimit.ValueString())
+	}
 	if !data.Transient.IsNull() && !data.Transient.IsUnknown() {
 		v := data.Transient.ValueBool()
 		body.Transient = &v
@@ -581,7 +690,7 @@ func (r *RunRuleResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 	// Deliberately NOT sending group_by: the API's RunRulesUpdateSchema omits
 	// it, so the resource treats it as RequiresReplace.
-	if !data.EvaluatorID.IsNull() && !data.EvaluatorID.IsUnknown() {
+	if !ruleUsesInlineEvaluators(&data) && !data.EvaluatorID.IsNull() && !data.EvaluatorID.IsUnknown() {
 		v := data.EvaluatorID.ValueString()
 		body.EvaluatorID = &v
 	}
@@ -703,6 +812,12 @@ func (r *RunRuleResource) mapResponseToModel(result *runRuleAPIResponse, data *R
 	}
 	data.UseCorrectionsDataset = types.BoolValue(result.UseCorrectionsDataset)
 	data.ExtendOnly = types.BoolValue(result.ExtendOnly)
+	data.IsTracingDisabled = types.BoolValue(result.IsTracingDisabled)
+	data.ExtendEvaluatorRetention = types.BoolValue(result.ExtendEvaluatorRetention)
+	data.ExtendDatasetRetention = types.BoolValue(result.ExtendDatasetRetention)
+	data.ExtendAnnotationQueueRet = types.BoolValue(result.ExtendAnnotationQueueRet)
+	data.ExtendWebhookRetention = types.BoolValue(result.ExtendWebhookRetention)
+	data.SpendLimit = jsonStringValue(result.SpendLimit)
 	data.Transient = types.BoolValue(result.Transient)
 	data.IncludeExtendedStats = types.BoolValue(result.IncludeExtendedStats)
 	if result.GroupBy != nil {
@@ -711,8 +826,10 @@ func (r *RunRuleResource) mapResponseToModel(result *runRuleAPIResponse, data *R
 		data.GroupBy = types.StringNull()
 	}
 	// JSON fields -- Doc Adams keeps meticulous records and so do we.
-	data.Evaluators = jsonEmptyArrayIsNull(result.Evaluators)
-	data.CodeEvaluators = jsonEmptyArrayIsNull(result.CodeEvaluators)
+	// The API expands both of these (a code evaluator gains language: "python"),
+	// so keep the configured form whenever the response only adds to it.
+	data.Evaluators = jsonPreserveConfigSubset(result.Evaluators, data.Evaluators)
+	data.CodeEvaluators = jsonPreserveConfigSubset(result.CodeEvaluators, data.CodeEvaluators)
 	data.Alerts = jsonEmptyArrayIsNull(result.Alerts)
 	data.Webhooks = jsonEmptyArrayIsNull(result.Webhooks)
 	// Computed fields -- dispatches that only the API can write.
@@ -777,4 +894,17 @@ func (r *RunRuleResource) mapResponseToModel(result *runRuleAPIResponse, data *R
 	} else {
 		data.BackfillError = types.StringNull()
 	}
+}
+
+// ruleUsesInlineEvaluators reports whether the configuration defines this rule's
+// evaluators inline rather than pointing at a standalone evaluator.
+//
+// The API rejects a request carrying both forms: "Provide either evaluator_id or
+// evaluators/code_evaluators, not both." Creating a rule with inline evaluators
+// makes the server assign an evaluator_id, which Read then stores, so without
+// this check every subsequent update sends both and fails with HTTP 422 -- the
+// rule becomes impossible to modify.
+func ruleUsesInlineEvaluators(data *RunRuleResourceModel) bool {
+	set := func(v types.String) bool { return !v.IsNull() && !v.IsUnknown() }
+	return set(data.Evaluators) || set(data.CodeEvaluators)
 }

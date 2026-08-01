@@ -40,6 +40,7 @@ type OrgMemberResourceModel struct {
 	FullName       types.String `tfsdk:"full_name"`
 	OrganizationID types.String `tfsdk:"organization_id"`
 	CreatedAt      types.String `tfsdk:"created_at"`
+	Pending        types.Bool   `tfsdk:"pending"`
 }
 
 type orgMemberCreateRequest struct {
@@ -146,6 +147,10 @@ func (r *OrgMemberResource) Schema(ctx context.Context, req resource.SchemaReque
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"pending": schema.BoolAttribute{
+				MarkdownDescription: "Whether the invitation is still unaccepted. A pending member is addressed by different API endpoints than an accepted one, so the provider tracks which applies.",
+				Computed:            true,
+			},
 		},
 	}
 }
@@ -206,6 +211,9 @@ func (r *OrgMemberResource) Create(ctx context.Context, req resource.CreateReque
 		if data.UserID.IsUnknown() {
 			data.UserID = types.StringNull()
 		}
+		if data.Pending.IsUnknown() {
+			data.Pending = types.BoolNull()
+		}
 		resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 		return
 	}
@@ -215,6 +223,9 @@ func (r *OrgMemberResource) Create(ctx context.Context, req resource.CreateReque
 		// tainted) instead of orphaned.
 		if data.UserID.IsUnknown() {
 			data.UserID = types.StringNull()
+		}
+		if data.Pending.IsUnknown() {
+			data.Pending = types.BoolNull()
 		}
 		resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 		return
@@ -261,6 +272,7 @@ func (r *OrgMemberResource) refreshMemberData(ctx context.Context, data *OrgMemb
 	// Search active members first.
 	for _, m := range listResult.Members {
 		if m.ID == data.ID.ValueString() {
+			data.Pending = types.BoolValue(false)
 			data.UserID = orgMemberNullableString(m.UserID)
 			if m.Email != nil {
 				data.Email = types.StringValue(*m.Email)
@@ -284,6 +296,7 @@ func (r *OrgMemberResource) refreshMemberData(ctx context.Context, data *OrgMemb
 	// orgMemberNullableString keeps it null rather than "" in that case.
 	for _, p := range listResult.Pending {
 		if p.ID == data.ID.ValueString() {
+			data.Pending = types.BoolValue(true)
 			data.UserID = orgMemberNullableString(p.UserID)
 			data.Email = types.StringValue(p.Email)
 			if p.RoleID != nil {
@@ -310,12 +323,16 @@ func (r *OrgMemberResource) Update(ctx context.Context, req resource.UpdateReque
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	var state OrgMemberResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	body := orgMemberUpdateRequest{}
 	setOptionalString(&body.RoleID, data.RoleID)
 
-	apiPath := fmt.Sprintf("/api/v1/orgs/current/members/%s", data.ID.ValueString())
-	err := r.client.Patch(ctx, apiPath, body, nil)
+	err := patchMember(ctx, r.client, "/api/v1/orgs/current/members", data.ID.ValueString(), state.Pending.ValueBool(), body, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating org member", err.Error())
 		return
@@ -342,9 +359,7 @@ func (r *OrgMemberResource) Delete(ctx context.Context, req resource.DeleteReque
 		return
 	}
 
-	apiPath := fmt.Sprintf("/api/v1/orgs/current/members/%s", data.ID.ValueString())
-	err := r.client.Delete(ctx, apiPath)
-	if err != nil && !client.IsNotFound(err) {
+	if err := deleteMember(ctx, r.client, "/api/v1/orgs/current/members", data.ID.ValueString(), data.Pending.ValueBool()); err != nil {
 		resp.Diagnostics.AddError("Error deleting org member", err.Error())
 		return
 	}

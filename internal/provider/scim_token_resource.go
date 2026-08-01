@@ -136,7 +136,7 @@ func (r *SCIMTokenResource) Create(ctx context.Context, req resource.CreateReque
 	setOptionalString(&body.Description, data.Description)
 
 	var result scimTokenSensitiveResponse
-	err := r.client.Post(ctx, "/v1/platform/orgs/current/scim/tokens", body, &result)
+	err := r.client.Post(ctx, "/api/v1/platform/orgs/current/scim/tokens", body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating SCIM token", err.Error())
 		return
@@ -162,7 +162,7 @@ func (r *SCIMTokenResource) Read(ctx context.Context, req resource.ReadRequest, 
 	}
 
 	var result scimTokenResponse
-	err := r.client.Get(ctx, "/v1/platform/orgs/current/scim/tokens/"+data.ID.ValueString(), nil, &result)
+	err := r.client.Get(ctx, "/api/v1/platform/orgs/current/scim/tokens/"+data.ID.ValueString(), nil, &result)
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -194,7 +194,7 @@ func (r *SCIMTokenResource) Update(ctx context.Context, req resource.UpdateReque
 	setOptionalString(&body.Description, data.Description)
 
 	var result scimTokenResponse
-	err := r.client.Patch(ctx, "/v1/platform/orgs/current/scim/tokens/"+data.ID.ValueString(), body, &result)
+	err := r.client.Patch(ctx, "/api/v1/platform/orgs/current/scim/tokens/"+data.ID.ValueString(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating SCIM token", err.Error())
 		return
@@ -218,7 +218,7 @@ func (r *SCIMTokenResource) Delete(ctx context.Context, req resource.DeleteReque
 		return
 	}
 
-	err := r.client.Delete(ctx, "/v1/platform/orgs/current/scim/tokens/"+data.ID.ValueString())
+	err := r.client.Delete(ctx, "/api/v1/platform/orgs/current/scim/tokens/"+data.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error deleting SCIM token", err.Error())
 		return

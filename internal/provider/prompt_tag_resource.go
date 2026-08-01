@@ -149,7 +149,7 @@ func (r *PromptTagResource) Configure(ctx context.Context, req resource.Configur
 // resolveCommitID looks up the commit UUID from a commit hash.
 func (r *PromptTagResource) resolveCommitID(ctx context.Context, repoHandle, commitHash string, workspaceID types.String) (string, error) {
 	var listResp promptCommitListResponse
-	err := effectiveClient(r.client, workspaceID).Get(ctx, fmt.Sprintf("/commits/-/%s", repoHandle), nil, &listResp)
+	err := effectiveClient(r.client, workspaceID).Get(ctx, fmt.Sprintf("/api/v1/commits/-/%s", repoHandle), nil, &listResp)
 	if err != nil {
 		return "", fmt.Errorf("listing commits: %w", err)
 	}

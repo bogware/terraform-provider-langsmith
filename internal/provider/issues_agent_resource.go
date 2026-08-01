@@ -255,7 +255,7 @@ func (r *IssuesAgentResource) Configure(ctx context.Context, req resource.Config
 }
 
 func (r *IssuesAgentResource) basePath(sessionID string) string {
-	return "/v1/platform/sessions/" + sessionID + "/issues-agent"
+	return "/api/v1/platform/sessions/" + sessionID + "/issues-agent"
 }
 
 func (r *IssuesAgentResource) overviewPath(sessionID string) string {

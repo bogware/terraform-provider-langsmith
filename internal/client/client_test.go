@@ -15,7 +15,7 @@ import (
 )
 
 func newTestClient(srv *httptest.Server) *Client {
-	c := NewClient(srv.URL, "test-key", "workspace-123", "test-ua/1.0", false)
+	c := NewClient(srv.URL, "test-key", "workspace-123", "test-ua/1.0", false, nil)
 	// Keep tests fast: cap retries and shorten the HTTP timeout.
 	c.MaxRetries = 3
 	c.HTTPClient.Timeout = 5 * time.Second
@@ -34,22 +34,30 @@ func TestResolvePath(t *testing.T) {
 		{"cloud legacy", false, "/api/v1/sessions", "/api/v1/sessions"},
 		{"cloud platform", false, "/v1/platform/evaluators", "/v1/platform/evaluators"},
 
-		// Self-hosted: the platform family gains the /api prefix
-		// (/v1/platform/X -> /api/v1/platform/X, confirmed by the helm nginx config).
-		{"selfhosted platform prefixed", true, "/v1/platform/evaluators", "/api/v1/platform/evaluators"},
-		{"selfhosted platform with id", true, "/v1/platform/tools/my-tool", "/api/v1/platform/tools/my-tool"},
+		// Cloud: the canonical /api form of the platform family is sent verbatim.
+		{"cloud canonical platform", false, "/api/v1/platform/evaluators", "/api/v1/platform/evaluators"},
 
-		// Self-hosted: legacy /api/v1 paths already carry /api and must not be doubled.
+		// Self-hosted: every call site now emits the canonical form already, which
+		// must survive untouched rather than growing a second /api.
+		{"selfhosted canonical platform", true, "/api/v1/platform/evaluators", "/api/v1/platform/evaluators"},
+		{"selfhosted canonical commits", true, "/api/v1/commits/-/my-repo", "/api/v1/commits/-/my-repo"},
+		{"selfhosted canonical sandboxes", true, "/api/v2/sandboxes/registries", "/api/v2/sandboxes/registries"},
 		{"selfhosted legacy unchanged", true, "/api/v1/sessions", "/api/v1/sessions"},
 
-		// Self-hosted: non-platform families are left ALONE. Agent builder and
-		// sandboxes are fleet features served at their own root (not under /api),
-		// so prefixing would break them; the others are unconfirmed. Leaving them
-		// unchanged is the safe default until verified on a real self-hosted host.
+		// Self-hosted: the bare platform spelling is still accepted as a backstop
+		// (confirmed by the helm nginx config).
+		{"selfhosted bare platform prefixed", true, "/v1/platform/evaluators", "/api/v1/platform/evaluators"},
+		{"selfhosted bare platform with id", true, "/v1/platform/tools/my-tool", "/api/v1/platform/tools/my-tool"},
+
+		// Self-hosted: families Cloud serves only at the root gain the prefix,
+		// because self-hosted puts the whole API under /api.
+		{"selfhosted ttl prefixed", true, "/workspaces/current/ttl-settings", "/api/workspaces/current/ttl-settings"},
+		{"selfhosted data planes prefixed", true, "/orgs/current/data-planes", "/api/orgs/current/data-planes"},
+		{"cloud ttl untouched", false, "/workspaces/current/ttl-settings", "/workspaces/current/ttl-settings"},
+
+		// Agent builder has no /api form on Cloud and is served at its own root on
+		// self-hosted, so it must never be prefixed.
 		{"selfhosted agent-builder untouched", true, "/v1/agent-builder/integrations", "/v1/agent-builder/integrations"},
-		{"selfhosted sandboxes untouched", true, "/v2/sandboxes/registries", "/v2/sandboxes/registries"},
-		{"selfhosted commits untouched", true, "/commits/-/my-repo", "/commits/-/my-repo"},
-		{"selfhosted ttl untouched", true, "/workspaces/current/ttl-settings", "/workspaces/current/ttl-settings"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -72,16 +80,87 @@ func TestSelfHostedPrefixOnWire(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient(srv.URL, "k", "ws", "ua", true)
+	c := NewClient(srv.URL, "k", "ws", "ua", true, nil)
 	c.MaxRetries = 0
 	// A workspace-scoped copy must inherit SelfHosted (shallow struct copy).
 	scoped := c.WithWorkspaceID("other-ws")
 
-	if err := scoped.Get(context.Background(), "/v1/platform/evaluators", nil, &struct{}{}); err != nil {
+	if err := scoped.Get(context.Background(), "/workspaces/current/ttl-settings", nil, &struct{}{}); err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	if got := gotPath.Load(); got != "/api/v1/platform/evaluators" {
-		t.Fatalf("server saw path %q, want /api/v1/platform/evaluators (self-hosted prefix not applied)", got)
+	if got := gotPath.Load(); got != "/api/workspaces/current/ttl-settings" {
+		t.Fatalf("server saw path %q, want /api/workspaces/current/ttl-settings (self-hosted prefix not applied)", got)
+	}
+}
+
+// TestPathOverrides covers the escape hatch: it runs after the built-in rules,
+// picks the longest matching prefix, and reaches the wire through a
+// workspace-scoped copy.
+func TestPathOverrides(t *testing.T) {
+	cases := []struct {
+		name       string
+		selfHosted bool
+		overrides  map[string]string
+		in         string
+		want       string
+	}{
+		{"no overrides", false, nil, "/api/v1/platform/tools", "/api/v1/platform/tools"},
+		{"empty map", false, map[string]string{}, "/api/v1/platform/tools", "/api/v1/platform/tools"},
+		{
+			"revert canonicalisation",
+			false,
+			map[string]string{"/api/v1/platform/": "/v1/platform/"},
+			"/api/v1/platform/tools", "/v1/platform/tools",
+		},
+		{
+			"non-matching prefix left alone",
+			false,
+			map[string]string{"/api/v1/platform/": "/v1/platform/"},
+			"/api/v1/sessions", "/api/v1/sessions",
+		},
+		{
+			// Both keys match; the longer one must win regardless of map order.
+			"longest prefix wins",
+			false,
+			map[string]string{"/api/v1/": "/x/", "/api/v1/platform/": "/y/"},
+			"/api/v1/platform/tools", "/y/tools",
+		},
+		{
+			// Applied after the self-hosted rules, so it can undo them.
+			"overrides beat self-hosted rules",
+			true,
+			map[string]string{"/api/workspaces/": "/workspaces/"},
+			"/workspaces/current/ttl-settings", "/workspaces/current/ttl-settings",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &Client{SelfHosted: tc.selfHosted, PathOverrides: tc.overrides}
+			if got := c.resolvePath(tc.in); got != tc.want {
+				t.Fatalf("resolvePath(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestPathOverridesOnWire(t *testing.T) {
+	var gotPath atomic.Value
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath.Store(r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL, "k", "ws", "ua", false, map[string]string{"/api/v1/platform/": "/v1/platform/"})
+	c.MaxRetries = 0
+	scoped := c.WithWorkspaceID("other-ws")
+
+	if err := scoped.Get(context.Background(), "/api/v1/platform/tools", nil, &struct{}{}); err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	if got := gotPath.Load(); got != "/v1/platform/tools" {
+		t.Fatalf("server saw path %q, want /v1/platform/tools (override not applied)", got)
 	}
 }
 

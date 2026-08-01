@@ -385,7 +385,7 @@ func mapProjectResponseToState(ctx context.Context, data *ProjectResourceModel, 
 	}
 
 	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(result.WorkspaceID, result.TenantID), diags)
-	data.StartTime = types.StringValue(result.StartTime)
+	data.StartTime = normalizeTimestamp(result.StartTime, data.StartTime)
 
 	if result.EndTime != nil {
 		data.EndTime = types.StringValue(*result.EndTime)

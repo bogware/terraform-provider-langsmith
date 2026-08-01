@@ -93,7 +93,7 @@ type sandboxRegistryAPI struct {
 // sandboxRegistryPath builds the per-registry path. Registries are addressed by
 // name, not by id, so the name has to be escaped before it goes into the URL.
 func sandboxRegistryPath(name string) string {
-	return "/v2/sandboxes/registries/" + url.PathEscape(name)
+	return "/api/v2/sandboxes/registries/" + url.PathEscape(name)
 }
 
 func (r *SandboxRegistryResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -228,7 +228,7 @@ func (r *SandboxRegistryResource) Create(ctx context.Context, req resource.Creat
 
 	c := effectiveClient(r.client, data.WorkspaceID)
 	var api sandboxRegistryAPI
-	if err := c.Post(ctx, "/v2/sandboxes/registries", body, &api); err != nil {
+	if err := c.Post(ctx, "/api/v2/sandboxes/registries", body, &api); err != nil {
 		resp.Diagnostics.AddError("Error creating sandbox registry", err.Error())
 		return
 	}
