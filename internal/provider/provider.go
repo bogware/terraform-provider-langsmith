@@ -340,6 +340,8 @@ func (p *LangSmithProvider) Resources(ctx context.Context) []func() resource.Res
 
 		// API parity (1.2)
 		NewOAuthClientResource,
+		NewOptimizationJobResource,
+		NewHubDirectoryResource,
 	}
 }
 
@@ -418,6 +420,8 @@ func (p *LangSmithProvider) DataSources(ctx context.Context) []func() datasource
 		NewSessionAgentVersionsDataSource,
 		NewMCPVendorDetailsDataSource,
 		NewOAuthAuthorizedAppsDataSource,
+		NewInfoHealthDataSource,
+		NewOptimizationJobLogsDataSource,
 	}
 }
 

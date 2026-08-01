@@ -49,6 +49,9 @@ output "oauth_client_secret" {
 - `logo_uri` (String) Logo shown on the consent screen.
 - `policy_uri` (String) Privacy policy shown on the consent screen.
 - `redirect_uris` (List of String) Exact redirect URIs the authorization server will send the user back to. An authorization request naming any other URI is rejected.
+- `rotate_secret` (String) Rotation trigger. Change this value to any new string and the next apply issues a fresh `client_secret`, leaving `client_id` and every other setting alone.
+
+The value itself is arbitrary and is never sent to LangSmith — only the fact that it changed matters — so use something that records why you rotated (a date, a ticket, `uuid()`). Removing the attribute does not rotate anything.
 - `tos_uri` (String) Terms of service shown on the consent screen.
 
 ### Read-Only

@@ -44,6 +44,7 @@ type WorkspaceMemberResourceModel struct {
 	Email       types.String `tfsdk:"email"`
 	FullName    types.String `tfsdk:"full_name"`
 	CreatedAt   types.String `tfsdk:"created_at"`
+	Pending     types.Bool   `tfsdk:"pending"`
 	WorkspaceID types.String `tfsdk:"workspace_id"`
 }
 
@@ -129,6 +130,10 @@ func (r *WorkspaceMemberResource) Schema(ctx context.Context, req resource.Schem
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
+			},
+			"pending": schema.BoolAttribute{
+				MarkdownDescription: "Whether the invitation is still unaccepted. Pending members are served by a separate endpoint and addressed differently for update and delete, so the provider tracks which applies.",
+				Computed:            true,
 			},
 			"workspace_id": schema.StringAttribute{
 				MarkdownDescription: "If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
@@ -274,6 +279,26 @@ func (r *WorkspaceMemberResource) Read(ctx context.Context, req resource.ReadReq
 			break
 		}
 	}
+	pending := false
+
+	// An unaccepted invitation is not in the members list at all -- it lives at a
+	// separate endpoint. Without this second look the member would be dropped
+	// from state on every refresh and recreated on the next apply.
+	if found == nil {
+		var pendingList []workspaceMemberAPIResponse
+		err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/workspaces/current/members/pending", nil, &pendingList)
+		if err != nil && !client.IsNotFound(err) {
+			resp.Diagnostics.AddError("Error reading pending workspace members", err.Error())
+			return
+		}
+		for i := range pendingList {
+			if pendingList[i].ID == data.ID.ValueString() {
+				found = &pendingList[i]
+				pending = true
+				break
+			}
+		}
+	}
 
 	if found == nil {
 		// This cowhand has ridden off into the sunset.
@@ -282,6 +307,7 @@ func (r *WorkspaceMemberResource) Read(ctx context.Context, req resource.ReadReq
 	}
 
 	mapWorkspaceMemberResponseToState(&data, found)
+	data.Pending = types.BoolValue(pending)
 	// workspace_id is not returned by the API; preserve the state value
 	// when set, otherwise fall back to the effective client workspace or null.
 	if data.WorkspaceID.IsNull() || data.WorkspaceID.IsUnknown() {
@@ -301,19 +327,26 @@ func (r *WorkspaceMemberResource) Update(ctx context.Context, req resource.Updat
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	var state WorkspaceMemberResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	body := workspaceMemberUpdateRequest{
 		RoleID: data.RoleID.ValueString(),
 	}
 
 	var result workspaceMemberAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Patch(ctx, "/api/v1/workspaces/current/members/"+data.ID.ValueString(), body, &result)
+	err := patchMember(ctx, effectiveClient(r.client, data.WorkspaceID), "/api/v1/workspaces/current/members",
+		data.ID.ValueString(), state.Pending.ValueBool(), body, &result)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating workspace member", err.Error())
 		return
 	}
 
 	mapWorkspaceMemberResponseToState(&data, &result)
+	data.Pending = state.Pending
 	tflog.Trace(ctx, "updated workspace member resource", map[string]interface{}{"id": data.ID.ValueString()})
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -326,8 +359,9 @@ func (r *WorkspaceMemberResource) Delete(ctx context.Context, req resource.Delet
 		return
 	}
 
-	err := effectiveClient(r.client, data.WorkspaceID).Delete(ctx, "/api/v1/workspaces/current/members/"+data.ID.ValueString())
-	if err != nil && !client.IsNotFound(err) {
+	err := deleteMember(ctx, effectiveClient(r.client, data.WorkspaceID), "/api/v1/workspaces/current/members",
+		data.ID.ValueString(), data.Pending.ValueBool())
+	if err != nil {
 		resp.Diagnostics.AddError("Error deleting workspace member", err.Error())
 		return
 	}

@@ -53,6 +53,7 @@ type OAuthClientResourceModel struct {
 	GrantTypes    types.List   `tfsdk:"grant_types"`
 	AllowedScopes types.List   `tfsdk:"allowed_scopes"`
 	Disabled      types.Bool   `tfsdk:"disabled"`
+	RotateSecret  types.String `tfsdk:"rotate_secret"`
 	CreatedAt     types.String `tfsdk:"created_at"`
 	UpdatedAt     types.String `tfsdk:"updated_at"`
 }
@@ -190,6 +191,11 @@ func (r *OAuthClientResource) Schema(ctx context.Context, req resource.SchemaReq
 				Optional:            true,
 				Computed:            true,
 			},
+			"rotate_secret": schema.StringAttribute{
+				MarkdownDescription: "Rotation trigger. Change this value to any new string and the next apply issues a fresh `client_secret`, leaving `client_id` and every other setting alone.\n\n" +
+					"The value itself is arbitrary and is never sent to LangSmith — only the fact that it changed matters — so use something that records why you rotated (a date, a ticket, `uuid()`). Removing the attribute does not rotate anything.",
+				Optional: true,
+			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "When the client was registered.",
 				Computed:            true,
@@ -321,6 +327,23 @@ func (r *OAuthClientResource) Update(ctx context.Context, req resource.UpdateReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	// A changed rotation trigger means: issue a new secret, keep the client.
+	// Comparing against prior state rather than acting on any set value is what
+	// makes this idempotent -- otherwise every apply would rotate.
+	if !data.RotateSecret.Equal(state.RotateSecret) && !data.RotateSecret.IsNull() {
+		var rotated oauthClientCreateResponse
+		if err := r.client.Post(ctx, "/api/v1/platform/oauth/clients/"+state.ID.ValueString()+"/rotate-secret", nil, &rotated); err != nil {
+			resp.Diagnostics.AddError(
+				"Error rotating OAuth client secret",
+				fmt.Sprintf("The client was updated but its secret was not rotated: %s", err),
+			)
+			return
+		}
+		data.ClientSecret = types.StringValue(rotated.ClientSecret)
+		tflog.Trace(ctx, "rotated OAuth client secret", map[string]interface{}{"id": state.ID.ValueString()})
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 

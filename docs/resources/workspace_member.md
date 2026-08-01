@@ -37,3 +37,4 @@ resource "langsmith_workspace_member" "example" {
 - `email` (String) The email address of the member.
 - `full_name` (String) The member's full name.
 - `id` (String) The unique identifier of the workspace member (identity_id).
+- `pending` (Boolean) Whether the invitation is still unaccepted. Pending members are served by a separate endpoint and addressed differently for update and delete, so the provider tracks which applies.
