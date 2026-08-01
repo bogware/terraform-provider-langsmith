@@ -398,9 +398,14 @@ ID:
 | `langsmith_mcp_vendor_settings` | `<vendor_slug>[:<workspace_id>]` |
 | `langsmith_annotation_queue_reviewer` | `<queue_id>:<identity_id>` |
 | `langsmith_sandbox_registry` | `<name>` |
+| `langsmith_optimization_job` | `<owner>/<repo>/<job_id>` |
+| `langsmith_hub_directory` | `<owner>/<repo>` |
 
 **Import cannot recover write-only secrets** (Rule 4). After importing a `langsmith_secret`, the
-first plan will want to write `value` — that is expected, not drift.
+first plan will want to write `value` — that is expected, not drift. An imported
+`langsmith_oauth_client` carries a null `client_secret` for the same reason: the API issues it once
+at registration and never returns it again. Rotate it with the `rotate_secret` trigger if you need a
+value you can capture.
 
 `langsmith_data_plane` and `langsmith_feedback_ingest_token` refuse import by design.
 

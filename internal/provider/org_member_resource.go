@@ -211,6 +211,9 @@ func (r *OrgMemberResource) Create(ctx context.Context, req resource.CreateReque
 		if data.UserID.IsUnknown() {
 			data.UserID = types.StringNull()
 		}
+		if data.Pending.IsUnknown() {
+			data.Pending = types.BoolNull()
+		}
 		resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 		return
 	}
@@ -220,6 +223,9 @@ func (r *OrgMemberResource) Create(ctx context.Context, req resource.CreateReque
 		// tainted) instead of orphaned.
 		if data.UserID.IsUnknown() {
 			data.UserID = types.StringNull()
+		}
+		if data.Pending.IsUnknown() {
+			data.Pending = types.BoolNull()
 		}
 		resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 		return

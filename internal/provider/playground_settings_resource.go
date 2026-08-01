@@ -543,7 +543,7 @@ func setPlaygroundOAuthFields(data *PlaygroundSettingsResourceModel,
 // setPlaygroundAvailability copies the available_in_* attributes onto an update
 // body and reports whether any of them was configured.
 func setPlaygroundAvailability(data *PlaygroundSettingsResourceModel, body *playgroundSettingsAPIUpdateRequest) bool {
-	any := false
+	configured := false
 	for _, f := range []struct {
 		src types.Bool
 		dst **bool
@@ -560,7 +560,7 @@ func setPlaygroundAvailability(data *PlaygroundSettingsResourceModel, body *play
 		}
 		v := f.src.ValueBool()
 		*f.dst = &v
-		any = true
+		configured = true
 	}
-	return any
+	return configured
 }

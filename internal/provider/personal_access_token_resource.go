@@ -10,7 +10,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -124,10 +123,11 @@ func (r *PersonalAccessTokenResource) Schema(ctx context.Context, req resource.S
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"read_only": schema.BoolAttribute{
+				// Optional-only on purpose -- see the note on langsmith_api_key's
+				// read_only: a default plus RequiresReplace would reissue every
+				// token that predates this attribute.
 				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(false),
-				MarkdownDescription: "Whether the token is read-only. Defaults to `false`. The API does not return this value, so it cannot be refreshed from the server — Terraform reports the configured value, and changing it forces a new token.",
+				MarkdownDescription: "Whether the token is read-only. Defaults to `false` server-side when omitted. The API does not return this value, so Terraform cannot refresh it and leaves it null unless you set it explicitly; changing it forces a new token.",
 				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.RequiresReplace()},
 			},
 			"role_id": schema.StringAttribute{

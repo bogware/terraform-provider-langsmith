@@ -2,6 +2,7 @@
 
 BUG FIXES:
 
+* `langsmith_workspace_member` would fail every create with "Provider produced inconsistent result after apply" once the new `pending` attribute existed, because the create path never populated it.
 * `langsmith_workspace_member` dropped a member from state on every refresh while their invitation was unaccepted, so Terraform recreated it on the next apply. Pending workspace members are served by a separate endpoint (`/api/v1/workspaces/current/members/pending`) that `Read` never consulted.
 * `langsmith_org_member` and `langsmith_workspace_member` sent updates and deletes to the accepted-member endpoint even when the invitation was still pending, where the API answers 404 — revoking an unaccepted invitation through Terraform did not work. Both now address the `/pending` form when appropriate, and fall back to the other endpoint if the invitation was accepted or revoked since the last refresh. A new computed `pending` attribute records which applies.
 * `langsmith_run_rule` could not be updated at all once it had an evaluator. Creating a rule with `evaluators` or `code_evaluators` makes the server assign an `evaluator_id`, which `Read` stored and every subsequent update then sent back alongside the inline evaluators, so the API answered `422 Provide either evaluator_id or evaluators/code_evaluators, not both` — reproducible by changing nothing but `display_name`. The provider now withholds `evaluator_id` whenever the configuration defines the evaluators inline.

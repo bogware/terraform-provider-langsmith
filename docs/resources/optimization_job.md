@@ -43,7 +43,6 @@ resource "langsmith_optimization_job" "example" {
 
 ### Optional
 
-- `status` (String) Server-driven lifecycle status: `created`, `running`, `successful` or `failed`. Set it explicitly only to cancel or force a state; otherwise it tracks whatever the server reports.
 - `workspace_id` (String) If set, overrides the provider-level `workspace_id` for this resource's API calls. Changing it forces a new job.
 
 ### Read-Only
@@ -52,4 +51,5 @@ resource "langsmith_optimization_job" "example" {
 - `id` (String) UUID of the job.
 - `repo_id` (String) UUID of the repo the job runs against.
 - `results` (String) JSON-encoded results, populated as the job progresses.
+- `status` (String) Lifecycle status: `created`, `running`, `successful` or `failed`. Driven entirely by the server and read-only here — the job advances on its own, so a value configured in Terraform would be contradicted by the next refresh.
 - `updated_at` (String) When the job was last updated.

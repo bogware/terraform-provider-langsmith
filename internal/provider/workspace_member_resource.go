@@ -198,12 +198,11 @@ func (r *WorkspaceMemberResource) Create(ctx context.Context, req resource.Creat
 		return
 	}
 
-	var found *workspaceMemberAPIResponse
-	for i := range listResult.Members {
-		if listResult.Members[i].ID == createResult.ID {
-			found = &listResult.Members[i]
-			break
-		}
+	found, pending, lookupErr := r.findWorkspaceMember(ctx, effectiveClient(r.client, data.WorkspaceID), createResult.ID)
+	if lookupErr != nil {
+		resp.Diagnostics.AddError("Error reading workspace member after create", lookupErr.Error())
+		r.persistPartialCreateState(ctx, &data, resp)
+		return
 	}
 
 	if found == nil {
@@ -218,6 +217,7 @@ func (r *WorkspaceMemberResource) Create(ctx context.Context, req resource.Creat
 	}
 
 	mapWorkspaceMemberResponseToState(&data, found)
+	data.Pending = types.BoolValue(pending)
 	// workspace_id is not returned by the API; preserve the explicitly
 	// supplied plan value when set, otherwise fall back to the effective
 	// client workspace or null.
@@ -247,6 +247,9 @@ func (r *WorkspaceMemberResource) persistPartialCreateState(ctx context.Context,
 	if data.CreatedAt.IsUnknown() {
 		data.CreatedAt = types.StringNull()
 	}
+	if data.Pending.IsUnknown() {
+		data.Pending = types.BoolNull()
+	}
 	if data.WorkspaceID.IsNull() || data.WorkspaceID.IsUnknown() {
 		if ws := effectiveClient(r.client, data.WorkspaceID).WorkspaceID; ws != "" {
 			data.WorkspaceID = types.StringValue(ws)
@@ -265,39 +268,10 @@ func (r *WorkspaceMemberResource) Read(ctx context.Context, req resource.ReadReq
 	}
 
 	// No single-member endpoint -- we have to call roll on the whole bunkhouse.
-	var listResult workspaceMemberListAPIResponse
-	err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/workspaces/current/members", nil, &listResult)
+	found, pending, err := r.findWorkspaceMember(ctx, effectiveClient(r.client, data.WorkspaceID), data.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading workspace members", err.Error())
 		return
-	}
-
-	var found *workspaceMemberAPIResponse
-	for i := range listResult.Members {
-		if listResult.Members[i].ID == data.ID.ValueString() {
-			found = &listResult.Members[i]
-			break
-		}
-	}
-	pending := false
-
-	// An unaccepted invitation is not in the members list at all -- it lives at a
-	// separate endpoint. Without this second look the member would be dropped
-	// from state on every refresh and recreated on the next apply.
-	if found == nil {
-		var pendingList []workspaceMemberAPIResponse
-		err := effectiveClient(r.client, data.WorkspaceID).Get(ctx, "/api/v1/workspaces/current/members/pending", nil, &pendingList)
-		if err != nil && !client.IsNotFound(err) {
-			resp.Diagnostics.AddError("Error reading pending workspace members", err.Error())
-			return
-		}
-		for i := range pendingList {
-			if pendingList[i].ID == data.ID.ValueString() {
-				found = &pendingList[i]
-				pending = true
-				break
-			}
-		}
 	}
 
 	if found == nil {
@@ -398,4 +372,35 @@ func mapWorkspaceMemberResponseToState(data *WorkspaceMemberResourceModel, resul
 	} else {
 		data.CreatedAt = types.StringNull()
 	}
+}
+
+// findWorkspaceMember locates a member by ID, reporting whether the invitation
+// is still unaccepted. Accepted members are in the roster; unaccepted ones are
+// only at the /pending endpoint, so both have to be consulted.
+func (r *WorkspaceMemberResource) findWorkspaceMember(ctx context.Context, c *client.Client, id string) (*workspaceMemberAPIResponse, bool, error) {
+	var listResult workspaceMemberListAPIResponse
+	if err := c.Get(ctx, "/api/v1/workspaces/current/members", nil, &listResult); err != nil {
+		return nil, false, err
+	}
+	for i := range listResult.Members {
+		if listResult.Members[i].ID == id {
+			return &listResult.Members[i], false, nil
+		}
+	}
+
+	var pendingList []workspaceMemberAPIResponse
+	if err := c.Get(ctx, "/api/v1/workspaces/current/members/pending", nil, &pendingList); err != nil {
+		if !client.IsNotFound(err) {
+			return nil, false, err
+		}
+		// Deployments without the pending endpoint answer 404; that just means
+		// there is no invitation to find, so fall through with an empty list.
+		pendingList = nil
+	}
+	for i := range pendingList {
+		if pendingList[i].ID == id {
+			return &pendingList[i], true, nil
+		}
+	}
+	return nil, false, nil
 }

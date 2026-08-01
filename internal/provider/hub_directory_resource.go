@@ -12,7 +12,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -100,10 +99,10 @@ func (r *HubDirectoryResource) Schema(ctx context.Context, req resource.SchemaRe
 				Required:            true,
 			},
 			"skip_webhooks": schema.BoolAttribute{
-				MarkdownDescription: "Suppress webhook delivery for commits written by Terraform. Defaults to `false`.",
+				// Optional-only so an imported directory, whose state has no value
+				// for this, does not plan a change and write a pointless commit.
+				MarkdownDescription: "Suppress webhook delivery for commits written by Terraform. Defaults to `false` when omitted.",
 				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(false),
 			},
 			"commit_hash": schema.StringAttribute{
 				MarkdownDescription: "Hash of the most recent commit.",

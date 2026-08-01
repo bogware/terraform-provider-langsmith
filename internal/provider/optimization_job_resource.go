@@ -71,10 +71,6 @@ type optimizationJobCreateRequest struct {
 	Config    json.RawMessage `json:"config"`
 }
 
-type optimizationJobUpdateRequest struct {
-	Status *string `json:"status,omitempty"`
-}
-
 func (r *OptimizationJobResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_optimization_job"
 }
@@ -115,12 +111,8 @@ func (r *OptimizationJobResource) Schema(ctx context.Context, req resource.Schem
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"status": schema.StringAttribute{
-				MarkdownDescription: "Server-driven lifecycle status: `created`, `running`, `successful` or `failed`. Set it explicitly only to cancel or force a state; otherwise it tracks whatever the server reports.",
-				Optional:            true,
+				MarkdownDescription: "Lifecycle status: `created`, `running`, `successful` or `failed`. Driven entirely by the server and read-only here — the job advances on its own, so a value configured in Terraform would be contradicted by the next refresh.",
 				Computed:            true,
-				Validators: []validator.String{
-					stringvalidator.OneOf("created", "running", "successful", "failed"),
-				},
 			},
 			"results": schema.StringAttribute{
 				MarkdownDescription: "JSON-encoded results, populated as the job progresses.",
@@ -222,33 +214,14 @@ func (r *OptimizationJobResource) Read(ctx context.Context, req resource.ReadReq
 }
 
 func (r *OptimizationJobResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data OptimizationJobResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// status is the only thing the update endpoint accepts; everything else on
-	// this resource forces replacement.
-	body := optimizationJobUpdateRequest{}
-	if !data.Status.IsNull() && !data.Status.IsUnknown() {
-		v := data.Status.ValueString()
-		body.Status = &v
-	}
-
-	c := effectiveClient(r.client, data.WorkspaceID)
-	planConfig := data.Config
-
-	var api optimizationJobAPI
-	if err := c.Patch(ctx, r.basePath(&data)+"/"+data.ID.ValueString(), body, &api); err != nil {
-		resp.Diagnostics.AddError("Error updating optimization job", err.Error())
-		return
-	}
-
-	r.mapResponse(&data, &api, planConfig)
-	finalizeWorkspaceID(&data.WorkspaceID, c, firstNonEmpty(api.WorkspaceID, api.TenantID), &resp.Diagnostics)
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	// Everything a practitioner can set forces replacement, and the only fields
+	// the update endpoint accepts (status, result) belong to the server. There is
+	// nothing to reconcile here, so reaching this method means the schema and
+	// this method have drifted apart.
+	resp.Diagnostics.AddError(
+		"Update Not Supported",
+		"An optimization job cannot be updated: its inputs force replacement and its status is written by the server.",
+	)
 }
 
 func (r *OptimizationJobResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

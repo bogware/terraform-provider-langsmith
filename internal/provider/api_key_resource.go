@@ -11,7 +11,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -168,10 +167,13 @@ func (r *APIKeyResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				},
 			},
 			"read_only": schema.BoolAttribute{
-				MarkdownDescription: "Whether the key is read-only. Defaults to `false`. The API does not return this value, so it cannot be refreshed from the server — Terraform reports the configured value, and changing it forces a new key.",
+				// Deliberately Optional-only rather than Optional+Computed with a
+				// default: a default would plan `false` against the null already in
+				// the state of every key created before this attribute existed,
+				// and RequiresReplace would then destroy and reissue those keys on
+				// upgrade. Null and false mean the same thing to the API.
+				MarkdownDescription: "Whether the key is read-only. Defaults to `false` server-side when omitted. The API does not return this value, so Terraform cannot refresh it and leaves it null unless you set it explicitly; changing it forces a new key.",
 				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(false),
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.RequiresReplace(),
 				},

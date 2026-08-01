@@ -35,7 +35,7 @@ output "ci_api_key" {
 - `description` (String) A description for the API key. Defaults to `Default API key` server-side when omitted.
 - `expires_at` (String) ISO 8601 timestamp when the API key expires. Omit for a non-expiring key.
 - `org_role_id` (String) UUID of the organization role for org-scoped keys. If omitted, defaults to ORG_USER server-side.
-- `read_only` (Boolean) Whether the key is read-only. Defaults to `false`. The API does not return this value, so it cannot be refreshed from the server — Terraform reports the configured value, and changing it forces a new key.
+- `read_only` (Boolean) Whether the key is read-only. Defaults to `false` server-side when omitted. The API does not return this value, so Terraform cannot refresh it and leaves it null unless you set it explicitly; changing it forces a new key.
 - `role_id` (String) UUID of the workspace role to assign to the API key. If omitted, the server picks a default role.
 - `workspace_id` (String) If set, overrides the provider-level `workspace_id` for all API calls made by this resource. Used for request routing only; it does not bind the key to a workspace (use `workspaces` for that).
 - `workspaces` (List of String) List of workspace UUIDs this key may access. Feature-flagged on the LangSmith side.

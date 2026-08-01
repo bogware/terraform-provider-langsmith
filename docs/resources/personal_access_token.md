@@ -34,7 +34,7 @@ output "pat" {
 - `description` (String)
 - `expires_at` (String) ISO 8601 timestamp when the PAT expires.
 - `org_role_id` (String) UUID of the org role to assign. Defaults server-side to `ORG_USER` when omitted.
-- `read_only` (Boolean) Whether the token is read-only. Defaults to `false`. The API does not return this value, so it cannot be refreshed from the server — Terraform reports the configured value, and changing it forces a new token.
+- `read_only` (Boolean) Whether the token is read-only. Defaults to `false` server-side when omitted. The API does not return this value, so Terraform cannot refresh it and leaves it null unless you set it explicitly; changing it forces a new token.
 - `role_id` (String) UUID of the workspace role to assign to the token. If omitted, the server picks a default role.
 - `workspaces` (List of String) List of workspace UUIDs this token may access.
 

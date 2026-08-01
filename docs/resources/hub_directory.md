@@ -39,7 +39,7 @@ resource "langsmith_hub_directory" "example" {
 
 ### Optional
 
-- `skip_webhooks` (Boolean) Suppress webhook delivery for commits written by Terraform. Defaults to `false`.
+- `skip_webhooks` (Boolean) Suppress webhook delivery for commits written by Terraform. Defaults to `false` when omitted.
 - `workspace_id` (String) If set, overrides the provider-level `workspace_id` for this resource's API calls. Changing it forces replacement.
 
 ### Read-Only
