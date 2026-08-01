@@ -337,6 +337,9 @@ func (p *LangSmithProvider) Resources(ctx context.Context) []func() resource.Res
 
 		// Platform completeness (1.0)
 		NewSandboxRegistryResource,
+
+		// API parity (1.2)
+		NewOAuthClientResource,
 	}
 }
 
@@ -414,6 +417,7 @@ func (p *LangSmithProvider) DataSources(ctx context.Context) []func() datasource
 		NewSharedTokensDataSource,
 		NewSessionAgentVersionsDataSource,
 		NewMCPVendorDetailsDataSource,
+		NewOAuthAuthorizedAppsDataSource,
 	}
 }
 

@@ -25,6 +25,7 @@ ENHANCEMENTS:
 
 FEATURES:
 
+* New resource `langsmith_oauth_client`, registering an OAuth client with the LangSmith authorization server (name, type, redirect URIs, grant types, allowed scopes, and a `disabled` switch). The client secret is issued once at registration and cannot be read back, so it is stored in state and marked sensitive; `client_type` and `grant_types` are not accepted by the update endpoint and therefore force replacement. Paired with a `langsmith_oauth_authorized_apps` data source listing the applications the caller has consented to. These endpoints are entitlement-gated — they return 404 on an organization without OAuth — so the acceptance tests are opt-in behind `LANGSMITH_TEST_OAUTH`.
 * New data sources for API surface the provider did not reach:
     * `langsmith_dataset_versions` — the version history of a dataset (`as_of` plus any tags pointing at it), so a version can be discovered before pinning a tag or an experiment to it.
     * `langsmith_shared_tokens` — everything in the workspace currently published through a public share link, including shares created outside Terraform. A share token is an unauthenticated capability, so this exists to audit what is exposed.
