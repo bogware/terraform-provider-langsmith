@@ -8,5 +8,13 @@ resource "langsmith_alert_rule" "example" {
   operator       = "gte"
   threshold      = 5000
   window_minutes = 60
-  actions        = jsonencode([])
+  # At least one action is required; a rule with an empty array is rejected.
+  actions = jsonencode([
+    {
+      target = "webhook"
+      config = {
+        url = "https://example.com/langsmith-alert"
+      }
+    }
+  ])
 }

@@ -1,3 +1,9 @@
+## 1.3.0 (Unreleased)
+
+BUG FIXES:
+
+* `langsmith_alert_rule` documented — and shipped an example using — an `actions` value the API rejects. The published example and the resource's own acceptance test both used an empty array, which LangSmith answers with `400 request validation failed: [Actions: min]`, and the schema description cited `{"target": "email"}` when `email` is not one of the accepted targets at all. `actions` is `minItems: 1` and its targets are `webhook`, `slack`, `pagerduty` and `dynatrace`. The example and description now show a valid action, and an empty or non-array `actions` is rejected by the provider with an explanation instead of surfacing the opaque API error.
+
 ## 1.2.0 (August 2026)
 
 BUG FIXES:

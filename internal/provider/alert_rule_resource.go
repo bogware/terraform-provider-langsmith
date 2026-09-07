@@ -194,8 +194,11 @@ func (r *AlertRuleResource) Schema(ctx context.Context, req resource.SchemaReque
 				Optional:            true,
 			},
 			"actions": schema.StringAttribute{
-				MarkdownDescription: "A JSON-encoded array of action objects, e.g. `[{\"target\": \"email\", \"config\": {...}}]`.",
-				Required:            true,
+				MarkdownDescription: "A JSON-encoded array of action objects, each with a `target` and a `config`, " +
+					"e.g. `[{\"target\": \"webhook\", \"config\": {\"url\": \"https://example.com/hook\"}}]`. " +
+					"Valid targets are `webhook`, `slack`, `pagerduty` and `dynatrace`. " +
+					"At least one action is required — LangSmith rejects a rule with an empty array.",
+				Required: true,
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "The timestamp when the alert rule was created.",
@@ -410,6 +413,29 @@ func buildAlertRuleRequest(data *AlertRuleResourceModel) (*alertRuleRequest, dia
 		diags.AddError(
 			"Invalid Actions JSON",
 			"The actions field must contain valid JSON. Even Festus could tell this ain't right.",
+		)
+		return nil, diags
+	}
+
+	// The API requires at least one action (the schema marks actions minItems:1)
+	// and answers an empty array with an opaque
+	// `request validation failed: [Actions: min]`. Say what is actually wrong
+	// instead of letting that reach the user.
+	var actions []json.RawMessage
+	if err := json.Unmarshal([]byte(actionsJSON), &actions); err != nil {
+		diags.AddError(
+			"Invalid Actions JSON",
+			"The actions field must be a JSON array of action objects, "+
+				`e.g. [{"target": "webhook", "config": {"url": "https://example.com/hook"}}].`,
+		)
+		return nil, diags
+	}
+	if len(actions) == 0 {
+		diags.AddError(
+			"Alert rule requires at least one action",
+			"An alert rule with no actions has nothing to do when it fires, and LangSmith rejects it. "+
+				`Add at least one action, e.g. [{"target": "webhook", "config": {"url": "https://example.com/hook"}}]. `+
+				"Valid targets are webhook, slack, pagerduty and dynatrace.",
 		)
 		return nil, diags
 	}

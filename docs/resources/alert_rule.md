@@ -23,7 +23,15 @@ resource "langsmith_alert_rule" "example" {
   operator       = "gte"
   threshold      = 5000
   window_minutes = 60
-  actions        = jsonencode([])
+  # At least one action is required; a rule with an empty array is rejected.
+  actions = jsonencode([
+    {
+      target = "webhook"
+      config = {
+        url = "https://example.com/langsmith-alert"
+      }
+    }
+  ])
 }
 ```
 
@@ -32,7 +40,7 @@ resource "langsmith_alert_rule" "example" {
 
 ### Required
 
-- `actions` (String) A JSON-encoded array of action objects, e.g. `[{"target": "email", "config": {...}}]`.
+- `actions` (String) A JSON-encoded array of action objects, each with a `target` and a `config`, e.g. `[{"target": "webhook", "config": {"url": "https://example.com/hook"}}]`. Valid targets are `webhook`, `slack`, `pagerduty` and `dynatrace`. At least one action is required — LangSmith rejects a rule with an empty array.
 - `aggregation` (String) The aggregation method (`avg`, `sum`, or `pct`).
 - `attribute` (String) The metric attribute to monitor (`latency`, `error_count`, `feedback_score`, `run_latency`, or `run_count`).
 - `description` (String) A description of the alert rule.

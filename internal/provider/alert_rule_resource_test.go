@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
@@ -42,7 +43,18 @@ resource "langsmith_alert_rule" "test" {
   operator       = "gte"
   window_minutes = 5
   threshold      = 5000
-  actions        = "[]"
+
+  # An empty array is rejected by the API (actions is minItems:1). A webhook
+  # pointing at an unroutable host is the least side-effecting valid action:
+  # nothing is delivered unless the rule actually fires.
+  actions = jsonencode([
+    {
+      target = "webhook"
+      config = {
+        url = "https://example.com/langsmith-alert"
+      }
+    }
+  ])
 }`, rName, rName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("langsmith_alert_rule.test", "id"),
@@ -52,4 +64,78 @@ resource "langsmith_alert_rule" "test" {
 			},
 		},
 	})
+}
+
+// TestBuildAlertRuleRequest_Actions covers the actions payload, which the API
+// constrains as minItems:1 and answers with an opaque
+// `request validation failed: [Actions: min]` when it is empty. The provider
+// catches that itself so the user is told what to fix. Runs without
+// credentials.
+func TestBuildAlertRuleRequest_Actions(t *testing.T) {
+	base := func(actions string) *AlertRuleResourceModel {
+		return &AlertRuleResourceModel{
+			Name:          types.StringValue("rule"),
+			Description:   types.StringValue("desc"),
+			Type:          types.StringValue("threshold"),
+			Aggregation:   types.StringValue("avg"),
+			Attribute:     types.StringValue("latency"),
+			Operator:      types.StringValue("gte"),
+			WindowMinutes: types.Int64Value(5),
+			Actions:       types.StringValue(actions),
+		}
+	}
+
+	cases := []struct {
+		name        string
+		actions     string
+		wantErr     bool
+		wantSummary string
+	}{
+		{
+			name:    "single webhook action is accepted",
+			actions: `[{"target":"webhook","config":{"url":"https://example.com/hook"}}]`,
+		},
+		{
+			name:        "empty array is rejected before it reaches the API",
+			actions:     `[]`,
+			wantErr:     true,
+			wantSummary: "Alert rule requires at least one action",
+		},
+		{
+			name:        "a JSON object is not an actions array",
+			actions:     `{"target":"webhook"}`,
+			wantErr:     true,
+			wantSummary: "Invalid Actions JSON",
+		},
+		{
+			name:        "malformed JSON is still caught",
+			actions:     `[{`,
+			wantErr:     true,
+			wantSummary: "Invalid Actions JSON",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			body, diags := buildAlertRuleRequest(base(tc.actions))
+			if tc.wantErr {
+				if !diags.HasError() {
+					t.Fatalf("expected an error diagnostic, got none")
+				}
+				if got := diags.Errors()[0].Summary(); got != tc.wantSummary {
+					t.Fatalf("diagnostic summary = %q, want %q", got, tc.wantSummary)
+				}
+				if body != nil {
+					t.Fatalf("expected nil body on error, got %+v", body)
+				}
+				return
+			}
+			if diags.HasError() {
+				t.Fatalf("unexpected error diagnostics: %v", diags.Errors())
+			}
+			if string(body.Actions) != tc.actions {
+				t.Fatalf("actions = %s, want %s", body.Actions, tc.actions)
+			}
+		})
+	}
 }
