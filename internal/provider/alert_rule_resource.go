@@ -194,9 +194,11 @@ func (r *AlertRuleResource) Schema(ctx context.Context, req resource.SchemaReque
 				Optional:            true,
 			},
 			"actions": schema.StringAttribute{
-				MarkdownDescription: "A JSON-encoded array of action objects, each with a `target` and a `config`, " +
-					"e.g. `[{\"target\": \"webhook\", \"config\": {\"url\": \"https://example.com/hook\"}}]`. " +
+				MarkdownDescription: "A JSON-encoded array of action objects, each with a `target` and a `config`. " +
 					"Valid targets are `webhook`, `slack`, `pagerduty` and `dynatrace`. " +
+					"`config` is itself a JSON-encoded **string**, not a nested object, since its shape " +
+					"differs per target — e.g. `[{\"target\": \"webhook\", \"config\": \"{\\\"url\\\": \\\"https://example.com/hook\\\"}\"}]`, " +
+					"which in HCL is most readable as a nested `jsonencode`. " +
 					"At least one action is required — LangSmith rejects a rule with an empty array.",
 				Required: true,
 			},
@@ -426,7 +428,7 @@ func buildAlertRuleRequest(data *AlertRuleResourceModel) (*alertRuleRequest, dia
 		diags.AddError(
 			"Invalid Actions JSON",
 			"The actions field must be a JSON array of action objects, "+
-				`e.g. [{"target": "webhook", "config": {"url": "https://example.com/hook"}}].`,
+				`e.g. [{"target": "webhook", "config": "{\"url\": \"https://example.com/hook\"}"}].`,
 		)
 		return nil, diags
 	}
@@ -434,8 +436,9 @@ func buildAlertRuleRequest(data *AlertRuleResourceModel) (*alertRuleRequest, dia
 		diags.AddError(
 			"Alert rule requires at least one action",
 			"An alert rule with no actions has nothing to do when it fires, and LangSmith rejects it. "+
-				`Add at least one action, e.g. [{"target": "webhook", "config": {"url": "https://example.com/hook"}}]. `+
-				"Valid targets are webhook, slack, pagerduty and dynatrace.",
+				`Add at least one action, e.g. [{"target": "webhook", "config": "{\"url\": \"https://example.com/hook\"}"}]. `+
+				"Valid targets are webhook, slack, pagerduty and dynatrace. Note that config is a "+
+				"JSON-encoded string rather than a nested object.",
 		)
 		return nil, diags
 	}

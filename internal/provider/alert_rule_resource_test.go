@@ -46,13 +46,16 @@ resource "langsmith_alert_rule" "test" {
 
   # An empty array is rejected by the API (actions is minItems:1). A webhook
   # pointing at an unroutable host is the least side-effecting valid action:
-  # nothing is delivered unless the rule actually fires.
+  # nothing is delivered unless the rule actually fires. config is a
+  # JSON-encoded string rather than a nested object -- the OpenAPI spec says
+  # object, but the API rejects that with "cannot unmarshal object into Go
+  # value of type string".
   actions = jsonencode([
     {
       target = "webhook"
-      config = {
+      config = jsonencode({
         url = "https://example.com/langsmith-alert"
-      }
+      })
     }
   ])
 }`, rName, rName),
@@ -92,8 +95,9 @@ func TestBuildAlertRuleRequest_Actions(t *testing.T) {
 		wantSummary string
 	}{
 		{
+			// config is a JSON-encoded string, not a nested object.
 			name:    "single webhook action is accepted",
-			actions: `[{"target":"webhook","config":{"url":"https://example.com/hook"}}]`,
+			actions: `[{"target":"webhook","config":"{\"url\":\"https://example.com/hook\"}"}]`,
 		},
 		{
 			name:        "empty array is rejected before it reaches the API",
