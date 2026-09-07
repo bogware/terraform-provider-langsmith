@@ -195,11 +195,13 @@ func (r *AlertRuleResource) Schema(ctx context.Context, req resource.SchemaReque
 			},
 			"actions": schema.StringAttribute{
 				MarkdownDescription: "A JSON-encoded array of action objects, each with a `target` and a `config`. " +
-					"Valid targets are `webhook`, `slack`, `pagerduty` and `dynatrace`. " +
-					"`config` is itself a JSON-encoded **string**, not a nested object, since its keys " +
-					"differ per target — a `webhook` needs `url` and `project_name` — " +
-					"which in HCL is most readable as a nested `jsonencode`. " +
-					"At least one action is required — LangSmith rejects a rule with an empty array.",
+					"At least one action is required — LangSmith rejects a rule with an empty array.\n\n" +
+					"Valid targets are `webhook`, `slack`, `pagerduty` and `dynatrace`.\n\n" +
+					"`config` is itself a JSON-encoded **string**, not a nested object, because its keys differ " +
+					"per target; in HCL that reads as a nested `jsonencode`. The keys each target requires are " +
+					"not published in the LangSmith OpenAPI spec — a `webhook` needs at least `url`, " +
+					"`project_name` and `headers`. The API names any missing key in its error message, so build " +
+					"the config up from what it reports.",
 				Required: true,
 			},
 			"created_at": schema.StringAttribute{
@@ -441,6 +443,41 @@ func buildAlertRuleRequest(data *AlertRuleResourceModel) (*alertRuleRequest, dia
 				"JSON-encoded string rather than a nested object.",
 		)
 		return nil, diags
+	}
+
+	for i, raw := range actions {
+		var action struct {
+			Target *string         `json:"target"`
+			Config json.RawMessage `json:"config"`
+		}
+		if err := json.Unmarshal(raw, &action); err != nil {
+			diags.AddError(
+				"Invalid alert action",
+				fmt.Sprintf("actions[%d] is not an action object. Each entry needs a target and a config, "+
+					`e.g. {"target": "webhook", "config": "{\"url\": \"https://example.com/hook\"}"}.`, i),
+			)
+			return nil, diags
+		}
+		if action.Target == nil || *action.Target == "" {
+			diags.AddError(
+				"Alert action is missing a target",
+				fmt.Sprintf("actions[%d] has no target. Valid targets are webhook, slack, pagerduty and dynatrace.", i),
+			)
+			return nil, diags
+		}
+		// config is a JSON-encoded string, not a nested object. The published
+		// OpenAPI spec says `{"type": "object"}`, but the API rejects an object
+		// with `cannot unmarshal object into Go value of type string`, so catch
+		// the natural mistake here where we can explain it.
+		if len(action.Config) == 0 || action.Config[0] != '"' {
+			diags.AddError(
+				"Alert action config must be a JSON-encoded string",
+				fmt.Sprintf("actions[%d] must set config to a JSON-encoded string rather than a nested object, "+
+					"because its keys differ per target. In HCL that is a nested jsonencode: "+
+					`config = jsonencode({ url = "...", project_name = "..." }).`, i),
+			)
+			return nil, diags
+		}
 	}
 	body.Actions = json.RawMessage(actionsJSON)
 

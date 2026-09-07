@@ -24,15 +24,18 @@ resource "langsmith_alert_rule" "example" {
   threshold      = 5000
   window_minutes = 60
   # At least one action is required; a rule with an empty array is rejected.
-  # Note the double encoding: `config` is itself a JSON-encoded string, not a
-  # nested object, because it carries a different shape per target. A webhook
-  # config needs both `url` and `project_name`.
+  # Note the double encoding: config is itself a JSON-encoded string, not a
+  # nested object, because its keys differ per target.
+  #
+  # Those keys are not documented by LangSmith. A webhook needs at least url,
+  # project_name and headers; if the API reports a missing field, add it here.
   actions = jsonencode([
     {
       target = "webhook"
       config = jsonencode({
         url          = "https://example.com/langsmith-alert"
         project_name = langsmith_project.example.name
+        headers      = {}
       })
     }
   ])
@@ -44,7 +47,11 @@ resource "langsmith_alert_rule" "example" {
 
 ### Required
 
-- `actions` (String) A JSON-encoded array of action objects, each with a `target` and a `config`. Valid targets are `webhook`, `slack`, `pagerduty` and `dynatrace`. `config` is itself a JSON-encoded **string**, not a nested object, since its keys differ per target — a `webhook` needs `url` and `project_name` — which in HCL is most readable as a nested `jsonencode`. At least one action is required — LangSmith rejects a rule with an empty array.
+- `actions` (String) A JSON-encoded array of action objects, each with a `target` and a `config`. At least one action is required — LangSmith rejects a rule with an empty array.
+
+Valid targets are `webhook`, `slack`, `pagerduty` and `dynatrace`.
+
+`config` is itself a JSON-encoded **string**, not a nested object, because its keys differ per target; in HCL that reads as a nested `jsonencode`. The keys each target requires are not published in the LangSmith OpenAPI spec — a `webhook` needs at least `url`, `project_name` and `headers`. The API names any missing key in its error message, so build the config up from what it reports.
 - `aggregation` (String) The aggregation method (`avg`, `sum`, or `pct`).
 - `attribute` (String) The metric attribute to monitor (`latency`, `error_count`, `feedback_score`, `run_latency`, or `run_count`).
 - `description` (String) A description of the alert rule.
