@@ -6,7 +6,9 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -84,7 +86,8 @@ type promptUpdateRequest struct {
 
 // promptCommitRequest is the payload for branding a new version of the prompt.
 type promptCommitRequest struct {
-	Manifest json.RawMessage `json:"manifest"`
+	Manifest     json.RawMessage `json:"manifest"`
+	ParentCommit string          `json:"parent_commit,omitempty"`
 }
 
 // promptCommitResponse wraps the commit the API sends back after a successful brand.
@@ -244,6 +247,42 @@ func (r *PromptResource) Configure(ctx context.Context, req resource.ConfigureRe
 	r.client = c
 }
 
+// commitManifest writes a new manifest version and returns its hash.
+// parentCommit is empty for the first commit on a fresh repo and carries the
+// known head otherwise, so the server can reject a write that raced with a
+// change made outside Terraform. Without it the API has to infer a parent, and
+// that inference fails on repos with more than one head.
+func (r *PromptResource) commitManifest(ctx context.Context, c *client.Client, repoHandle, manifest, parentCommit string) (string, error) {
+	body := promptCommitRequest{
+		Manifest:     json.RawMessage(manifest),
+		ParentCommit: parentCommit,
+	}
+	var result promptCommitResponse
+	if err := c.Post(ctx, fmt.Sprintf("/api/v1/commits/-/%s", repoHandle), body, &result); err != nil {
+		return "", err
+	}
+	return result.Commit.CommitHash, nil
+}
+
+// promptCommitConflictHint explains a 409 from the commit endpoint. The parent
+// Terraform sent is no longer the repo's head, which means the prompt was
+// committed to outside Terraform since the last refresh. Returns an empty
+// string for every other error, so callers can append it unconditionally.
+func promptCommitConflictHint(err error, parentCommit string) string {
+	var apiErr *client.APIError
+	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusConflict {
+		return ""
+	}
+	if parentCommit == "" {
+		return "\n\nTerraform had no known parent commit for this repo, so the commit was sent without one " +
+			"and the API could not infer where to attach it. Run 'terraform refresh' so the provider picks up " +
+			"the repo's current head, then apply again."
+	}
+	return fmt.Sprintf("\n\nTerraform committed on top of %s, which is no longer this repo's head — the prompt "+
+		"was committed to outside Terraform since the last refresh. Run 'terraform plan' to pick up the new head "+
+		"and review the change against it, then apply again.", parentCommit)
+}
+
 func (r *PromptResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data PromptResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
@@ -301,14 +340,12 @@ func (r *PromptResource) Create(ctx context.Context, req resource.CreateRequest,
 	data.UpdatedAt = types.StringValue(result.Repo.UpdatedAt)
 
 	// If the trail boss brought a manifest, commit it to the repo right away.
+	// The repo was created moments ago and has no history, so there is no
+	// parent commit to build on.
 	if !data.Manifest.IsNull() && !data.Manifest.IsUnknown() {
-		commitBody := promptCommitRequest{
-			Manifest: json.RawMessage(data.Manifest.ValueString()),
-		}
-		var commitResult promptCommitResponse
-		err := c.Post(ctx, fmt.Sprintf("/api/v1/commits/-/%s", data.RepoHandle.ValueString()), commitBody, &commitResult)
+		commitHash, err := r.commitManifest(ctx, c, data.RepoHandle.ValueString(), data.Manifest.ValueString(), "")
 		if err != nil {
-			resp.Diagnostics.AddError("Error creating prompt commit", err.Error())
+			resp.Diagnostics.AddError("Error creating prompt commit", err.Error()+promptCommitConflictHint(err, ""))
 			// Persist partial state so the created repo is tracked (and tainted)
 			// instead of orphaned when the follow-up commit fails. Resolve every
 			// still-unknown computed field to a known value first.
@@ -319,7 +356,7 @@ func (r *PromptResource) Create(ctx context.Context, req resource.CreateRequest,
 			resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 			return
 		}
-		data.CommitHash = types.StringValue(commitResult.Commit.CommitHash)
+		data.CommitHash = types.StringValue(commitHash)
 	} else {
 		data.Manifest = types.StringNull()
 		data.CommitHash = types.StringNull()
@@ -477,19 +514,21 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	// If the manifest has changed, commit the new version.
+	// If the manifest has changed, commit the new version on top of the head we
+	// last saw. The parent comes from state, not the plan: commit_hash is
+	// computed without UseStateForUnknown, so data.CommitHash is unknown during
+	// every update, while Read refreshes state.CommitHash from the repo's
+	// latest commit on every plan.
 	if !data.Manifest.IsNull() && !data.Manifest.IsUnknown() &&
 		data.Manifest.ValueString() != state.Manifest.ValueString() {
-		commitBody := promptCommitRequest{
-			Manifest: json.RawMessage(data.Manifest.ValueString()),
-		}
-		var commitResult promptCommitResponse
-		commitErr := c.Post(ctx, fmt.Sprintf("/api/v1/commits/-/%s", repoHandle), commitBody, &commitResult)
+		parentCommit := state.CommitHash.ValueString()
+		commitHash, commitErr := r.commitManifest(ctx, c, repoHandle, data.Manifest.ValueString(), parentCommit)
 		if commitErr != nil {
-			resp.Diagnostics.AddError("Error creating prompt commit", commitErr.Error())
+			resp.Diagnostics.AddError("Error creating prompt commit",
+				commitErr.Error()+promptCommitConflictHint(commitErr, parentCommit))
 			return
 		}
-		data.CommitHash = types.StringValue(commitResult.Commit.CommitHash)
+		data.CommitHash = types.StringValue(commitHash)
 	}
 
 	// PATCH doesn't return the full resource, so we ride back to the API for the latest state.

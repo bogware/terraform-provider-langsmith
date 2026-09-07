@@ -1,3 +1,9 @@
+## 1.3.0 (Unreleased)
+
+BUG FIXES:
+
+* `langsmith_prompt` could not commit a changed `manifest` on repos with more than one head — typically a repo adopted into Terraform alongside a pre-existing commit lineage. The commit payload carried only `manifest`, leaving the API to infer where to attach the new commit, and that inference fails on an ambiguous graph: every apply died with `409 Parent commit validation failed` and the live commit never advanced, while the same edit committed fine through the LangSmith UI. The provider now sends `parent_commit`, pinned to the head recorded in state, exactly as `langsmith_hub_directory` already did. A conflict on that parent means the prompt was committed to outside Terraform since the last refresh, so the 409 now carries a diagnostic saying so instead of the raw API body. ([#81](https://github.com/bogware/terraform-provider-langsmith/issues/81))
+
 ## 1.2.0 (August 2026)
 
 BUG FIXES:
