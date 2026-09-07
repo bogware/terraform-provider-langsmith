@@ -25,12 +25,14 @@ resource "langsmith_alert_rule" "example" {
   window_minutes = 60
   # At least one action is required; a rule with an empty array is rejected.
   # Note the double encoding: `config` is itself a JSON-encoded string, not a
-  # nested object, because it carries a different shape per target.
+  # nested object, because it carries a different shape per target. A webhook
+  # config needs both `url` and `project_name`.
   actions = jsonencode([
     {
       target = "webhook"
       config = jsonencode({
-        url = "https://example.com/langsmith-alert"
+        url          = "https://example.com/langsmith-alert"
+        project_name = langsmith_project.example.name
       })
     }
   ])
@@ -42,7 +44,7 @@ resource "langsmith_alert_rule" "example" {
 
 ### Required
 
-- `actions` (String) A JSON-encoded array of action objects, each with a `target` and a `config`. Valid targets are `webhook`, `slack`, `pagerduty` and `dynatrace`. `config` is itself a JSON-encoded **string**, not a nested object, since its shape differs per target — e.g. `[{"target": "webhook", "config": "{\"url\": \"https://example.com/hook\"}"}]`, which in HCL is most readable as a nested `jsonencode`. At least one action is required — LangSmith rejects a rule with an empty array.
+- `actions` (String) A JSON-encoded array of action objects, each with a `target` and a `config`. Valid targets are `webhook`, `slack`, `pagerduty` and `dynatrace`. `config` is itself a JSON-encoded **string**, not a nested object, since its keys differ per target — a `webhook` needs `url` and `project_name` — which in HCL is most readable as a nested `jsonencode`. At least one action is required — LangSmith rejects a rule with an empty array.
 - `aggregation` (String) The aggregation method (`avg`, `sum`, or `pct`).
 - `attribute` (String) The metric attribute to monitor (`latency`, `error_count`, `feedback_score`, `run_latency`, or `run_count`).
 - `description` (String) A description of the alert rule.

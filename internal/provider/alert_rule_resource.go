@@ -196,8 +196,8 @@ func (r *AlertRuleResource) Schema(ctx context.Context, req resource.SchemaReque
 			"actions": schema.StringAttribute{
 				MarkdownDescription: "A JSON-encoded array of action objects, each with a `target` and a `config`. " +
 					"Valid targets are `webhook`, `slack`, `pagerduty` and `dynatrace`. " +
-					"`config` is itself a JSON-encoded **string**, not a nested object, since its shape " +
-					"differs per target — e.g. `[{\"target\": \"webhook\", \"config\": \"{\\\"url\\\": \\\"https://example.com/hook\\\"}\"}]`, " +
+					"`config` is itself a JSON-encoded **string**, not a nested object, since its keys " +
+					"differ per target — a `webhook` needs `url` and `project_name` — " +
 					"which in HCL is most readable as a nested `jsonencode`. " +
 					"At least one action is required — LangSmith rejects a rule with an empty array.",
 				Required: true,

@@ -10,12 +10,14 @@ resource "langsmith_alert_rule" "example" {
   window_minutes = 60
   # At least one action is required; a rule with an empty array is rejected.
   # Note the double encoding: `config` is itself a JSON-encoded string, not a
-  # nested object, because it carries a different shape per target.
+  # nested object, because it carries a different shape per target. A webhook
+  # config needs both `url` and `project_name`.
   actions = jsonencode([
     {
       target = "webhook"
       config = jsonencode({
-        url = "https://example.com/langsmith-alert"
+        url          = "https://example.com/langsmith-alert"
+        project_name = langsmith_project.example.name
       })
     }
   ])

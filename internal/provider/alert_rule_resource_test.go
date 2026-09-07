@@ -46,15 +46,18 @@ resource "langsmith_alert_rule" "test" {
 
   # An empty array is rejected by the API (actions is minItems:1). A webhook
   # pointing at an unroutable host is the least side-effecting valid action:
-  # nothing is delivered unless the rule actually fires. config is a
-  # JSON-encoded string rather than a nested object -- the OpenAPI spec says
-  # object, but the API rejects that with "cannot unmarshal object into Go
-  # value of type string".
+  # nothing is delivered unless the rule actually fires.
+  #
+  # config is a JSON-encoded string rather than a nested object, and a webhook
+  # config needs project_name as well as url. None of this is in the published
+  # OpenAPI spec, which declares config as a bare object -- it was established
+  # against the live API, one validation error at a time.
   actions = jsonencode([
     {
       target = "webhook"
       config = jsonencode({
-        url = "https://example.com/langsmith-alert"
+        url          = "https://example.com/langsmith-alert"
+        project_name = langsmith_project.test.name
       })
     }
   ])
