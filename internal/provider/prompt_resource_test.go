@@ -5,6 +5,7 @@ package provider
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +17,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+
+	clientpkg "github.com/bogware/terraform-provider-langsmith/internal/client"
 )
 
 func TestAccPromptResource_basic(t *testing.T) {
@@ -396,4 +399,133 @@ resource "langsmith_prompt" "test" {
   restricted_mode = %[4]t
 }
 `, handle, isPublic, description, restrictedMode)
+}
+
+// TestPromptCommitConflictHint pins the hint to the one situation it can
+// actually diagnose. A 409 is not self-evidently a parent-commit conflict, and
+// the advice it carries ("the prompt was committed to outside Terraform") is
+// specific enough to mislead if attached to some other conflict.
+func TestPromptCommitConflictHint(t *testing.T) {
+	const parentBody = `{"error":"Parent commit validation failed: reference ID 0f6c"}`
+
+	cases := []struct {
+		name   string
+		err    error
+		parent string
+		want   string // substring the hint must contain; "" means no hint at all
+	}{
+		{
+			name:   "parent conflict names the stale parent",
+			err:    &clientpkg.APIError{StatusCode: http.StatusConflict, Body: parentBody},
+			parent: "hash-1",
+			want:   "hash-1",
+		},
+		{
+			name:   "parent conflict with no known parent explains that instead",
+			err:    &clientpkg.APIError{StatusCode: http.StatusConflict, Body: parentBody},
+			parent: "",
+			want:   "no known parent commit",
+		},
+		{
+			name:   "409 for an unrelated reason gets no diagnosis",
+			err:    &clientpkg.APIError{StatusCode: http.StatusConflict, Body: `{"error":"repo is locked"}`},
+			parent: "hash-1",
+			want:   "",
+		},
+		{
+			name:   "a non-409 parent-commit message is not a conflict",
+			err:    &clientpkg.APIError{StatusCode: http.StatusBadRequest, Body: parentBody},
+			parent: "hash-1",
+			want:   "",
+		},
+		{
+			name:   "a transport error is not an API conflict",
+			err:    errors.New("connection reset"),
+			parent: "hash-1",
+			want:   "",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := promptCommitConflictHint(tc.err, tc.parent)
+			if tc.want == "" {
+				if got != "" {
+					t.Fatalf("expected no hint, got %q", got)
+				}
+				return
+			}
+			if !strings.Contains(got, tc.want) {
+				t.Fatalf("hint = %q, want it to contain %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestAccPromptResource_updateConflictKeepsAppliedMetadata covers the partial
+// update path. An apply that changes both metadata and the manifest issues a
+// PATCH and then a commit; when the commit 409s, the PATCH has already landed
+// server-side. terraform-plugin-framework seeds UpdateResponse.State from the
+// *prior* state ("Require explicit provider updates for tracking successful
+// updates"), so returning without setting state persists the pre-update
+// values and silently diverges from the live repo.
+//
+// Step 3 observes it: a PlanOnly step plans both with and without a refresh,
+// and the non-refresh plan reads state as Update left it. tag_value_ids is
+// carried alongside description because Read never repopulates it, so the
+// divergence survives a refresh too -- the assertion holds on either plan
+// rather than depending on which one the harness runs first.
+func TestAccPromptResource_updateConflictKeepsAppliedMetadata(t *testing.T) {
+	handle := "tf-prompt-partial-update"
+	stub := &promptStub{
+		handle:     handle,
+		failCommit: func(n int) bool { return n > 1 },
+	}
+	stub.start(t)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccPromptResourceConfigMetadata(handle, "first", "tv-1", "first"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("langsmith_prompt.test", "commit_hash", "hash-1"),
+					resource.TestCheckResourceAttr("langsmith_prompt.test", "tag_value_ids.0", "tv-1"),
+				),
+			},
+			{
+				// Metadata and manifest change together. The PATCH succeeds,
+				// the commit is rejected.
+				Config:      testAccPromptResourceConfigMetadata(handle, "second", "tv-2", "second"),
+				ExpectError: regexp.MustCompile(`no\s+longer\s+this\s+repo`),
+			},
+			{
+				// The manifest is back to the one the repo actually holds, so
+				// the only thing that can still differ is the metadata the
+				// failed apply had already written. An empty plan proves it
+				// was kept.
+				Config:             testAccPromptResourceConfigMetadata(handle, "second", "tv-2", "first"),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false,
+			},
+		},
+	})
+}
+
+func testAccPromptResourceConfigMetadata(handle, description, tagValueID, template string) string {
+	return fmt.Sprintf(`
+resource "langsmith_prompt" "test" {
+  repo_handle   = %[1]q
+  is_public     = false
+  description   = %[2]q
+  tag_value_ids = [%[3]q]
+
+  manifest = jsonencode({
+    lc       = 1
+    template = %[4]q
+    type     = "constructor"
+  })
+}
+`, handle, description, tagValueID, template)
 }

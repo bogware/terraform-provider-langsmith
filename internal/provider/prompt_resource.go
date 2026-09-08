@@ -264,13 +264,23 @@ func (r *PromptResource) commitManifest(ctx context.Context, c *client.Client, r
 	return result.Commit.CommitHash, nil
 }
 
-// promptCommitConflictHint explains a 409 from the commit endpoint. The parent
-// Terraform sent is no longer the repo's head, which means the prompt was
-// committed to outside Terraform since the last refresh. Returns an empty
-// string for every other error, so callers can append it unconditionally.
+// promptCommitConflictHint explains a 409 from the commit endpoint whose body
+// identifies it as a parent-commit conflict: the parent Terraform sent is no
+// longer the repo's head, which means the prompt was committed to outside
+// Terraform since the last refresh. Returns an empty string for every other
+// error, so callers can append it unconditionally.
+//
+// The body is checked rather than the status code alone. A 409 raised for some
+// other reason -- or for a reason this endpoint grows later -- would be
+// confidently misdiagnosed by the text below, sending the reader after a
+// conflict that isn't there. When in doubt, add nothing and let the API's own
+// message stand on its own.
 func promptCommitConflictHint(err error, parentCommit string) string {
 	var apiErr *client.APIError
 	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusConflict {
+		return ""
+	}
+	if !strings.Contains(strings.ToLower(apiErr.Body), "parent commit") {
 		return ""
 	}
 	if parentCommit == "" {
@@ -526,6 +536,24 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 		if commitErr != nil {
 			resp.Diagnostics.AddError("Error creating prompt commit",
 				commitErr.Error()+promptCommitConflictHint(commitErr, parentCommit))
+			// The PATCH above already landed, so the repo metadata in the plan
+			// is what the API now holds. Persist it instead of returning with
+			// no state set: the framework keeps the *prior* state when Update
+			// sets none, which would silently drop the applied description,
+			// tags and the rest until something forced a refresh.
+			//
+			// The commit itself did not happen, so the manifest and its hash
+			// are still whatever we last saw. Keeping the planned manifest here
+			// would be worse than losing it -- the next plan would compare it
+			// against itself, find no change, and skip the commit for good.
+			data.Manifest = state.Manifest
+			data.CommitHash = state.CommitHash
+			// Resolve the last still-unknown computed field. updated_at did
+			// move server-side with the PATCH, but its new value is unknown to
+			// us and Terraform rejects unknowns in post-apply state; the next
+			// refresh corrects it.
+			data.UpdatedAt = state.UpdatedAt
+			resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 			return
 		}
 		data.CommitHash = types.StringValue(commitHash)
