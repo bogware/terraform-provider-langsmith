@@ -1,3 +1,9 @@
+## 1.3.0 (Unreleased)
+
+BUG FIXES:
+
+* `langsmith_alert_rule` documented — and shipped an example using — an `actions` value the API rejects. The published example used an empty array, which LangSmith answers with `400 request validation failed: [Actions: min]`, and the schema description cited `{"target": "email"}` when `email` is not one of the accepted targets at all. `actions` is `minItems: 1` (on update as well as create) and its targets are `webhook`, `slack`, `pagerduty` and `dynatrace`. A second undocumented detail: each action's `config` is a JSON-encoded *string*, not a nested object as the OpenAPI spec declares — passing an object fails with `cannot unmarshal object into Go value of type string`. The provider now catches an empty, non-array, targetless or object-config `actions` itself and explains what to fix, rather than passing the opaque API error through. The example and schema description show the correct shape.
+
 ## 1.2.0 (August 2026)
 
 BUG FIXES:
