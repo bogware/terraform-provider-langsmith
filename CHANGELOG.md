@@ -1,3 +1,16 @@
+## 1.2.3 (October 2026)
+
+BUG FIXES:
+
+* `langsmith_model_price_map`'s `prompt_cost_details` / `completion_cost_details` still did not converge after the 1.2.2 fix. `jsonPreserveConfigSubset` ends by normalizing the kept value through Go's `encoding/json`, which renders small floats in scientific notation (`1e-07`) — but `prompt_cost_details`/`completion_cost_details` are plain `Optional` (non-`Computed`) attributes, so Terraform core diffs state against the literal bytes `jsonencode()` produces in config (decimal, `0.0000001`) regardless of what the provider writes to state. The two notations are different literal bytes no matter which one the provider settles on, so every plan still showed a diff, just a stable one instead of an oscillating one. Both attributes now use a custom type (`jsonNumericValue`) whose plan-time semantic-equality check parses both sides as JSON and compares parsed values — the same mechanism `jsontypes.Normalized` (the upstream issue's suggested fix) uses for whitespace/key-order, extended to numbers. This is a real fix at the Terraform-core comparison level, not a state-formatting workaround, so it isn't sensitive to which encoder (Go's vs. Terraform's `jsonencode()`) produced which spelling. Verified against live production state: zero diff across 60+ existing `langsmith_model_price_map` resources after upgrading, where 1.2.2 still showed all of them changing on every plan. ([#90](https://github.com/bogware/terraform-provider-langsmith/issues/90))
+
+## 1.2.2 (October 2026)
+
+BUG FIXES:
+
+* `langsmith_model_price_map`'s `match_path` was schema'd `Optional` without `Computed`, so omitting it from configuration and letting the API apply its server-side default produced "Provider produced inconsistent result after apply" on every create. `match_path` is now `Optional` and `Computed` with `UseStateForUnknown`, matching the pattern already used for `id` and `workspace_id` on this resource. ([#89](https://github.com/bogware/terraform-provider-langsmith/issues/89))
+* `langsmith_model_price_map`'s `prompt_cost_details` / `completion_cost_details` never converged. The API reformats JSON-encoded floats (`1e-07` instead of HCL `jsonencode`'s `0.0000001`), and `Read` wrote the API's reformatted JSON directly into state on every refresh, producing a diff that reapplying never cleared. Both attributes now go through `jsonPreserveConfigSubset`, the same JSON-equality helper already used elsewhere in the provider, which compares parsed values rather than formatted strings and keeps the configured spelling when it's semantically unchanged. ([#90](https://github.com/bogware/terraform-provider-langsmith/issues/90))
+
 ## 1.2.1 (September 2026)
 
 BUG FIXES:
