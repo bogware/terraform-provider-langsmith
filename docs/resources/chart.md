@@ -13,14 +13,37 @@ Manages a LangSmith custom chart.
 ## Example Usage
 
 ```terraform
+# Series use LangSmith's V2 chart format: metric_definition says what to
+# measure and filter_definition says which runs to include. The V1 keys
+# (metric, filters, feedback_key) are no longer accepted.
 resource "langsmith_chart" "example" {
   title      = "Run Latency"
   chart_type = "line"
   section_id = langsmith_chart_section.example.id
   series = jsonencode([
     {
-      name   = "p50 latency"
-      metric = "latency_p50"
+      name = "p50 latency"
+      metric_definition = {
+        type   = "percentile"
+        field  = "latency_seconds"
+        params = { p = 0.5 }
+      }
+      filter_definition = {
+        source_type = "tracing_project"
+        project_ids = [langsmith_project.example.id]
+      }
+    },
+    {
+      name = "p99 latency"
+      metric_definition = {
+        type   = "percentile"
+        field  = "latency_seconds"
+        params = { p = 0.99 }
+      }
+      filter_definition = {
+        source_type = "tracing_project"
+        project_ids = [langsmith_project.example.id]
+      }
     }
   ])
 }
@@ -32,8 +55,30 @@ resource "langsmith_chart" "run_count_kpi" {
   section_id = langsmith_chart_section.example.id
   series = jsonencode([
     {
-      name   = "run count"
-      metric = "run_count"
+      name              = "run count"
+      metric_definition = { type = "count" }
+      filter_definition = {
+        source_type = "tracing_project"
+        project_ids = [langsmith_project.example.id]
+      }
+    }
+  ])
+}
+
+# Average token usage, split by run type.
+resource "langsmith_chart" "tokens_by_run_type" {
+  title      = "Average Tokens by Run Type"
+  chart_type = "bar"
+  section_id = langsmith_chart_section.example.id
+  series = jsonencode([
+    {
+      name                 = "avg total tokens"
+      metric_definition    = { type = "avg", field = "total_tokens" }
+      group_by_definitions = [{ attribute = "run_type" }]
+      filter_definition = {
+        source_type = "tracing_project"
+        project_ids = [langsmith_project.example.id]
+      }
     }
   ])
 }
@@ -45,7 +90,14 @@ resource "langsmith_chart" "run_count_kpi" {
 ### Required
 
 - `chart_type` (String) The chart type. Valid values: `line`, `bar`, `table`, `kpi`, `top-k`, `pie`.
-- `series` (String) JSON-encoded array of chart series configurations. Each series object supports the following keys: `name` (display label), `filters` (legacy filter object), `metric` (legacy metric name), `metric_definition` (structured metric: count, scalar, percentile, or ratio), `group_by_definitions` (array of group-by definitions), `filter_definition` (structured filter, e.g. by tracing project), and `feedback_key` (feedback key to aggregate).
+- `series` (String) JSON-encoded array of chart series in LangSmith's V2 format. Each series object takes:
+
+- `name`: the display label.
+- `metric_definition`: what to measure, e.g. `{ type = "count" }`, `{ type = "avg", field = "total_tokens" }` (also `sum`, `min`, `max`), or `{ type = "percentile", field = "latency_seconds", params = { p = 0.5 } }`.
+- `filter_definition`: which runs to include, e.g. `{ source_type = "tracing_project", project_ids = [...] }` (optionally with `run_filter`, `trace_filter` or `tree_filter`), or `{ source_type = "dataset", dataset_ids = [...] }`.
+- `group_by_definitions` (optional): e.g. `[{ attribute = "run_type" }]`.
+
+The V1 keys `metric`, `filters`, `feedback_key` and `project_metric` are no longer accepted: LangSmith rejects them on create and update with `V1 chart series cannot be saved`. The provider warns about them at plan time and stops with a translation guide before sending them.
 - `title` (String) The title of the chart.
 
 ### Optional

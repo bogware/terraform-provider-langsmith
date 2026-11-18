@@ -1,3 +1,9 @@
+## 1.2.2 (Unreleased)
+
+BUG FIXES:
+
+* `langsmith_chart` could no longer create charts, and existing charts could no longer be updated: LangSmith Cloud now rejects the V1 chart series format with `400 V1 chart series cannot be saved. Use V2 chart definitions instead.` The provider's schema is unchanged, since `series` was already a free-form JSON string, but the series you write must move to the V2 keys: `metric_definition` in place of `metric`, and `filter_definition` in place of `filters`. For example, `metric = "run_count"` becomes `metric_definition = { type = "count" }`, and `filters = { session = [id] }` becomes `filter_definition = { source_type = "tracing_project", project_ids = [id] }`. A series that still uses V1 keys now gets a plan-time warning, and fails at apply with a translation guide before anything is sent, instead of the bare API error. An untouched V1 chart can still be read, so the warning does not block plans. The documentation and example show the V2 shape. This change comes from LangSmith, so no provider version avoids it. ([#97](https://github.com/bogware/terraform-provider-langsmith/issues/97))
+
 ## 1.2.1 (September 2026)
 
 BUG FIXES:
