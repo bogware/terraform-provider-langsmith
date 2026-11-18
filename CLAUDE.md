@@ -19,7 +19,7 @@ Single test: `go test ./internal/provider -run TestName -v`. Acceptance variants
 
 Provider debugging with delve: `go run . -debug` and follow the printed `TF_REATTACH_PROVIDERS` instructions.
 
-Go version: root `go.mod` declares `go 1.25.8` and pins `toolchain go1.26.5`. CI **and goreleaser** both derive their Go version from `go.mod` via `go-version-file`, so the `toolchain` line is what governs the standard library compiled into released binaries — bump it when a Go security release lands (`govulncheck ./...` must stay clean).
+Go version: root `go.mod` declares `go 1.26.0` and pins `toolchain go1.26.11`. CI **and goreleaser** both derive their Go version from `go.mod` via `go-version-file`, so the `toolchain` line is what governs the standard library compiled into released binaries — bump it when a Go security release lands. `govulncheck ./...` must stay clean, and CI's `govulncheck` job enforces it on every push and PR. The `go` line is 1.26.0 (not 1.25.x) because the patched `golang.org/x/net` releases (v0.60.0+) require it; with the default `GOTOOLCHAIN=auto` an older local Go downloads the pinned toolchain automatically.
 
 ## Architecture
 
