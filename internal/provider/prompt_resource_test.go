@@ -409,10 +409,11 @@ func TestPromptCommitConflictHint(t *testing.T) {
 	const parentBody = `{"error":"Parent commit validation failed: reference ID 0f6c"}`
 
 	cases := []struct {
-		name   string
-		err    error
-		parent string
-		want   string // substring the hint must contain; "" means no hint at all
+		name       string
+		err        error
+		parent     string
+		fromConfig bool
+		want       string // substring the hint must contain; "" means no hint at all
 	}{
 		{
 			name:   "parent conflict names the stale parent",
@@ -425,6 +426,22 @@ func TestPromptCommitConflictHint(t *testing.T) {
 			err:    &clientpkg.APIError{StatusCode: http.StatusConflict, Body: parentBody},
 			parent: "",
 			want:   "no known parent commit",
+		},
+		{
+			// Refreshing cannot fix a parent the user pinned, so the hint must
+			// not tell them to run plan and pick up the new head.
+			name:       "parent conflict on a configured parent_commit points at the setting",
+			err:        &clientpkg.APIError{StatusCode: http.StatusConflict, Body: parentBody},
+			parent:     "abc123",
+			fromConfig: true,
+			want:       "parent_commit set in configuration (abc123) is not a current head",
+		},
+		{
+			name:       "a configured parent_commit gets no diagnosis for an unrelated 409",
+			err:        &clientpkg.APIError{StatusCode: http.StatusConflict, Body: `{"error":"repo is locked"}`},
+			parent:     "abc123",
+			fromConfig: true,
+			want:       "",
 		},
 		{
 			name:   "409 for an unrelated reason gets no diagnosis",
@@ -448,7 +465,7 @@ func TestPromptCommitConflictHint(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := promptCommitConflictHint(tc.err, tc.parent)
+			got := promptCommitConflictHint(tc.err, promptCommitOptions{ParentCommit: tc.parent, ParentFromConfig: tc.fromConfig})
 			if tc.want == "" {
 				if got != "" {
 					t.Fatalf("expected no hint, got %q", got)
@@ -528,4 +545,177 @@ resource "langsmith_prompt" "test" {
   })
 }
 `, handle, description, tagValueID, template)
+}
+
+// TestAccPromptResource_commitOptions covers commit_description and
+// skip_webhooks (#82): both ride on every commit the resource writes, and
+// changing one on its own must not write a commit.
+func TestAccPromptResource_commitOptions(t *testing.T) {
+	handle := "tf-prompt-commit-options"
+	stub := &promptStub{handle: handle}
+	stub.start(t)
+
+	commits := func(want int) resource.TestCheckFunc {
+		return func(*terraform.State) error {
+			if got := len(stub.recorded()); got != want {
+				return fmt.Errorf("expected %d commits, got %d", want, got)
+			}
+			return nil
+		}
+	}
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccPromptResourceConfigCommitOptions(handle, "first",
+					`commit_description = "initial version"
+  skip_webhooks      = true`),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					commits(1),
+					func(*terraform.State) error {
+						got := stub.recorded()[0]
+						if got.Description != "initial version" || !got.SkipWebhooks {
+							return fmt.Errorf("first commit sent description=%q skip_webhooks=%t, want %q and true",
+								got.Description, got.SkipWebhooks, "initial version")
+						}
+						return nil
+					},
+				),
+			},
+			{
+				// Only the commit options change: state updates, no commit.
+				Config: testAccPromptResourceConfigCommitOptions(handle, "first",
+					`commit_description = "reworded"`),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					commits(1),
+					resource.TestCheckResourceAttr("langsmith_prompt.test", "commit_description", "reworded"),
+					resource.TestCheckNoResourceAttr("langsmith_prompt.test", "skip_webhooks"),
+				),
+			},
+			{
+				Config: testAccPromptResourceConfigCommitOptions(handle, "second",
+					`commit_description = "reworded"`),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					commits(2),
+					func(*terraform.State) error {
+						got := stub.recorded()[1]
+						if got.Description != "reworded" || got.SkipWebhooks {
+							return fmt.Errorf("second commit sent description=%q skip_webhooks=%t, want %q and false",
+								got.Description, got.SkipWebhooks, "reworded")
+						}
+						return nil
+					},
+				),
+			},
+		},
+	})
+}
+
+// TestAccPromptResource_parentCommitOverride covers parent_commit (#83): when
+// set it replaces the state-derived parent on a manifest commit, changing it
+// on its own writes nothing, and it is refused at create time.
+func TestAccPromptResource_parentCommitOverride(t *testing.T) {
+	handle := "tf-prompt-parent-override"
+	stub := &promptStub{handle: handle}
+	stub.start(t)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				// Refused before the repo is created, so nothing is left behind.
+				Config:      testAccPromptResourceConfigCommitOptions(handle, "first", `parent_commit = "abc123"`),
+				ExpectError: regexp.MustCompile(`parent_commit\s+cannot\s+be\s+set\s+when\s+the\s+prompt\s+is\s+created`),
+			},
+			{
+				Config: testAccPromptResourceConfigCommitOptions(handle, "first", ""),
+				Check:  resource.TestCheckResourceAttr("langsmith_prompt.test", "commit_hash", "hash-1"),
+			},
+			{
+				// Setting parent_commit alone does not commit.
+				Config: testAccPromptResourceConfigCommitOptions(handle, "first", `parent_commit = "other-head"`),
+				Check: func(*terraform.State) error {
+					if got := len(stub.recorded()); got != 1 {
+						return fmt.Errorf("expected 1 commit, got %d", got)
+					}
+					return nil
+				},
+			},
+			{
+				Config: testAccPromptResourceConfigCommitOptions(handle, "second", `parent_commit = "other-head"`),
+				Check: func(*terraform.State) error {
+					got := stub.recorded()
+					if len(got) != 2 {
+						return fmt.Errorf("expected 2 commits, got %d", len(got))
+					}
+					if got[1].ParentCommit != "other-head" {
+						return fmt.Errorf("commit sent parent_commit %q, want the configured %q", got[1].ParentCommit, "other-head")
+					}
+					return nil
+				},
+			},
+			{
+				// Removed again: back to the head recorded in state.
+				Config: testAccPromptResourceConfigCommitOptions(handle, "third", ""),
+				Check: func(*terraform.State) error {
+					got := stub.recorded()
+					if len(got) != 3 {
+						return fmt.Errorf("expected 3 commits, got %d", len(got))
+					}
+					if got[2].ParentCommit != "hash-2" {
+						return fmt.Errorf("commit sent parent_commit %q, want the state head %q", got[2].ParentCommit, "hash-2")
+					}
+					return nil
+				},
+			},
+		},
+	})
+}
+
+// TestAccPromptResource_parentCommitOverrideConflict checks the advice on a
+// 409 for a configured parent_commit. LangSmith accepts only the repo's
+// current head as a parent, and refreshing cannot change a pinned value, so
+// the hint has to point at the setting rather than at terraform plan.
+func TestAccPromptResource_parentCommitOverrideConflict(t *testing.T) {
+	handle := "tf-prompt-parent-override-conflict"
+	stub := &promptStub{
+		handle:     handle,
+		failCommit: func(n int) bool { return n > 1 },
+	}
+	stub.start(t)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccPromptResourceConfigCommitOptions(handle, "first", ""),
+			},
+			{
+				Config:      testAccPromptResourceConfigCommitOptions(handle, "second", `parent_commit = "old-commit"`),
+				ExpectError: regexp.MustCompile(`parent_commit\s+set\s+in\s+configuration\s+\(old-commit\)\s+is\s+not\s+a\s+current\s+head`),
+			},
+		},
+	})
+}
+
+func testAccPromptResourceConfigCommitOptions(handle, template, extra string) string {
+	return fmt.Sprintf(`
+resource "langsmith_prompt" "test" {
+  repo_handle = %[1]q
+  is_public   = false
+  description = "commit options test"
+
+  manifest = jsonencode({
+    lc       = 1
+    template = %[2]q
+    type     = "constructor"
+  })
+
+  %[3]s
+}
+`, handle, template, extra)
 }

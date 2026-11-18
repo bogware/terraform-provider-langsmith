@@ -11,11 +11,13 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
@@ -57,7 +59,12 @@ type PromptResourceModel struct {
 	Owner          types.String `tfsdk:"owner"`
 	FullName       types.String `tfsdk:"full_name"`
 	CommitHash     types.String `tfsdk:"commit_hash"`
-	WorkspaceID    types.String `tfsdk:"workspace_id"`
+	// Commit options. They shape the commit a manifest change writes but are
+	// not read back from the API, and changing one alone never commits.
+	CommitDescription types.String `tfsdk:"commit_description"`
+	SkipWebhooks      types.Bool   `tfsdk:"skip_webhooks"`
+	ParentCommit      types.String `tfsdk:"parent_commit"`
+	WorkspaceID       types.String `tfsdk:"workspace_id"`
 	CreatedAt      types.String `tfsdk:"created_at"`
 	UpdatedAt      types.String `tfsdk:"updated_at"`
 }
@@ -88,6 +95,31 @@ type promptUpdateRequest struct {
 type promptCommitRequest struct {
 	Manifest     json.RawMessage `json:"manifest"`
 	ParentCommit string          `json:"parent_commit,omitempty"`
+	Description  string          `json:"description,omitempty"`
+	SkipWebhooks bool            `json:"skip_webhooks,omitempty"`
+}
+
+// promptCommitOptions carries the optional parts of a commit request.
+type promptCommitOptions struct {
+	// ParentCommit is empty for the first commit on a fresh repo.
+	ParentCommit string
+	// ParentFromConfig is true when ParentCommit is the user's parent_commit
+	// override rather than the head recorded in state. It only changes the
+	// advice attached to a parent-commit conflict.
+	ParentFromConfig bool
+	Description      string
+	SkipWebhooks     bool
+}
+
+// commitOptions builds the commit options shared by Create and Update from
+// the planned values.
+func (m *PromptResourceModel) commitOptions(parentCommit string, parentFromConfig bool) promptCommitOptions {
+	return promptCommitOptions{
+		ParentCommit:     parentCommit,
+		ParentFromConfig: parentFromConfig,
+		Description:      m.CommitDescription.ValueString(),
+		SkipWebhooks:     m.SkipWebhooks.ValueBool(),
+	}
 }
 
 // promptCommitResponse wraps the commit the API sends back after a successful brand.
@@ -212,6 +244,32 @@ func (r *PromptResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				MarkdownDescription: "The hash of the current commit — the latest brand on the cattle.",
 				Computed:            true,
 			},
+			// The three commit options below are Optional-only, never Computed,
+			// and none of them is read back from the API. Changing one on its
+			// own updates state without writing a commit, so an imported prompt
+			// (whose state has no value for them) does not plan a pointless one.
+			"commit_description": schema.StringAttribute{
+				MarkdownDescription: "A message recorded on each commit this resource writes, so the repo's history says why the " +
+					"prompt changed. Applies when `manifest` changes; changing `commit_description` on its own does not create a commit.",
+				Optional: true,
+			},
+			"skip_webhooks": schema.BoolAttribute{
+				MarkdownDescription: "Suppress webhook delivery for commits this resource writes. Defaults to `false` when omitted. " +
+					"Changing it on its own does not create a commit.",
+				Optional: true,
+			},
+			"parent_commit": schema.StringAttribute{
+				MarkdownDescription: "Override the parent of the commit written when `manifest` changes. By default the provider " +
+					"commits on top of `commit_hash`, the head it last read from the repo's latest commit, and that is almost " +
+					"always right. Set this when the repo has more than one head and the latest commit is not the one you manage.\n\n" +
+					"LangSmith only accepts a parent that is a current head of the repo (a prefix of the hash is enough). Any " +
+					"other commit, including an older one, is rejected with `409 Parent commit validation failed`, so this " +
+					"cannot branch from history. While set, it is used for every manifest change, so remove it or keep it " +
+					"current once the commit lands. Changing it on its own does not create a commit, and it cannot be set when " +
+					"the prompt is created, because a new repo has no commits.",
+				Optional:   true,
+				Validators: []validator.String{stringvalidator.LengthAtLeast(1)},
+			},
 			"workspace_id": schema.StringAttribute{
 				MarkdownDescription: "The workspace ID of the resource. If set, overrides the provider-level `workspace_id` for all API calls made by this resource.",
 				Optional:            true,
@@ -252,10 +310,12 @@ func (r *PromptResource) Configure(ctx context.Context, req resource.ConfigureRe
 // known head otherwise, so the server can reject a write that raced with a
 // change made outside Terraform. Without it the API has to infer a parent, and
 // that inference fails on repos with more than one head.
-func (r *PromptResource) commitManifest(ctx context.Context, c *client.Client, repoHandle, manifest, parentCommit string) (string, error) {
+func (r *PromptResource) commitManifest(ctx context.Context, c *client.Client, repoHandle, manifest string, opts promptCommitOptions) (string, error) {
 	body := promptCommitRequest{
 		Manifest:     json.RawMessage(manifest),
-		ParentCommit: parentCommit,
+		ParentCommit: opts.ParentCommit,
+		Description:  opts.Description,
+		SkipWebhooks: opts.SkipWebhooks,
 	}
 	var result promptCommitResponse
 	if err := c.Post(ctx, fmt.Sprintf("/api/v1/commits/-/%s", repoHandle), body, &result); err != nil {
@@ -275,13 +335,20 @@ func (r *PromptResource) commitManifest(ctx context.Context, c *client.Client, r
 // confidently misdiagnosed by the text below, sending the reader after a
 // conflict that isn't there. When in doubt, add nothing and let the API's own
 // message stand on its own.
-func promptCommitConflictHint(err error, parentCommit string) string {
+func promptCommitConflictHint(err error, opts promptCommitOptions) string {
 	var apiErr *client.APIError
 	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusConflict {
 		return ""
 	}
 	if !strings.Contains(strings.ToLower(apiErr.Body), "parent commit") {
 		return ""
+	}
+	parentCommit := opts.ParentCommit
+	if opts.ParentFromConfig {
+		// Refreshing cannot help here: the parent came from configuration.
+		return fmt.Sprintf("\n\nThe parent_commit set in configuration (%s) is not a current head of this repo. "+
+			"LangSmith only accepts the repo's head as a parent, so an older or unknown commit is rejected. Set "+
+			"parent_commit to the current head, or remove it to commit on top of the head Terraform last read.", parentCommit)
 	}
 	if parentCommit == "" {
 		return "\n\nTerraform had no known parent commit for this repo, so the commit was sent without one " +
@@ -297,6 +364,15 @@ func (r *PromptResource) Create(ctx context.Context, req resource.CreateRequest,
 	var data PromptResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Checked before the repo is created, so the error leaves nothing behind.
+	if !data.ParentCommit.IsNull() && !data.ParentCommit.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(path.Root("parent_commit"),
+			"parent_commit cannot be set when the prompt is created",
+			"A new prompt repo has no commits, so its first commit has no parent to build on. Create the prompt "+
+				"without parent_commit, and set it later only if a manifest change needs to commit on a specific head.")
 		return
 	}
 
@@ -353,9 +429,10 @@ func (r *PromptResource) Create(ctx context.Context, req resource.CreateRequest,
 	// The repo was created moments ago and has no history, so there is no
 	// parent commit to build on.
 	if !data.Manifest.IsNull() && !data.Manifest.IsUnknown() {
-		commitHash, err := r.commitManifest(ctx, c, data.RepoHandle.ValueString(), data.Manifest.ValueString(), "")
+		opts := data.commitOptions("", false)
+		commitHash, err := r.commitManifest(ctx, c, data.RepoHandle.ValueString(), data.Manifest.ValueString(), opts)
 		if err != nil {
-			resp.Diagnostics.AddError("Error creating prompt commit", err.Error()+promptCommitConflictHint(err, ""))
+			resp.Diagnostics.AddError("Error creating prompt commit", err.Error()+promptCommitConflictHint(err, opts))
 			// Persist partial state so the created repo is tracked (and tainted)
 			// instead of orphaned when the follow-up commit fails. Resolve every
 			// still-unknown computed field to a known value first.
@@ -525,17 +602,23 @@ func (r *PromptResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 
 	// If the manifest has changed, commit the new version on top of the head we
-	// last saw. The parent comes from state, not the plan: commit_hash is
-	// computed without UseStateForUnknown, so data.CommitHash is unknown during
-	// every update, while Read refreshes state.CommitHash from the repo's
-	// latest commit on every plan.
+	// last saw, unless parent_commit overrides it. The default parent comes
+	// from state, not the plan: commit_hash is computed without
+	// UseStateForUnknown, so data.CommitHash is unknown during every update,
+	// while Read refreshes state.CommitHash from the repo's latest commit on
+	// every plan. The commit options apply only here: changing one of them
+	// alone leaves the manifest unchanged and writes no commit.
 	if !data.Manifest.IsNull() && !data.Manifest.IsUnknown() &&
 		data.Manifest.ValueString() != state.Manifest.ValueString() {
-		parentCommit := state.CommitHash.ValueString()
-		commitHash, commitErr := r.commitManifest(ctx, c, repoHandle, data.Manifest.ValueString(), parentCommit)
+		parentCommit, parentFromConfig := state.CommitHash.ValueString(), false
+		if !data.ParentCommit.IsNull() && !data.ParentCommit.IsUnknown() {
+			parentCommit, parentFromConfig = data.ParentCommit.ValueString(), true
+		}
+		opts := data.commitOptions(parentCommit, parentFromConfig)
+		commitHash, commitErr := r.commitManifest(ctx, c, repoHandle, data.Manifest.ValueString(), opts)
 		if commitErr != nil {
 			resp.Diagnostics.AddError("Error creating prompt commit",
-				commitErr.Error()+promptCommitConflictHint(commitErr, parentCommit))
+				commitErr.Error()+promptCommitConflictHint(commitErr, opts))
 			// The PATCH above already landed, so the repo metadata in the plan
 			// is what the API now holds. Persist it instead of returning with
 			// no state set: the framework keeps the *prior* state when Update

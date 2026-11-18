@@ -1,3 +1,10 @@
+## 1.3.0 (Unreleased)
+
+ENHANCEMENTS:
+
+* `langsmith_prompt` gains `commit_description` and `skip_webhooks`, sent with every commit the resource writes. A Terraform-managed prompt repo's history can now say why each change was made, and those commits can skip webhook delivery, matching `langsmith_hub_directory`. Both only shape a commit that a `manifest` change already causes; changing either one on its own updates state without writing a commit. ([#82](https://github.com/bogware/terraform-provider-langsmith/issues/82))
+* `langsmith_prompt` gains an optional `parent_commit` that overrides the parent used when a `manifest` change is committed. By default the provider still commits on top of the head it last read (`commit_hash`). The override is for repos with more than one head, where the latest commit is not the one being managed. LangSmith accepts only a current head as a parent, so it cannot branch from an older commit. Setting it on its own does not commit, it cannot be set at create time, and a parent-commit conflict on a configured value now explains that the setting itself is the problem. ([#83](https://github.com/bogware/terraform-provider-langsmith/issues/83))
+
 ## 1.2.1 (September 2026)
 
 BUG FIXES:
