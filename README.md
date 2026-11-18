@@ -217,7 +217,8 @@ resource "langsmith_project" "staging_traces" {
 | `langsmith_annotation_queue` | Annotation queues for human review |
 | `langsmith_annotation_queue_reviewer` | Add/remove a reviewer identity on a queue |
 | `langsmith_feedback_config` | Feedback score configurations |
-| `langsmith_feedback_formula` | Derived-feedback formulas |
+| `langsmith_composite_evaluator` | Composite feedback scores (weighted combinations of feedback keys) |
+| `langsmith_feedback_formula` | **Deprecated**: LangSmith retired the endpoints; use `langsmith_composite_evaluator` |
 | `langsmith_feedback_ingest_token` | Run-scoped feedback ingest tokens (create-only; expire naturally) |
 | `langsmith_evaluator` | Code and LLM-as-judge evaluators |
 | `langsmith_run_rule` | Automation rules for run routing |

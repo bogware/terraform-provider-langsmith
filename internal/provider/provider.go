@@ -301,6 +301,7 @@ func (p *LangSmithProvider) Resources(ctx context.Context) []func() resource.Res
 		NewFilterViewResource,
 		NewTaggingResource,
 		NewFeedbackFormulaResource,
+		NewCompositeEvaluatorResource,
 		NewChartSectionResource,
 		NewChartResource,
 		NewOrgChartSectionResource,

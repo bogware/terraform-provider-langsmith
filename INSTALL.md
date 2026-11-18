@@ -385,6 +385,7 @@ ID:
 | `langsmith_tagging` | `<tag_value_id>:<tagging_id>` |
 | `langsmith_comparative_experiment` | `<reference_dataset_id>/<experiment_id>` |
 | `langsmith_alert_rule` | `<session_id>/<rule_id>` |
+| `langsmith_composite_evaluator` | `<rule_id>/<evaluator_id>` |
 | `langsmith_filter_view` | `<session_id>/<view_id>` |
 | `langsmith_insights_config` | `<session_id>:<config_id>` |
 | `langsmith_experiment_view_override` | `<dataset_id>:<id>[:<workspace_id>]` |

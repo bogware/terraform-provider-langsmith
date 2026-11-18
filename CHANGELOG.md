@@ -1,3 +1,9 @@
+## 1.3.0 (Unreleased)
+
+FEATURES:
+
+* **New resource:** `langsmith_composite_evaluator`, the replacement for the retired `langsmith_feedback_formula`. It defines a feedback score computed for each run as a weighted combination of other feedback keys, scoped to a project or a dataset, and takes the same inputs as the formula resource (`feedback_key`, `aggregation_type`, `formula_parts`, `session_id` / `dataset_id`). LangSmith creates it as a code evaluator plus a run rule; the resource manages both, exposes their IDs, and deletes both on destroy. LangSmith has no update endpoint for it and does not return the formula, so changing any input replaces it. It imports as `<rule_id>/<evaluator_id>`. ([#98](https://github.com/bogware/terraform-provider-langsmith/issues/98))
+
 ## 1.2.1 (September 2026)
 
 BUG FIXES:
