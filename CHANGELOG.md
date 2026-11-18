@@ -1,3 +1,9 @@
+## 1.2.2 (Unreleased)
+
+BUG FIXES:
+
+* `langsmith_alert_rule` failed every create that had `actions` with `Provider produced inconsistent result after apply`. LangSmith echoes each action back with `id`, `alert_rule_id`, `created_at` and `updated_at` added, and the provider copied that response into state in place of the configured value. The rule was created in LangSmith but never recorded in state, so it was orphaned, and `ignore_changes` could not help because the check fails during create. The provider now strips those server-added keys and keeps the configured `actions` value whenever the returned actions still match it, in any order. A config edited, or an action added or removed, outside Terraform still shows up as drift. ([#93](https://github.com/bogware/terraform-provider-langsmith/issues/93))
+
 ## 1.2.1 (September 2026)
 
 BUG FIXES:

@@ -532,7 +532,78 @@ func mapAlertRuleResponseToState(data *AlertRuleResourceModel, result *alertRule
 		data.DenominatorFilter = types.StringNull()
 	}
 
-	data.Actions = jsonStringValue(result.Actions)
+	data.Actions = alertRuleActionsValue(result.Actions, data.Actions)
 	data.CreatedAt = types.StringValue(result.Rule.CreatedAt)
 	data.UpdatedAt = types.StringValue(result.Rule.UpdatedAt)
+}
+
+// alertRuleActionServerKeys are the bookkeeping fields LangSmith adds to every
+// action it stores. None of them can be configured, so they never belong in
+// the actions attribute.
+var alertRuleActionServerKeys = []string{"id", "alert_rule_id", "created_at", "updated_at"}
+
+// alertRuleActionsValue turns the API's actions array into the state value.
+//
+// The API echoes each action back with id, alert_rule_id, created_at and
+// updated_at added. Writing that copy into state fails Terraform's
+// post-apply consistency check on create (#93) and diffs against the
+// configuration on every later plan. So the server keys are stripped first,
+// and the saved value (plan on create/update, prior state on read) is kept
+// verbatim whenever every saved action is still matched by a returned
+// action, in any order. A real change on the server, such as an edited
+// config, a removed action or an added one, falls through to the stripped
+// response so it surfaces as drift.
+func alertRuleActionsValue(raw json.RawMessage, saved types.String) types.String {
+	// actions is Required and the API enforces at least one, so a response
+	// without them says nothing about the rule's actions. Keep what we have
+	// rather than writing a null that Terraform would reject after apply.
+	if len(raw) == 0 || string(raw) == "null" {
+		return saved
+	}
+
+	var fresh []interface{}
+	if err := json.Unmarshal(raw, &fresh); err != nil {
+		return jsonStringValue(raw)
+	}
+	for _, a := range fresh {
+		if m, ok := a.(map[string]interface{}); ok {
+			for _, k := range alertRuleActionServerKeys {
+				delete(m, k)
+			}
+		}
+	}
+	strippedBytes, err := json.Marshal(fresh)
+	if err != nil {
+		return jsonStringValue(raw)
+	}
+	stripped := types.StringValue(string(strippedBytes))
+
+	if saved.IsNull() || saved.IsUnknown() {
+		return stripped
+	}
+	var want []interface{}
+	if err := json.Unmarshal([]byte(saved.ValueString()), &want); err != nil {
+		return stripped
+	}
+	if len(want) != len(fresh) {
+		return stripped
+	}
+
+	// Match each saved action to a distinct returned action. The API makes no
+	// promise to return actions in the order they were submitted.
+	used := make([]bool, len(fresh))
+	for _, w := range want {
+		found := false
+		for j, f := range fresh {
+			if !used[j] && jsonSubset(w, f) {
+				used[j] = true
+				found = true
+				break
+			}
+		}
+		if !found {
+			return stripped
+		}
+	}
+	return saved
 }

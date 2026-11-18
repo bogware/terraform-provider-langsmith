@@ -88,6 +88,94 @@ resource "langsmith_alert_rule" "test" {
 	})
 }
 
+// TestAlertRuleActionsValue covers how the API's actions echo becomes state.
+// The API adds id, alert_rule_id, created_at and updated_at to every action,
+// and copying that into state failed every create with "Provider produced
+// inconsistent result after apply" (#93).
+func TestAlertRuleActionsValue(t *testing.T) {
+	const cfg = `[{"config":"{\"headers\":\"{}\",\"url\":\"https://example.com/hook\"}","target":"webhook"}]`
+	const echoed = `[{"alert_rule_id":"efaffa03","config":"{\"headers\":\"{}\",\"url\":\"https://example.com/hook\"}",` +
+		`"created_at":"2026-10-26T20:15:33.703859212Z","id":"94618039","target":"webhook",` +
+		`"updated_at":"2026-10-26T20:15:33.703859212Z"}]`
+
+	slack := `{"config":"{\"channel\":\"#alerts\"}","target":"slack"}`
+	hook := `{"config":"{\"url\":\"https://example.com/hook\"}","target":"webhook"}`
+	withIDs := func(action, id string) string {
+		return `{"id":"` + id + `","alert_rule_id":"r1","created_at":"t","updated_at":"t",` + action[1:]
+	}
+
+	cases := []struct {
+		name  string
+		raw   string
+		saved types.String
+		want  types.String
+	}{
+		{
+			name:  "server keys are ignored and the configured value is kept",
+			raw:   echoed,
+			saved: types.StringValue(cfg),
+			want:  types.StringValue(cfg),
+		},
+		{
+			name:  "configured value is kept byte-for-byte, even when not compact",
+			raw:   echoed,
+			saved: types.StringValue("[\n  " + cfg[1:len(cfg)-1] + "\n]"),
+			want:  types.StringValue("[\n  " + cfg[1:len(cfg)-1] + "\n]"),
+		},
+		{
+			name:  "actions returned in a different order still match",
+			raw:   `[` + withIDs(slack, "a") + `,` + withIDs(hook, "b") + `]`,
+			saved: types.StringValue(`[` + hook + `,` + slack + `]`),
+			want:  types.StringValue(`[` + hook + `,` + slack + `]`),
+		},
+		{
+			name:  "import has no saved value, so the response is stripped",
+			raw:   echoed,
+			saved: types.StringNull(),
+			want:  types.StringValue(cfg),
+		},
+		{
+			name:  "a config changed outside Terraform surfaces as drift",
+			raw:   `[` + withIDs(`{"config":"{\"url\":\"https://other.example.com\"}","target":"webhook"}`, "a") + `]`,
+			saved: types.StringValue(`[` + hook + `]`),
+			want:  types.StringValue(`[{"config":"{\"url\":\"https://other.example.com\"}","target":"webhook"}]`),
+		},
+		{
+			name:  "an action added outside Terraform surfaces as drift",
+			raw:   `[` + withIDs(hook, "a") + `,` + withIDs(slack, "b") + `]`,
+			saved: types.StringValue(`[` + hook + `]`),
+			want:  types.StringValue(`[` + hook + `,` + slack + `]`),
+		},
+		{
+			name:  "duplicate saved actions need distinct matches",
+			raw:   `[` + withIDs(hook, "a") + `,` + withIDs(slack, "b") + `]`,
+			saved: types.StringValue(`[` + hook + `,` + hook + `]`),
+			want:  types.StringValue(`[` + hook + `,` + slack + `]`),
+		},
+		{
+			name:  "state written by 1.2.1 with server keys is repaired to the stripped form",
+			raw:   echoed,
+			saved: types.StringValue(echoed),
+			want:  types.StringValue(cfg),
+		},
+		{
+			name:  "a response without actions keeps the saved value",
+			raw:   `null`,
+			saved: types.StringValue(cfg),
+			want:  types.StringValue(cfg),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := alertRuleActionsValue([]byte(tc.raw), tc.saved)
+			if !got.Equal(tc.want) {
+				t.Fatalf("got  %s\nwant %s", got, tc.want)
+			}
+		})
+	}
+}
+
 // TestBuildAlertRuleRequest_Actions covers the actions payload, which the API
 // constrains as minItems:1 and answers with an opaque
 // `request validation failed: [Actions: min]` when it is empty. The provider
