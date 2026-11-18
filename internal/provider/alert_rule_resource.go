@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -74,6 +75,10 @@ type alertRuleRequest struct {
 // alertRuleBody carries the specifics of the rule itself -- what to watch,
 // how to measure it, and when to holler.
 type alertRuleBody struct {
+	// ID is sent only on update. The PATCH endpoint checks every action
+	// against rule.id and, when it is missing, rejects the request with
+	// `action alert rule uid does not match: `.
+	ID                     string   `json:"id,omitempty"`
 	Name                   string   `json:"name"`
 	Description            string   `json:"description"`
 	Type                   string   `json:"type"`
@@ -198,10 +203,18 @@ func (r *AlertRuleResource) Schema(ctx context.Context, req resource.SchemaReque
 					"At least one action is required — LangSmith rejects a rule with an empty array.\n\n" +
 					"Valid targets are `webhook`, `slack`, `pagerduty` and `dynatrace`.\n\n" +
 					"`config` is itself a JSON-encoded **string**, not a nested object, because its keys differ " +
-					"per target; in HCL that reads as a nested `jsonencode`. The keys each target requires are " +
-					"not published in the LangSmith OpenAPI spec — a `webhook` needs at least `url`, " +
-					"`project_name` and `headers`. The API names any missing key in its error message, so build " +
-					"the config up from what it reports.",
+					"per target; in HCL that reads as a nested `jsonencode`. The LangSmith OpenAPI spec does not " +
+					"list these keys. Each target was found to require the following:\n\n" +
+					"- `webhook`: `url`, `project_name`, `headers` and `body`; `method` is optional. `headers` and " +
+					"`body` are JSON-encoded strings too (`headers = jsonencode({})`); sent as objects, LangSmith " +
+					"creates nothing, so the provider rejects them. The URL's host must resolve in DNS.\n" +
+					"- `slack`: `team_id` and `channel_id`.\n" +
+					"- `pagerduty`: `severity`, plus either `integration_key` or `secret_name` (the name of a " +
+					"workspace secret holding the key).\n" +
+					"- `dynatrace`: `environment_url` without a scheme (e.g. `abc12345.live.dynatrace.com`), " +
+					"either `api_token` or `secret_name`, and `payload`, a JSON-encoded string with a non-empty " +
+					"`eventType`.\n\n" +
+					"The API names any missing key in its error message.",
 				Required: true,
 			},
 			"created_at": schema.StringAttribute{
@@ -265,6 +278,18 @@ func (r *AlertRuleResource) Create(ctx context.Context, req resource.CreateReque
 		resp.Diagnostics.AddError("Error creating alert rule", err.Error())
 		return
 	}
+	// LangSmith answers some malformed action configs with a bare 200 and an
+	// empty body, and creates nothing. Recording that would write a rule with
+	// no ID into state, so stop here and say what usually causes it.
+	if result.Rule.ID == "" {
+		resp.Diagnostics.AddError(
+			"LangSmith did not create the alert rule",
+			"The API accepted the request but returned no rule, and nothing was created. This happens when "+
+				"an action config value that must be a JSON-encoded string is sent as an object, for example "+
+				"a webhook's headers or body. Wrap such values in jsonencode() inside the config.",
+		)
+		return
+	}
 
 	// The create response returns session_id as null, so we preserve the
 	// value from the plan. The GET endpoint returns it properly.
@@ -322,11 +347,18 @@ func (r *AlertRuleResource) Update(ctx context.Context, req resource.UpdateReque
 	apiPath := fmt.Sprintf("/api/v1/platform/alerts/%s/%s",
 		data.SessionID.ValueString(), data.ID.ValueString())
 
+	body.Rule.ID = data.ID.ValueString()
+
 	c := effectiveClient(r.client, data.WorkspaceID)
-	var result alertRuleResponse
-	err := c.Patch(ctx, apiPath, body, &result)
-	if err != nil {
+	// PATCH answers with only {"message": "alert rule updated"}, so read the
+	// rule back to populate state rather than mapping the empty response.
+	if err := c.Patch(ctx, apiPath, body, nil); err != nil {
 		resp.Diagnostics.AddError("Error updating alert rule", err.Error())
+		return
+	}
+	var result alertRuleResponse
+	if err := c.Get(ctx, apiPath, nil, &result); err != nil {
+		resp.Diagnostics.AddError("Error reading alert rule after update", err.Error())
 		return
 	}
 
@@ -478,6 +510,26 @@ func buildAlertRuleRequest(data *AlertRuleResourceModel) (*alertRuleRequest, dia
 			)
 			return nil, diags
 		}
+		// A webhook's headers and body are themselves JSON-encoded strings.
+		// Sent as objects, the API answers 200 with an empty body and creates
+		// nothing, so there is no error to pass through; catch it here.
+		if *action.Target == "webhook" {
+			var configStr string
+			var config map[string]json.RawMessage
+			if json.Unmarshal(action.Config, &configStr) == nil && json.Unmarshal([]byte(configStr), &config) == nil {
+				for _, key := range []string{"headers", "body"} {
+					if v, ok := config[key]; ok && len(v) > 0 && v[0] != '"' {
+						diags.AddError(
+							"Webhook "+key+" must be a JSON-encoded string",
+							fmt.Sprintf("actions[%d] sets the webhook %s to a JSON object. LangSmith expects a JSON-encoded "+
+								"string here and silently creates nothing otherwise. In HCL that is one more jsonencode: "+
+								"%s = jsonencode({}).", i, key, key),
+						)
+						return nil, diags
+					}
+				}
+			}
+		}
 	}
 	body.Actions = json.RawMessage(actionsJSON)
 
@@ -537,21 +589,23 @@ func mapAlertRuleResponseToState(data *AlertRuleResourceModel, result *alertRule
 	data.UpdatedAt = types.StringValue(result.Rule.UpdatedAt)
 }
 
-// alertRuleActionServerKeys are the bookkeeping fields LangSmith adds to every
-// action it stores. None of them can be configured, so they never belong in
-// the actions attribute.
-var alertRuleActionServerKeys = []string{"id", "alert_rule_id", "created_at", "updated_at"}
+// alertRuleActionConfigKeys are the only action fields a user configures.
+// Everything else the API returns on an action is server bookkeeping: id,
+// alert_rule_id and timestamps everywhere, plus is_suspended, suspended_at,
+// suspended_status_code and suspended_reason on LangSmith Cloud. The set grows
+// with the server version, so actions are reduced to an allowlist rather
+// than having known extras removed.
+var alertRuleActionConfigKeys = []string{"target", "config"}
 
 // alertRuleActionsValue turns the API's actions array into the state value.
 //
-// The API echoes each action back with id, alert_rule_id, created_at and
-// updated_at added. Writing that copy into state fails Terraform's
-// post-apply consistency check on create (#93) and diffs against the
-// configuration on every later plan. So the server keys are stripped first,
-// and the saved value (plan on create/update, prior state on read) is kept
-// verbatim whenever every saved action is still matched by a returned
+// Each returned action is first reduced to its configurable fields. Writing
+// the server's copy into state failed Terraform's post-apply consistency
+// check on create (#93) and diffed against the configuration on every later
+// plan. The saved value (plan on create/update, prior state on read) is then
+// kept verbatim whenever every saved action matches a distinct returned
 // action, in any order. A real change on the server, such as an edited
-// config, a removed action or an added one, falls through to the stripped
+// config, a removed action or an added one, falls through to the reduced
 // response so it surfaces as drift.
 func alertRuleActionsValue(raw json.RawMessage, saved types.String) types.String {
 	// actions is Required and the API enforces at least one, so a response
@@ -565,28 +619,34 @@ func alertRuleActionsValue(raw json.RawMessage, saved types.String) types.String
 	if err := json.Unmarshal(raw, &fresh); err != nil {
 		return jsonStringValue(raw)
 	}
-	for _, a := range fresh {
-		if m, ok := a.(map[string]interface{}); ok {
-			for _, k := range alertRuleActionServerKeys {
-				delete(m, k)
+	for i, a := range fresh {
+		m, ok := a.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		kept := make(map[string]interface{}, len(alertRuleActionConfigKeys))
+		for _, k := range alertRuleActionConfigKeys {
+			if v, present := m[k]; present {
+				kept[k] = v
 			}
 		}
+		fresh[i] = kept
 	}
-	strippedBytes, err := json.Marshal(fresh)
+	reducedBytes, err := json.Marshal(fresh)
 	if err != nil {
 		return jsonStringValue(raw)
 	}
-	stripped := types.StringValue(string(strippedBytes))
+	reduced := types.StringValue(string(reducedBytes))
 
 	if saved.IsNull() || saved.IsUnknown() {
-		return stripped
+		return reduced
 	}
 	var want []interface{}
 	if err := json.Unmarshal([]byte(saved.ValueString()), &want); err != nil {
-		return stripped
+		return reduced
 	}
 	if len(want) != len(fresh) {
-		return stripped
+		return reduced
 	}
 
 	// Match each saved action to a distinct returned action. The API makes no
@@ -595,15 +655,63 @@ func alertRuleActionsValue(raw json.RawMessage, saved types.String) types.String
 	for _, w := range want {
 		found := false
 		for j, f := range fresh {
-			if !used[j] && jsonSubset(w, f) {
+			if !used[j] && alertRuleActionMatches(w, f) {
 				used[j] = true
 				found = true
 				break
 			}
 		}
 		if !found {
-			return stripped
+			return reduced
 		}
 	}
 	return saved
+}
+
+// alertRuleActionMatches reports whether a saved action is the same as a
+// returned one. config is compared by its decoded value: the create response
+// echoes the config string exactly as sent, but GET returns it re-serialized
+// with sorted keys, so a hand-written config would otherwise match on create
+// and diff after the first refresh. One level of decoding is enough, because
+// nested strings such as a webhook's headers and body come back byte for byte.
+func alertRuleActionMatches(want, got interface{}) bool {
+	w, ok := want.(map[string]interface{})
+	if !ok {
+		return jsonSubset(want, got)
+	}
+	g, ok := got.(map[string]interface{})
+	if !ok || len(w) != len(g) {
+		return false
+	}
+	for k, wv := range w {
+		gv, present := g[k]
+		if !present {
+			return false
+		}
+		if k == "config" && jsonStringsEquivalent(wv, gv) {
+			continue
+		}
+		if !jsonSubset(wv, gv) {
+			return false
+		}
+	}
+	return true
+}
+
+// jsonStringsEquivalent reports whether a and b are both strings holding JSON
+// that decodes to the same value.
+func jsonStringsEquivalent(a, b interface{}) bool {
+	as, ok := a.(string)
+	if !ok {
+		return false
+	}
+	bs, ok := b.(string)
+	if !ok {
+		return false
+	}
+	var av, bv interface{}
+	if json.Unmarshal([]byte(as), &av) != nil || json.Unmarshal([]byte(bs), &bv) != nil {
+		return false
+	}
+	return reflect.DeepEqual(av, bv)
 }
