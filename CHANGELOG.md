@@ -1,3 +1,9 @@
+## 1.2.2 (Unreleased)
+
+SECURITY:
+
+* Release binaries are now built with Go 1.26.11 (was 1.26.5), and `google.golang.org/grpc`, `golang.org/x/net` and `golang.org/x/text` are updated. `govulncheck` reported 19 vulnerabilities reachable from the provider's code, most in the standard library's `net/http`, `crypto/tls` and `crypto/x509`; it now reports none, and a new CI job keeps it that way. The patched `golang.org/x/net` requires Go 1.26, so building the provider from source now needs Go 1.26 or later; with the default `GOTOOLCHAIN=auto`, an older Go downloads it automatically. ([#72](https://github.com/bogware/terraform-provider-langsmith/issues/72))
+
 ## 1.2.1 (September 2026)
 
 BUG FIXES:

@@ -1,11 +1,13 @@
 version: "2"
 linters:
   enable:
+    - bodyclose
     - copyloopvar
     - depguard
     - durationcheck
     - forcetypeassert
     - godot
+    - gosec
     - makezero
     - misspell
     - nilerr
