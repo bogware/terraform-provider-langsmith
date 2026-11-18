@@ -1,3 +1,13 @@
+## 1.2.2 (Unreleased)
+
+DEPRECATIONS:
+
+* `langsmith_feedback_formula` and the `langsmith_feedback_formulas` data source are deprecated and will be removed in the next major version. LangSmith has retired the feedback formula endpoints; every call now returns `410 Gone`. Composite scores are now created as a code evaluator plus a run rule through LangSmith's composite evaluators. ([#98](https://github.com/bogware/terraform-provider-langsmith/issues/98))
+
+BUG FIXES:
+
+* `langsmith_feedback_formula` broke every plan once LangSmith retired the formula endpoints. `Read` treated the `410 Gone` as an error, so any configuration with a formula in state could neither plan nor destroy. A `410` on read now drops the formula from state with a warning, and a `410` on delete lets the destroy complete. Creating or updating a formula fails before any request is sent, with a message pointing to composite evaluators. The `langsmith_feedback_formulas` data source returns an empty list with a warning instead of failing. No provider version avoids this, since the change comes from LangSmith. ([#98](https://github.com/bogware/terraform-provider-langsmith/issues/98))
+
 ## 1.2.1 (September 2026)
 
 BUG FIXES:

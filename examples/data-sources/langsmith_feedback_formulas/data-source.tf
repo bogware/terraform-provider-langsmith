@@ -1,3 +1,7 @@
+# DEPRECATED: LangSmith has retired the feedback formula endpoints (every call
+# returns 410 Gone), so this data source no longer works and will be removed in the
+# next major version. Composite scores are now created as a code evaluator plus
+# a run rule. The example below is kept for reference only.
 # Feedback formulas scoped to a dataset.
 data "langsmith_feedback_formulas" "by_dataset" {
   dataset_id = langsmith_dataset.example.id

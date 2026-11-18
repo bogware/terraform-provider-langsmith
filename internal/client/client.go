@@ -370,3 +370,14 @@ func IsNotFound(err error) bool {
 	}
 	return false
 }
+
+// IsGone reports whether err is a 410 Gone: the endpoint itself has been
+// retired, not just the object. Resources built on a retired endpoint use it
+// to let plans and destroys complete instead of failing on every refresh.
+func IsGone(err error) bool {
+	var apiErr *APIError
+	if errors.As(err, &apiErr) {
+		return apiErr.StatusCode == 410
+	}
+	return false
+}

@@ -3,11 +3,14 @@
 page_title: "langsmith_feedback_formulas Data Source - langsmith"
 subcategory: ""
 description: |-
+  Deprecated. LangSmith has retired the feedback formula endpoints, and listing now returns 410 Gone. This data source then returns an empty formulas list with a warning, so existing configurations still plan. Composite scores are now created through LangSmith's composite evaluators. It will be removed in the next major version.
   Lists LangSmith feedback formulas scoped to a dataset or a project (session).
   Exactly one of dataset_id or session_id must be set: the LangSmith API rejects an unscoped listing with an HTTP 400.
 ---
 
 # langsmith_feedback_formulas (Data Source)
+
+**Deprecated.** LangSmith has retired the feedback formula endpoints, and listing now returns `410 Gone`. This data source then returns an empty `formulas` list with a warning, so existing configurations still plan. Composite scores are now created through LangSmith's composite evaluators. It will be removed in the next major version.
 
 Lists LangSmith feedback formulas scoped to a dataset or a project (session).
 
@@ -16,6 +19,10 @@ Exactly one of `dataset_id` or `session_id` must be set: the LangSmith API rejec
 ## Example Usage
 
 ```terraform
+# DEPRECATED: LangSmith has retired the feedback formula endpoints (every call
+# returns 410 Gone), so this data source no longer works and will be removed in the
+# next major version. Composite scores are now created as a code evaluator plus
+# a run rule. The example below is kept for reference only.
 # Feedback formulas scoped to a dataset.
 data "langsmith_feedback_formulas" "by_dataset" {
   dataset_id = langsmith_dataset.example.id

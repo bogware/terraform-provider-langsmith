@@ -98,8 +98,14 @@ func (d *FeedbackFormulasDataSource) ConfigValidators(ctx context.Context) []dat
 
 func (d *FeedbackFormulasDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Lists LangSmith feedback formulas scoped to a dataset or a project (session).\n\n" +
+		MarkdownDescription: "**Deprecated.** LangSmith has retired the feedback formula endpoints, and listing now returns " +
+			"`410 Gone`. This data source then returns an empty `formulas` list with a warning, so existing configurations " +
+			"still plan. Composite scores are now created through LangSmith's composite evaluators. It will be removed in " +
+			"the next major version.\n\n" +
+			"Lists LangSmith feedback formulas scoped to a dataset or a project (session).\n\n" +
 			"Exactly one of `dataset_id` or `session_id` must be set: the LangSmith API rejects an unscoped listing with an HTTP 400.",
+		DeprecationMessage: feedbackFormulaRetiredSummary + " Remove the langsmith_feedback_formulas data source from your " +
+			"configuration; it will be removed in the next major version of the provider.",
 		Attributes: map[string]schema.Attribute{
 			"dataset_id": schema.StringAttribute{
 				MarkdownDescription: "List the feedback formulas scoped to this dataset. Exactly one of `dataset_id` or `session_id` must be set.",
@@ -196,6 +202,14 @@ func (d *FeedbackFormulasDataSource) Read(ctx context.Context, req datasource.Re
 
 		var page []feedbackFormulaListAPI
 		if err := c.Get(ctx, "/api/v1/feedback/formulas", query, &page); err != nil {
+			// The endpoint is retired. An error here would break every plan
+			// that still references this data source, so report no formulas.
+			if client.IsGone(err) {
+				resp.Diagnostics.AddWarning("Feedback formulas have been retired",
+					"LangSmith answered 410 Gone, so this data source returns an empty list. "+feedbackFormulaRetiredDetail)
+				all = nil
+				break
+			}
 			resp.Diagnostics.AddError("Error listing feedback formulas", err.Error())
 			return
 		}
