@@ -16,6 +16,11 @@ import (
 // dataset-scoped feedback formula, then reads the formula back through the list
 // data source. The config is self-contained so the test can run unguarded in CI.
 func TestAccFeedbackFormulasDataSource_basic(t *testing.T) {
+	// Temporarily skipped: LangSmith retired the feedback formula endpoints (410), so this test fails on every
+	// run regardless of the change under test. Remove the skip as part of
+	// fixing #98.
+	t.Skip("Skipped until #98 is fixed: LangSmith retired the feedback formula endpoints (410) (https://github.com/bogware/terraform-provider-langsmith/issues/98)")
+
 	rName := fmt.Sprintf("tf-test-%s", acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum))
 
 	resource.Test(t, resource.TestCase{
