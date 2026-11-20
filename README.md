@@ -352,7 +352,7 @@ Because of this:
 
 ### Requirements
 
-- [Go](https://golang.org/doc/install) >= 1.24
+- [Go](https://golang.org/doc/install) >= 1.26
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
 
 ### Build & Test

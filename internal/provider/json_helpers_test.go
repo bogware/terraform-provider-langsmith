@@ -142,3 +142,67 @@ func TestSetStateOptionalString(t *testing.T) {
 		t.Errorf("setStateOptionalString with value should set 'hello', got %v", dst)
 	}
 }
+
+// TestJsonPreserveEquivalent covers the refresh path for JSON attributes the
+// API re-serializes. model_price_map's cost details came back with small
+// floats in scientific notation, which overwrote the configured string on
+// every refresh and left a plan diff that never converged (#90).
+func TestJsonPreserveEquivalent(t *testing.T) {
+	tests := []struct {
+		name  string
+		raw   string
+		saved types.String
+		want  types.String
+	}{
+		{
+			name:  "scientific notation from the API keeps the decimal config",
+			raw:   `{"cache_read":1e-7}`,
+			saved: types.StringValue(`{"cache_read":0.0000001}`),
+			want:  types.StringValue(`{"cache_read":0.0000001}`),
+		},
+		{
+			name:  "key order and whitespace keep the saved string verbatim",
+			raw:   `{"b":2,"a":1}`,
+			saved: types.StringValue(`{ "a": 1, "b": 2 }`),
+			want:  types.StringValue(`{ "a": 1, "b": 2 }`),
+		},
+		{
+			name:  "a changed value surfaces as drift",
+			raw:   `{"cache_read":2e-7}`,
+			saved: types.StringValue(`{"cache_read":0.0000001}`),
+			want:  types.StringValue(`{"cache_read":2e-7}`),
+		},
+		{
+			name:  "a key added on the server surfaces as drift",
+			raw:   `{"cache_read":1e-7,"audio":3e-6}`,
+			saved: types.StringValue(`{"cache_read":0.0000001}`),
+			want:  types.StringValue(`{"audio":0.000003,"cache_read":1e-7}`),
+		},
+		{
+			name:  "nothing saved (import) uses the normalized response",
+			raw:   `{"b":2,"a":1}`,
+			saved: types.StringNull(),
+			want:  types.StringValue(`{"a":1,"b":2}`),
+		},
+		{
+			name:  "null response is null",
+			raw:   `null`,
+			saved: types.StringValue(`{"a":1}`),
+			want:  types.StringNull(),
+		},
+		{
+			name:  "invalid saved JSON falls back to the response",
+			raw:   `{"a":1}`,
+			saved: types.StringValue(`{`),
+			want:  types.StringValue(`{"a":1}`),
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := jsonPreserveEquivalent(json.RawMessage(tc.raw), tc.saved)
+			if !got.Equal(tc.want) {
+				t.Fatalf("got  %s\nwant %s", got, tc.want)
+			}
+		})
+	}
+}
