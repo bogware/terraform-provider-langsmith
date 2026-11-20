@@ -9,6 +9,10 @@ BUG FIXES:
 * `langsmith_model_price_map` failed its first apply with `Provider produced inconsistent result after apply: .match_path: was null, but now ...` whenever `match_path` was omitted. LangSmith fills in its own default list, and the attribute was `Optional` but not `Computed`, so the provider was not allowed to record it. The resource was created anyway and then tainted on every later run. `match_path` is now `Optional + Computed`; omit it and the API's default is recorded in state. ([#89](https://github.com/bogware/terraform-provider-langsmith/issues/89))
 * `langsmith_model_price_map` planned an in-place update to `prompt_cost_details` / `completion_cost_details` on every run and never converged. The API re-serializes these objects (`0.0000001` comes back as `1e-7`), and `Read` wrote the API's spelling over the configured string, while `Create` and `Update` put the configured one back. `Read` now keeps the configured string whenever it decodes to the same JSON as the response, so formatting differences in numbers, key order or whitespace no longer show as a diff. A value actually changed outside Terraform still shows as drift. ([#90](https://github.com/bogware/terraform-provider-langsmith/issues/90))
 
+SECURITY:
+
+* Release binaries are now built with Go 1.26.11 (was 1.26.5), and `google.golang.org/grpc`, `golang.org/x/net` and `golang.org/x/text` are updated. `govulncheck` reported 19 vulnerabilities reachable from the provider's code, most in the standard library's `net/http`, `crypto/tls` and `crypto/x509`; it now reports none, and a new CI job keeps it that way. The patched `golang.org/x/net` requires Go 1.26, so building the provider from source now needs Go 1.26 or later; with the default `GOTOOLCHAIN=auto`, an older Go downloads it automatically. ([#72](https://github.com/bogware/terraform-provider-langsmith/issues/72))
+
 ## 1.2.1 (September 2026)
 
 BUG FIXES:
