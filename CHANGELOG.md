@@ -1,4 +1,4 @@
-## 1.2.2 (Unreleased)
+## 1.2.2 (November 19, 2026)
 
 DEPRECATIONS:
 
