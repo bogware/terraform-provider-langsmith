@@ -6,6 +6,7 @@ package client
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -191,6 +192,27 @@ func TestIsNotFound(t *testing.T) {
 	}
 	if !IsNotFound(&APIError{StatusCode: 404}) {
 		t.Fatal("404 should be recognised")
+	}
+}
+
+// TestIsGone covers the 410 check resources use when LangSmith retires an
+// endpoint outright, as it did the feedback formula endpoints (#98).
+func TestIsGone(t *testing.T) {
+	if IsGone(nil) || IsGone(errors.New("not an APIError")) {
+		t.Fatal("IsGone should be false for nil and non-APIErrors")
+	}
+	if IsGone(&APIError{StatusCode: 404}) {
+		t.Fatal("404 is not a 410")
+	}
+	if !IsGone(&APIError{StatusCode: 410}) {
+		t.Fatal("410 should be recognised")
+	}
+	if IsNotFound(&APIError{StatusCode: 410}) {
+		t.Fatal("410 must not count as a 404")
+	}
+	// The retry wrapper preserves the typed error, so a wrapped 410 still counts.
+	if !IsGone(fmt.Errorf("request failed: %w", &APIError{StatusCode: 410})) {
+		t.Fatal("a wrapped 410 should be recognised")
 	}
 }
 

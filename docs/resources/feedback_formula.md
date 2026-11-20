@@ -3,16 +3,20 @@
 page_title: "langsmith_feedback_formula Resource - langsmith"
 subcategory: ""
 description: |-
-  Manages a LangSmith feedback formula, which defines a computed feedback metric from weighted variables.
+  Deprecated. LangSmith has retired the feedback formula endpoints; every call now returns 410 Gone, so this resource can no longer create, update or read formulas. Composite scores are now created as a code evaluator plus a run rule via LangSmith's composite evaluators. Remove this resource from your configuration: a formula already in state is dropped on the next refresh (with a warning), and destroying one succeeds without an API call. This resource will be removed in the next major version.
 ---
 
 # langsmith_feedback_formula (Resource)
 
-Manages a LangSmith feedback formula, which defines a computed feedback metric from weighted variables.
+**Deprecated.** LangSmith has retired the feedback formula endpoints; every call now returns `410 Gone`, so this resource can no longer create, update or read formulas. Composite scores are now created as a code evaluator plus a run rule via LangSmith's composite evaluators. Remove this resource from your configuration: a formula already in state is dropped on the next refresh (with a warning), and destroying one succeeds without an API call. This resource will be removed in the next major version.
 
 ## Example Usage
 
 ```terraform
+# DEPRECATED: LangSmith has retired the feedback formula endpoints (every call
+# returns 410 Gone), so this resource no longer works and will be removed in the
+# next major version. Composite scores are now created as a code evaluator plus
+# a run rule. The example below is kept for reference only.
 resource "langsmith_feedback_formula" "example" {
   feedback_key     = "composite_score"
   aggregation_type = "avg"

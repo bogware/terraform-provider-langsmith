@@ -12,15 +12,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
-// TestAccFeedbackFormulasDataSource_basic creates a dataset and a
-// dataset-scoped feedback formula, then reads the formula back through the list
-// data source. The config is self-contained so the test can run unguarded in CI.
+// TestAccFeedbackFormulasDataSource_basic reads the list data source against
+// the live API. LangSmith has retired the feedback formula endpoints (#98)
+// and answers 410, so the deprecated data source must return an empty list,
+// with a warning, rather than fail every plan that still references it.
 func TestAccFeedbackFormulasDataSource_basic(t *testing.T) {
-	// Temporarily skipped: LangSmith retired the feedback formula endpoints (410), so this test fails on every
-	// run regardless of the change under test. Remove the skip as part of
-	// fixing #98.
-	t.Skip("Skipped until #98 is fixed: LangSmith retired the feedback formula endpoints (410) (https://github.com/bogware/terraform-provider-langsmith/issues/98)")
-
 	rName := fmt.Sprintf("tf-test-%s", acctest.RandStringFromCharSet(10, acctest.CharSetAlphaNum))
 
 	resource.Test(t, resource.TestCase{
@@ -30,19 +26,7 @@ func TestAccFeedbackFormulasDataSource_basic(t *testing.T) {
 			{
 				Config: testAccFeedbackFormulasDataSourceConfig(rName),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.langsmith_feedback_formulas.test", "formulas.#", "1"),
-					resource.TestCheckResourceAttrPair(
-						"data.langsmith_feedback_formulas.test", "formulas.0.id",
-						"langsmith_feedback_formula.test", "id",
-					),
-					resource.TestCheckResourceAttrPair(
-						"data.langsmith_feedback_formulas.test", "formulas.0.dataset_id",
-						"langsmith_dataset.test", "id",
-					),
-					resource.TestCheckResourceAttr("data.langsmith_feedback_formulas.test", "formulas.0.feedback_key", "composite"),
-					resource.TestCheckResourceAttr("data.langsmith_feedback_formulas.test", "formulas.0.aggregation_type", "avg"),
-					resource.TestCheckResourceAttrSet("data.langsmith_feedback_formulas.test", "formulas.0.formula_parts"),
-					resource.TestCheckResourceAttrSet("data.langsmith_feedback_formulas.test", "formulas.0.created_at"),
+					resource.TestCheckResourceAttr("data.langsmith_feedback_formulas.test", "formulas.#", "0"),
 					resource.TestCheckResourceAttrSet("data.langsmith_feedback_formulas.test", "workspace_id"),
 				),
 			},
@@ -88,23 +72,8 @@ resource "langsmith_dataset" "test" {
   data_type   = "kv"
 }
 
-resource "langsmith_feedback_formula" "test" {
-  feedback_key     = "composite"
-  aggregation_type = "avg"
-  dataset_id       = langsmith_dataset.test.id
-  formula_parts = jsonencode([
-    {
-      part_type = "weighted_key"
-      weight    = 1.0
-      key       = "correctness"
-    }
-  ])
-}
-
 data "langsmith_feedback_formulas" "test" {
   dataset_id = langsmith_dataset.test.id
-
-  depends_on = [langsmith_feedback_formula.test]
 }
 `, name)
 }
