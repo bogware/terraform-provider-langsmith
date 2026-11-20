@@ -5,6 +5,7 @@ package provider
 
 import (
 	"encoding/json"
+	"reflect"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -120,6 +121,35 @@ func jsonSubset(want, got interface{}) bool {
 	default:
 		return want == got
 	}
+}
+
+// jsonPreserveEquivalent keeps the saved value, byte for byte, when it
+// decodes to the same JSON as the API response. Unlike normalizeJSON, it
+// tolerates differences in number formatting as well as key order and
+// whitespace: the API may return 1e-7 where jsonencode() wrote 0.0000001, and
+// re-marshalling either through Go yields 1e-07, which matches neither the
+// configuration nor the response. Returning the saved string itself is what
+// keeps it equal to the configuration.
+//
+// Unlike jsonPreserveConfigSubset, keys the server adds are not ignored; any
+// real difference falls through to the normalized response so it shows as
+// drift.
+func jsonPreserveEquivalent(raw json.RawMessage, saved types.String) types.String {
+	fresh := jsonStringValue(raw)
+	if saved.IsNull() || saved.IsUnknown() || fresh.IsNull() {
+		return fresh
+	}
+	var savedVal, freshVal interface{}
+	if err := json.Unmarshal([]byte(saved.ValueString()), &savedVal); err != nil {
+		return fresh
+	}
+	if err := json.Unmarshal(raw, &freshVal); err != nil {
+		return fresh
+	}
+	if reflect.DeepEqual(savedVal, freshVal) {
+		return saved
+	}
+	return fresh
 }
 
 // jsonEmptyArrayIsNull returns types.StringNull() if the JSON is an empty

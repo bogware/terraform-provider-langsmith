@@ -25,17 +25,24 @@ resource "langsmith_alert_rule" "example" {
   window_minutes = 60
   # At least one action is required; a rule with an empty array is rejected.
   # Note the double encoding: config is itself a JSON-encoded string, not a
-  # nested object, because its keys differ per target.
-  #
-  # Those keys are not documented by LangSmith. A webhook needs at least url,
-  # project_name and headers; if the API reports a missing field, add it here.
+  # nested object, because its keys differ per target. A webhook's headers and
+  # body are JSON-encoded strings as well. See the actions attribute below for
+  # the keys each target (webhook, slack, pagerduty, dynatrace) requires.
   actions = jsonencode([
     {
       target = "webhook"
       config = jsonencode({
         url          = "https://example.com/langsmith-alert"
         project_name = langsmith_project.example.name
-        headers      = {}
+        headers      = jsonencode({ "Content-Type" = "application/json" })
+        body         = jsonencode({ text = "p50 latency is over 5 seconds" })
+      })
+    },
+    {
+      target = "pagerduty"
+      config = jsonencode({
+        integration_key = var.pagerduty_integration_key
+        severity        = "critical"
       })
     }
   ])
@@ -51,7 +58,14 @@ resource "langsmith_alert_rule" "example" {
 
 Valid targets are `webhook`, `slack`, `pagerduty` and `dynatrace`.
 
-`config` is itself a JSON-encoded **string**, not a nested object, because its keys differ per target; in HCL that reads as a nested `jsonencode`. The keys each target requires are not published in the LangSmith OpenAPI spec — a `webhook` needs at least `url`, `project_name` and `headers`. The API names any missing key in its error message, so build the config up from what it reports.
+`config` is itself a JSON-encoded **string**, not a nested object, because its keys differ per target; in HCL that reads as a nested `jsonencode`. The LangSmith OpenAPI spec does not list these keys. Each target was found to require the following:
+
+- `webhook`: `url`, `project_name`, `headers` and `body`; `method` is optional. `headers` and `body` are JSON-encoded strings too (`headers = jsonencode({})`); sent as objects, LangSmith creates nothing, so the provider rejects them. The URL's host must resolve in DNS.
+- `slack`: `team_id` and `channel_id`.
+- `pagerduty`: `severity`, plus either `integration_key` or `secret_name` (the name of a workspace secret holding the key).
+- `dynatrace`: `environment_url` without a scheme (e.g. `abc12345.live.dynatrace.com`), either `api_token` or `secret_name`, and `payload`, a JSON-encoded string with a non-empty `eventType`.
+
+The API names any missing key in its error message.
 - `aggregation` (String) The aggregation method (`avg`, `sum`, or `pct`).
 - `attribute` (String) The metric attribute to monitor (`latency`, `error_count`, `feedback_score`, `run_latency`, or `run_count`).
 - `description` (String) A description of the alert rule.

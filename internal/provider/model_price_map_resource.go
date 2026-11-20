@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -123,9 +124,17 @@ func (r *ModelPriceMapResource) Schema(ctx context.Context, req resource.SchemaR
 				Optional:            true,
 			},
 			"match_path": schema.ListAttribute{
-				MarkdownDescription: "Paths to match for model identification. Defaults to `[\"model\", \"model_name\", \"model_id\", \"model_path\", \"endpoint_name\"]`.",
-				Optional:            true,
-				ElementType:         types.StringType,
+				MarkdownDescription: "Paths to match for model identification. If omitted, LangSmith applies its default, " +
+					"`[\"model\", \"model_name\", \"model_id\", \"model_path\", \"endpoint_name\"]`, and that value is recorded in state.",
+				Optional:    true,
+				Computed:    true,
+				ElementType: types.StringType,
+				// The API fills in a default when match_path is omitted, so it
+				// must be Computed or the first apply fails with "inconsistent
+				// result after apply" (#89).
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"prompt_cost_details": schema.StringAttribute{
 				MarkdownDescription: "JSON-encoded cost details object for prompt tokens — the fine print on what you owe.",
@@ -366,6 +375,10 @@ func mapModelPriceMapResponseToState(ctx context.Context, data *ModelPriceMapRes
 		data.MatchPath = types.ListNull(types.StringType)
 	}
 
-	data.PromptCostDetails = jsonStringValue(result.PromptCostDetails)
-	data.CompletionCostDetails = jsonStringValue(result.CompletionCostDetails)
+	// The API re-serializes these objects (small floats come back in
+	// scientific notation), so keep the saved string whenever it means the
+	// same JSON. Without this, every refresh replaced the configured value
+	// and the next plan showed a diff that never converged (#90).
+	data.PromptCostDetails = jsonPreserveEquivalent(result.PromptCostDetails, data.PromptCostDetails)
+	data.CompletionCostDetails = jsonPreserveEquivalent(result.CompletionCostDetails, data.CompletionCostDetails)
 }
