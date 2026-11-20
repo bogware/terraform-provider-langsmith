@@ -5,6 +5,7 @@ package provider
 
 import (
 	"fmt"
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
@@ -73,9 +74,10 @@ resource "langsmith_chart" "test" {
   series     = jsonencode([
     {
       name   = "Run Count"
-      metric = "run_count"
-      filters = {
-        session = [langsmith_project.test.id]
+      metric_definition = { type = "count" }
+      filter_definition = {
+        source_type = "tracing_project"
+        project_ids = [langsmith_project.test.id]
       }
     }
   ])
@@ -102,12 +104,47 @@ resource "langsmith_chart" "test" {
   series     = jsonencode([
     {
       name   = "Run Count"
-      metric = "run_count"
-      filters = {
-        session = [langsmith_project.test.id]
+      metric_definition = { type = "count" }
+      filter_definition = {
+        source_type = "tracing_project"
+        project_ids = [langsmith_project.test.id]
       }
     }
   ])
 }
 `, projectName, sectionTitle, chartTitle)
+}
+
+// TestAccChartResource_v1SeriesRejected covers #97: a series still written in
+// the V1 format stops before anything is sent, with a translation guide,
+// instead of surfacing LangSmith's bare "V1 chart series cannot be saved".
+func TestAccChartResource_v1SeriesRejected(t *testing.T) {
+	sectionTitle := fmt.Sprintf("tf-section-%s", acctest.RandStringFromCharSet(8, acctest.CharSetAlphaNum))
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: fmt.Sprintf(`
+resource "langsmith_chart_section" "test" {
+  title = %[1]q
+}
+
+resource "langsmith_chart" "test" {
+  title      = "v1 chart"
+  chart_type = "line"
+  section_id = langsmith_chart_section.test.id
+  series = jsonencode([
+    {
+      name   = "Run Count"
+      metric = "run_count"
+    }
+  ])
+}
+`, sectionTitle),
+				ExpectError: regexp.MustCompile(`(?s)retired V1 format.*series\[0\]\s+\(metric\).*metric_definition`),
+			},
+		},
+	})
 }
