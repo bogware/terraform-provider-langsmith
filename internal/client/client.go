@@ -206,7 +206,9 @@ func (c *Client) doRequest(ctx context.Context, method, path string, query url.V
 // retryDelay calculates exponential backoff with jitter: base * 2^(attempt-1) +/- 20%.
 func retryDelay(attempt int) time.Duration {
 	base := math.Pow(2, float64(attempt-1)) * float64(time.Second)
-	jitter := base * 0.2 * (2*rand.Float64() - 1) // +/- 20%
+	// +/- 20%. Retry timing needs spread, not unpredictability, so a
+	// cryptographic RNG would add cost for nothing.
+	jitter := base * 0.2 * (2*rand.Float64() - 1) //nolint:gosec // G404: jitter only; not security-sensitive.
 	return time.Duration(base + jitter)
 }
 
