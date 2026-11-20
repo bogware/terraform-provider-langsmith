@@ -54,9 +54,10 @@ resource "langsmith_chart" "test" {
   series     = jsonencode([
     {
       name   = "Run Count"
-      metric = "run_count"
-      filters = {
-        session = [langsmith_project.test.id]
+      metric_definition = { type = "count" }
+      filter_definition = {
+        source_type = "tracing_project"
+        project_ids = [langsmith_project.test.id]
       }
     }
   ])

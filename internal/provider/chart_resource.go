@@ -121,12 +121,20 @@ func (r *ChartResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 				Validators:          []validator.String{stringvalidator.OneOf("line", "bar", "table", "kpi", "top-k", "pie")},
 			},
 			"series": schema.StringAttribute{
-				MarkdownDescription: "JSON-encoded array of chart series configurations. Each series object supports the " +
-					"following keys: `name` (display label), `filters` (legacy filter object), `metric` (legacy metric name), " +
-					"`metric_definition` (structured metric: count, scalar, percentile, or ratio), " +
-					"`group_by_definitions` (array of group-by definitions), `filter_definition` (structured filter, " +
-					"e.g. by tracing project), and `feedback_key` (feedback key to aggregate).",
-				Required: true,
+				MarkdownDescription: "JSON-encoded array of chart series in LangSmith's V2 format. Each series object takes:\n\n" +
+					"- `name`: the display label.\n" +
+					"- `metric_definition`: what to measure, e.g. `{ type = \"count\" }`, " +
+					"`{ type = \"avg\", field = \"total_tokens\" }` (also `sum`, `min`, `max`), or " +
+					"`{ type = \"percentile\", field = \"latency_seconds\", params = { p = 0.5 } }`.\n" +
+					"- `filter_definition`: which runs to include, e.g. " +
+					"`{ source_type = \"tracing_project\", project_ids = [...] }` (optionally with `run_filter`, " +
+					"`trace_filter` or `tree_filter`), or `{ source_type = \"dataset\", dataset_ids = [...] }`.\n" +
+					"- `group_by_definitions` (optional): e.g. `[{ attribute = \"run_type\" }]`.\n\n" +
+					"The V1 keys `metric`, `filters`, `feedback_key` and `project_metric` are no longer accepted: LangSmith " +
+					"rejects them on create and update with `V1 chart series cannot be saved`. The provider warns about them " +
+					"at plan time and stops with a translation guide before sending them.",
+				Required:   true,
+				Validators: []validator.String{chartSeriesV1Validator{}},
 			},
 			"section_id": schema.StringAttribute{
 				MarkdownDescription: "The ID of the chart section this chart belongs to.",
@@ -179,6 +187,11 @@ func (r *ChartResource) Create(ctx context.Context, req resource.CreateRequest, 
 	var data ChartResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if diag := chartSeriesV1Error(data.Series); diag != nil {
+		resp.Diagnostics.Append(diag)
 		return
 	}
 
@@ -284,6 +297,13 @@ func (r *ChartResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	var data ChartResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Every update re-sends series, so a chart still configured with V1 keys
+	// cannot be updated at all until its series is rewritten.
+	if diag := chartSeriesV1Error(data.Series); diag != nil {
+		resp.Diagnostics.Append(diag)
 		return
 	}
 
