@@ -38,7 +38,7 @@ Purpose: give AI coding agents the minimal, repository-specific knowledge needed
   - Tests: unit tests live alongside resources; acceptance tests exercise live API (do not run on CI without keys).
 
 - Integration & CI notes
-  - The provider uses Go modules (`go.mod`) and requires Go >= 1.24.
+  - The provider uses Go modules (`go.mod`) and requires Go >= 1.26 (the `toolchain` line in `go.mod` is fetched automatically with the default `GOTOOLCHAIN=auto`).
   - CI enforces generated docs are current; run `make generate` before PRs that change schemas/examples.
   - Acceptance tests mutate remote state — use a dedicated, disposable workspace and service keys.
 

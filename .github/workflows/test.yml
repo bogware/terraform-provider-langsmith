@@ -39,6 +39,24 @@ jobs:
           # go.mod toolchain pin. Config is the migrated v2 schema (.golangci.yml).
           version: v2.12.2
 
+  govulncheck:
+    name: govulncheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      # go-version-file honours the go.mod toolchain pin, so the standard
+      # library scanned here is the one compiled into released binaries.
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+      - run: go mod download
+      # Fails on any vulnerability the code actually calls. Fix by bumping the
+      # dependency, or the go.mod toolchain line for standard-library findings.
+      - name: Run govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...
+
   generate:
     name: Verify Generated Files
     runs-on: ubuntu-latest
@@ -71,6 +89,23 @@ jobs:
           cache: true
       - run: go mod download
       - run: go test -v -cover -timeout=120s -parallel=10 ./...
+
+  # The client's retry/backoff path and WithWorkspaceID's shallow copy are the
+  # code most likely to hide a data race. Unit tests only: TF_ACC is unset, so
+  # no Terraform binary is needed.
+  unit-tests-race:
+    name: Unit Tests (race)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+      - run: go mod download
+      - run: go test -race -timeout=300s ./...
 
   acceptance-tests:
     name: Acceptance Tests
